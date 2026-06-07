@@ -1,0 +1,72 @@
+# Example provider/tool configuration for LIVE runs.
+# Copy to config/tools.yaml and fill in. ALL keys are optional: any provider
+# whose key is absent is simply unavailable, and unit tests never read this file.
+#
+# Credentials are read from environment variables, NEVER stored here. This file
+# only selects which adapters to enable and their non-secret options.
+
+answerer:
+  provider: "openai_responses"
+  model: "gpt-5.5"                 # default; cheaper: gpt-5.4-mini
+  api_key_env: "OPENAI_API_KEY"
+
+embeddings:
+  provider: "openai"               # or "hash" (deterministic, default for tests)
+  model: "text-embedding-3-small"
+  api_key_env: "OPENAI_API_KEY"
+
+# The benchmark-matching hosted-search baseline.
+search_baseline:
+  adapter: "openai_web_search"
+  model: "gpt-5.5"
+  context_size: "medium"           # low | medium | high
+  api_key_env: "OPENAI_API_KEY"
+
+# Independent search adapters create tool diversity for the contextual bandit.
+# Enable at least two so routing differences are learnable.
+adapters:
+  openai_web_search:
+    enabled: true
+    api_key_env: "OPENAI_API_KEY"
+  openai_web_search_low_context:
+    enabled: false
+    api_key_env: "OPENAI_API_KEY"
+  openai_web_search_unlimited_context:   # optional, expensive
+    enabled: false
+    api_key_env: "OPENAI_API_KEY"
+  brave_search:
+    enabled: false
+    api_key_env: "BRAVE_SEARCH_API_KEY"
+  tavily_search:
+    enabled: false
+    api_key_env: "TAVILY_API_KEY"
+  exa_search:
+    enabled: false
+    api_key_env: "EXA_API_KEY"
+  serper_search:
+    enabled: false
+    api_key_env: "SERPER_API_KEY"
+  news_search:
+    enabled: false
+    endpoint: ""
+    api_key_env: "NEWS_API_KEY"
+  official_domain_search:
+    enabled: false
+    endpoint: ""
+    api_key_env: "OFFICIAL_SEARCH_API_KEY"
+    allowed_domains: []
+  generic_web_search:
+    enabled: false
+    endpoint: ""
+    api_key_env: ""
+  page_fetch:
+    enabled: true                  # stdlib-only, no key required
+  academic_search:
+    enabled: false
+    api_key_env: "ACADEMIC_API_KEY"
+  code_search:
+    enabled: false
+    api_key_env: "CODE_SEARCH_API_KEY"
+
+# Required env vars (documented, not required for tests):
+#   OPENAI_API_KEY, BRAVE_SEARCH_API_KEY, TAVILY_API_KEY, EXA_API_KEY, SERPER_API_KEY

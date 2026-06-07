@@ -1,0 +1,91 @@
+# regimes-probe default configuration.
+# Everything here runs with NO API keys and NO network (synthetic + fake tools).
+# Live settings are documented but inert until the relevant provider keys exist.
+
+run:
+  run_id_prefix: "regimes-probe"
+  results_root: "results"
+  as_of: "2026-06-01"            # frozen "today" for freshness scoring / replay
+
+dataset:
+  primary: "LiveBrowseComp"       # benchmark_primary
+  secondary: "BrowseComp"         # benchmark_secondary
+  default: "synthetic"            # what the no-key quickstart uses
+  synthetic_path: "fixtures/synthetic_browse.json"
+  fake_corpus_path: "fixtures/fake_search_corpus.json"
+
+split:
+  confirm_fraction: 0.4
+  salt: "regimes-probe-v0"
+  mode: "hash"                    # hash | time (time recommended for LiveBrowseComp)
+
+budgets: [1, 3, 5, 10]           # tool-call budget tracks
+main_metric: "correct_per_tool_call"
+
+memory:
+  optimize_allows_exploration: true
+  confirm_uses_frozen_snapshot: true
+  confirm_updates_memory: false
+  experience_passes: 4
+  experience_budget: 5
+  nearest_k: 8
+
+bandit:
+  strategy: "ucb"                 # ucb | epsilon_greedy | thompson
+  exploration_coeff: 0.6
+  recency_decay: 0.98
+  confidence_penalty: 0.1
+  blend_local: 1.0
+  blend_global: 0.4
+  blend_neighbor: 0.7
+  seed: 1729
+
+policy:
+  query_mode: "learned"           # fixed | llm | learned
+  stop_mode: "learned"            # always_full | first_candidate | learned
+
+router:
+  cost_weight: 0.5
+
+stopping:
+  stop_threshold: 0.6
+  min_calls_before_stop: 1
+
+verification:
+  authority_threshold: 0.7
+  freshness_required_when_sensitive: true
+  min_support: 1
+
+reward:
+  preset: "full"                  # full | correctness_only | correctness_minus_cost | correctness_plus_evidence
+  weights:
+    correctness: 1.0
+    evidence_quality: 0.3
+    source_authority: 0.2
+    freshness: 0.2
+    first_tool_hit: 0.5
+    cost_penalty: 2.0
+    latency_penalty: 0.0
+    stale_penalty: 0.4
+    contradiction_penalty: 0.3
+    extra_call_penalty: 0.2
+
+regimes_loop:
+  enabled: false
+  passes: 4
+  gate_budget: 3
+  optimize_min_delta: 0.01
+  confirm_max_regression: 0.0
+
+# Live model/search settings (inert without keys). See MODEL_AND_TOOL_CHOICES.md.
+live:
+  answer_model: "gpt-5.5"
+  cheaper_answer_model: "gpt-5.4-mini"
+  embedder: "hash_embedder"       # or "openai_embedder" for live runs
+  search_baseline: "openai_web_search"
+  tools_enabled:
+    - "generic_web_search"
+    - "news_search"
+    - "official_domain_search"
+    - "brave_search"
+    - "page_fetch"

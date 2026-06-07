@@ -1,0 +1,4716 @@
+{
+  "documents": [
+    {
+      "doc_id": "d_syn-001_gold",
+      "item_id": "syn-001",
+      "title": "Acme Robotics: primary source",
+      "url": "https://www.example.com/acme",
+      "snippet": "Acme Robotics \u2014 verified record: Mara Olsen.",
+      "published_at": "2026-05-10",
+      "source_authority": 0.7,
+      "asserts": "Mara Olsen",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "acme",
+        "robotics"
+      ],
+      "requires_tokens": [
+        "2026"
+      ],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-001_generic_web_search",
+      "item_id": "syn-001",
+      "title": "Acme Robotics: secondary mention (generic_web_search)",
+      "url": "https://blog.example-generic_web_search.com/acme",
+      "snippet": "Some sources claim Acme Robotics is linked to Jon Pike generic_web_search.",
+      "published_at": "2022-03-01",
+      "source_authority": 0.4,
+      "asserts": "Jon Pike generic_web_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "acme",
+        "robotics"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-001_official_domain_search",
+      "item_id": "syn-001",
+      "title": "Acme Robotics: secondary mention (official_domain_search)",
+      "url": "https://blog.example-official_domain_search.com/acme",
+      "snippet": "Some sources claim Acme Robotics is linked to Jon Pike official_domain_search.",
+      "published_at": "2022-03-01",
+      "source_authority": 0.4,
+      "asserts": "Jon Pike official_domain_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "acme",
+        "robotics"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-001_brave_search",
+      "item_id": "syn-001",
+      "title": "Acme Robotics: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/acme",
+      "snippet": "Some sources claim Acme Robotics is linked to Jon Pike brave_search.",
+      "published_at": "2022-03-01",
+      "source_authority": 0.4,
+      "asserts": "Jon Pike brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "acme",
+        "robotics"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-002_gold",
+      "item_id": "syn-002",
+      "title": "Borealis Foods: primary source",
+      "url": "https://www.example.com/borealis",
+      "snippet": "Borealis Foods \u2014 verified record: Mara Olsen.",
+      "published_at": "2026-05-10",
+      "source_authority": 0.7,
+      "asserts": "Mara Olsen",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "borealis",
+        "foods"
+      ],
+      "requires_tokens": [
+        "2026"
+      ],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-002_generic_web_search",
+      "item_id": "syn-002",
+      "title": "Borealis Foods: secondary mention (generic_web_search)",
+      "url": "https://blog.example-generic_web_search.com/borealis",
+      "snippet": "Some sources claim Borealis Foods is linked to Jon Pike generic_web_search.",
+      "published_at": "2022-03-01",
+      "source_authority": 0.4,
+      "asserts": "Jon Pike generic_web_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "borealis",
+        "foods"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-002_official_domain_search",
+      "item_id": "syn-002",
+      "title": "Borealis Foods: secondary mention (official_domain_search)",
+      "url": "https://blog.example-official_domain_search.com/borealis",
+      "snippet": "Some sources claim Borealis Foods is linked to Jon Pike official_domain_search.",
+      "published_at": "2022-03-01",
+      "source_authority": 0.4,
+      "asserts": "Jon Pike official_domain_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "borealis",
+        "foods"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-002_brave_search",
+      "item_id": "syn-002",
+      "title": "Borealis Foods: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/borealis",
+      "snippet": "Some sources claim Borealis Foods is linked to Jon Pike brave_search.",
+      "published_at": "2022-03-01",
+      "source_authority": 0.4,
+      "asserts": "Jon Pike brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "borealis",
+        "foods"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-003_gold",
+      "item_id": "syn-003",
+      "title": "Cobalt Systems: primary source",
+      "url": "https://www.example.com/cobalt",
+      "snippet": "Cobalt Systems \u2014 verified record: Mara Olsen.",
+      "published_at": "2026-05-10",
+      "source_authority": 0.7,
+      "asserts": "Mara Olsen",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "cobalt",
+        "systems"
+      ],
+      "requires_tokens": [
+        "2026"
+      ],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-003_generic_web_search",
+      "item_id": "syn-003",
+      "title": "Cobalt Systems: secondary mention (generic_web_search)",
+      "url": "https://blog.example-generic_web_search.com/cobalt",
+      "snippet": "Some sources claim Cobalt Systems is linked to Jon Pike generic_web_search.",
+      "published_at": "2022-03-01",
+      "source_authority": 0.4,
+      "asserts": "Jon Pike generic_web_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "cobalt",
+        "systems"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-003_official_domain_search",
+      "item_id": "syn-003",
+      "title": "Cobalt Systems: secondary mention (official_domain_search)",
+      "url": "https://blog.example-official_domain_search.com/cobalt",
+      "snippet": "Some sources claim Cobalt Systems is linked to Jon Pike official_domain_search.",
+      "published_at": "2022-03-01",
+      "source_authority": 0.4,
+      "asserts": "Jon Pike official_domain_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "cobalt",
+        "systems"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-003_brave_search",
+      "item_id": "syn-003",
+      "title": "Cobalt Systems: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/cobalt",
+      "snippet": "Some sources claim Cobalt Systems is linked to Jon Pike brave_search.",
+      "published_at": "2022-03-01",
+      "source_authority": 0.4,
+      "asserts": "Jon Pike brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "cobalt",
+        "systems"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-004_gold",
+      "item_id": "syn-004",
+      "title": "Delphi Mining: primary source",
+      "url": "https://www.example.com/delphi",
+      "snippet": "Delphi Mining \u2014 verified record: Mara Olsen.",
+      "published_at": "2026-05-10",
+      "source_authority": 0.7,
+      "asserts": "Mara Olsen",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "delphi",
+        "mining"
+      ],
+      "requires_tokens": [
+        "2026"
+      ],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-004_generic_web_search",
+      "item_id": "syn-004",
+      "title": "Delphi Mining: secondary mention (generic_web_search)",
+      "url": "https://blog.example-generic_web_search.com/delphi",
+      "snippet": "Some sources claim Delphi Mining is linked to Jon Pike generic_web_search.",
+      "published_at": "2022-03-01",
+      "source_authority": 0.4,
+      "asserts": "Jon Pike generic_web_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "delphi",
+        "mining"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-004_official_domain_search",
+      "item_id": "syn-004",
+      "title": "Delphi Mining: secondary mention (official_domain_search)",
+      "url": "https://blog.example-official_domain_search.com/delphi",
+      "snippet": "Some sources claim Delphi Mining is linked to Jon Pike official_domain_search.",
+      "published_at": "2022-03-01",
+      "source_authority": 0.4,
+      "asserts": "Jon Pike official_domain_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "delphi",
+        "mining"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-004_brave_search",
+      "item_id": "syn-004",
+      "title": "Delphi Mining: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/delphi",
+      "snippet": "Some sources claim Delphi Mining is linked to Jon Pike brave_search.",
+      "published_at": "2022-03-01",
+      "source_authority": 0.4,
+      "asserts": "Jon Pike brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "delphi",
+        "mining"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-005_gold",
+      "item_id": "syn-005",
+      "title": "Everest Labs: primary source",
+      "url": "https://www.example.com/everest",
+      "snippet": "Everest Labs \u2014 verified record: Mara Olsen.",
+      "published_at": "2026-05-10",
+      "source_authority": 0.7,
+      "asserts": "Mara Olsen",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "everest",
+        "labs"
+      ],
+      "requires_tokens": [
+        "2026"
+      ],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-005_generic_web_search",
+      "item_id": "syn-005",
+      "title": "Everest Labs: secondary mention (generic_web_search)",
+      "url": "https://blog.example-generic_web_search.com/everest",
+      "snippet": "Some sources claim Everest Labs is linked to Jon Pike generic_web_search.",
+      "published_at": "2022-03-01",
+      "source_authority": 0.4,
+      "asserts": "Jon Pike generic_web_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "everest",
+        "labs"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-005_official_domain_search",
+      "item_id": "syn-005",
+      "title": "Everest Labs: secondary mention (official_domain_search)",
+      "url": "https://blog.example-official_domain_search.com/everest",
+      "snippet": "Some sources claim Everest Labs is linked to Jon Pike official_domain_search.",
+      "published_at": "2022-03-01",
+      "source_authority": 0.4,
+      "asserts": "Jon Pike official_domain_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "everest",
+        "labs"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-005_brave_search",
+      "item_id": "syn-005",
+      "title": "Everest Labs: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/everest",
+      "snippet": "Some sources claim Everest Labs is linked to Jon Pike brave_search.",
+      "published_at": "2022-03-01",
+      "source_authority": 0.4,
+      "asserts": "Jon Pike brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "everest",
+        "labs"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-006_gold",
+      "item_id": "syn-006",
+      "title": "Fairwind Energy: primary source",
+      "url": "https://www.example.com/fairwind",
+      "snippet": "Fairwind Energy \u2014 verified record: Mara Olsen.",
+      "published_at": "2026-05-10",
+      "source_authority": 0.7,
+      "asserts": "Mara Olsen",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "fairwind",
+        "energy"
+      ],
+      "requires_tokens": [
+        "2026"
+      ],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-006_generic_web_search",
+      "item_id": "syn-006",
+      "title": "Fairwind Energy: secondary mention (generic_web_search)",
+      "url": "https://blog.example-generic_web_search.com/fairwind",
+      "snippet": "Some sources claim Fairwind Energy is linked to Jon Pike generic_web_search.",
+      "published_at": "2022-03-01",
+      "source_authority": 0.4,
+      "asserts": "Jon Pike generic_web_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "fairwind",
+        "energy"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-006_official_domain_search",
+      "item_id": "syn-006",
+      "title": "Fairwind Energy: secondary mention (official_domain_search)",
+      "url": "https://blog.example-official_domain_search.com/fairwind",
+      "snippet": "Some sources claim Fairwind Energy is linked to Jon Pike official_domain_search.",
+      "published_at": "2022-03-01",
+      "source_authority": 0.4,
+      "asserts": "Jon Pike official_domain_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "fairwind",
+        "energy"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-006_brave_search",
+      "item_id": "syn-006",
+      "title": "Fairwind Energy: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/fairwind",
+      "snippet": "Some sources claim Fairwind Energy is linked to Jon Pike brave_search.",
+      "published_at": "2022-03-01",
+      "source_authority": 0.4,
+      "asserts": "Jon Pike brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "fairwind",
+        "energy"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-007_gold",
+      "item_id": "syn-007",
+      "title": "Granite Capital: primary source",
+      "url": "https://www.example.com/granite",
+      "snippet": "Granite Capital \u2014 verified record: Mara Olsen.",
+      "published_at": "2026-05-10",
+      "source_authority": 0.7,
+      "asserts": "Mara Olsen",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "granite",
+        "capital"
+      ],
+      "requires_tokens": [
+        "2026"
+      ],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-007_generic_web_search",
+      "item_id": "syn-007",
+      "title": "Granite Capital: secondary mention (generic_web_search)",
+      "url": "https://blog.example-generic_web_search.com/granite",
+      "snippet": "Some sources claim Granite Capital is linked to Jon Pike generic_web_search.",
+      "published_at": "2022-03-01",
+      "source_authority": 0.4,
+      "asserts": "Jon Pike generic_web_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "granite",
+        "capital"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-007_official_domain_search",
+      "item_id": "syn-007",
+      "title": "Granite Capital: secondary mention (official_domain_search)",
+      "url": "https://blog.example-official_domain_search.com/granite",
+      "snippet": "Some sources claim Granite Capital is linked to Jon Pike official_domain_search.",
+      "published_at": "2022-03-01",
+      "source_authority": 0.4,
+      "asserts": "Jon Pike official_domain_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "granite",
+        "capital"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-007_brave_search",
+      "item_id": "syn-007",
+      "title": "Granite Capital: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/granite",
+      "snippet": "Some sources claim Granite Capital is linked to Jon Pike brave_search.",
+      "published_at": "2022-03-01",
+      "source_authority": 0.4,
+      "asserts": "Jon Pike brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "granite",
+        "capital"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-008_gold",
+      "item_id": "syn-008",
+      "title": "Helios Pharma: primary source",
+      "url": "https://www.example.com/helios",
+      "snippet": "Helios Pharma \u2014 verified record: Mara Olsen.",
+      "published_at": "2026-05-10",
+      "source_authority": 0.7,
+      "asserts": "Mara Olsen",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "helios",
+        "pharma"
+      ],
+      "requires_tokens": [
+        "2026"
+      ],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-008_generic_web_search",
+      "item_id": "syn-008",
+      "title": "Helios Pharma: secondary mention (generic_web_search)",
+      "url": "https://blog.example-generic_web_search.com/helios",
+      "snippet": "Some sources claim Helios Pharma is linked to Jon Pike generic_web_search.",
+      "published_at": "2022-03-01",
+      "source_authority": 0.4,
+      "asserts": "Jon Pike generic_web_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "helios",
+        "pharma"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-008_official_domain_search",
+      "item_id": "syn-008",
+      "title": "Helios Pharma: secondary mention (official_domain_search)",
+      "url": "https://blog.example-official_domain_search.com/helios",
+      "snippet": "Some sources claim Helios Pharma is linked to Jon Pike official_domain_search.",
+      "published_at": "2022-03-01",
+      "source_authority": 0.4,
+      "asserts": "Jon Pike official_domain_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "helios",
+        "pharma"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-008_brave_search",
+      "item_id": "syn-008",
+      "title": "Helios Pharma: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/helios",
+      "snippet": "Some sources claim Helios Pharma is linked to Jon Pike brave_search.",
+      "published_at": "2022-03-01",
+      "source_authority": 0.4,
+      "asserts": "Jon Pike brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "helios",
+        "pharma"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-009_gold",
+      "item_id": "syn-009",
+      "title": "Acme Robotics: primary source",
+      "url": "https://www.example.com/acme",
+      "snippet": "Acme Robotics \u2014 verified record: Mara Olsen.",
+      "published_at": "2026-05-10",
+      "source_authority": 0.7,
+      "asserts": "Mara Olsen",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "acme",
+        "robotics"
+      ],
+      "requires_tokens": [
+        "2026"
+      ],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-009_generic_web_search",
+      "item_id": "syn-009",
+      "title": "Acme Robotics: secondary mention (generic_web_search)",
+      "url": "https://blog.example-generic_web_search.com/acme",
+      "snippet": "Some sources claim Acme Robotics is linked to Jon Pike generic_web_search.",
+      "published_at": "2022-03-01",
+      "source_authority": 0.4,
+      "asserts": "Jon Pike generic_web_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "acme",
+        "robotics"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-009_official_domain_search",
+      "item_id": "syn-009",
+      "title": "Acme Robotics: secondary mention (official_domain_search)",
+      "url": "https://blog.example-official_domain_search.com/acme",
+      "snippet": "Some sources claim Acme Robotics is linked to Jon Pike official_domain_search.",
+      "published_at": "2022-03-01",
+      "source_authority": 0.4,
+      "asserts": "Jon Pike official_domain_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "acme",
+        "robotics"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-009_brave_search",
+      "item_id": "syn-009",
+      "title": "Acme Robotics: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/acme",
+      "snippet": "Some sources claim Acme Robotics is linked to Jon Pike brave_search.",
+      "published_at": "2022-03-01",
+      "source_authority": 0.4,
+      "asserts": "Jon Pike brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "acme",
+        "robotics"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-010_gold",
+      "item_id": "syn-010",
+      "title": "Borealis Foods: primary source",
+      "url": "https://www.example.com/borealis",
+      "snippet": "Borealis Foods \u2014 verified record: Mara Olsen.",
+      "published_at": "2026-05-10",
+      "source_authority": 0.7,
+      "asserts": "Mara Olsen",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "borealis",
+        "foods"
+      ],
+      "requires_tokens": [
+        "2026"
+      ],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-010_generic_web_search",
+      "item_id": "syn-010",
+      "title": "Borealis Foods: secondary mention (generic_web_search)",
+      "url": "https://blog.example-generic_web_search.com/borealis",
+      "snippet": "Some sources claim Borealis Foods is linked to Jon Pike generic_web_search.",
+      "published_at": "2022-03-01",
+      "source_authority": 0.4,
+      "asserts": "Jon Pike generic_web_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "borealis",
+        "foods"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-010_official_domain_search",
+      "item_id": "syn-010",
+      "title": "Borealis Foods: secondary mention (official_domain_search)",
+      "url": "https://blog.example-official_domain_search.com/borealis",
+      "snippet": "Some sources claim Borealis Foods is linked to Jon Pike official_domain_search.",
+      "published_at": "2022-03-01",
+      "source_authority": 0.4,
+      "asserts": "Jon Pike official_domain_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "borealis",
+        "foods"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-010_brave_search",
+      "item_id": "syn-010",
+      "title": "Borealis Foods: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/borealis",
+      "snippet": "Some sources claim Borealis Foods is linked to Jon Pike brave_search.",
+      "published_at": "2022-03-01",
+      "source_authority": 0.4,
+      "asserts": "Jon Pike brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "borealis",
+        "foods"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-011_gold",
+      "item_id": "syn-011",
+      "title": "Cobalt Systems: primary source",
+      "url": "https://www.example.com/cobalt",
+      "snippet": "Cobalt Systems \u2014 verified record: Mara Olsen.",
+      "published_at": "2026-05-10",
+      "source_authority": 0.7,
+      "asserts": "Mara Olsen",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "cobalt",
+        "systems"
+      ],
+      "requires_tokens": [
+        "2026"
+      ],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-011_generic_web_search",
+      "item_id": "syn-011",
+      "title": "Cobalt Systems: secondary mention (generic_web_search)",
+      "url": "https://blog.example-generic_web_search.com/cobalt",
+      "snippet": "Some sources claim Cobalt Systems is linked to Jon Pike generic_web_search.",
+      "published_at": "2022-03-01",
+      "source_authority": 0.4,
+      "asserts": "Jon Pike generic_web_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "cobalt",
+        "systems"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-011_official_domain_search",
+      "item_id": "syn-011",
+      "title": "Cobalt Systems: secondary mention (official_domain_search)",
+      "url": "https://blog.example-official_domain_search.com/cobalt",
+      "snippet": "Some sources claim Cobalt Systems is linked to Jon Pike official_domain_search.",
+      "published_at": "2022-03-01",
+      "source_authority": 0.4,
+      "asserts": "Jon Pike official_domain_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "cobalt",
+        "systems"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-011_brave_search",
+      "item_id": "syn-011",
+      "title": "Cobalt Systems: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/cobalt",
+      "snippet": "Some sources claim Cobalt Systems is linked to Jon Pike brave_search.",
+      "published_at": "2022-03-01",
+      "source_authority": 0.4,
+      "asserts": "Jon Pike brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "cobalt",
+        "systems"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-012_gold",
+      "item_id": "syn-012",
+      "title": "Delphi Mining: primary source",
+      "url": "https://www.example.com/delphi",
+      "snippet": "Delphi Mining \u2014 verified record: Mara Olsen.",
+      "published_at": "2026-05-10",
+      "source_authority": 0.7,
+      "asserts": "Mara Olsen",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "delphi",
+        "mining"
+      ],
+      "requires_tokens": [
+        "2026"
+      ],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-012_generic_web_search",
+      "item_id": "syn-012",
+      "title": "Delphi Mining: secondary mention (generic_web_search)",
+      "url": "https://blog.example-generic_web_search.com/delphi",
+      "snippet": "Some sources claim Delphi Mining is linked to Jon Pike generic_web_search.",
+      "published_at": "2022-03-01",
+      "source_authority": 0.4,
+      "asserts": "Jon Pike generic_web_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "delphi",
+        "mining"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-012_official_domain_search",
+      "item_id": "syn-012",
+      "title": "Delphi Mining: secondary mention (official_domain_search)",
+      "url": "https://blog.example-official_domain_search.com/delphi",
+      "snippet": "Some sources claim Delphi Mining is linked to Jon Pike official_domain_search.",
+      "published_at": "2022-03-01",
+      "source_authority": 0.4,
+      "asserts": "Jon Pike official_domain_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "delphi",
+        "mining"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-012_brave_search",
+      "item_id": "syn-012",
+      "title": "Delphi Mining: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/delphi",
+      "snippet": "Some sources claim Delphi Mining is linked to Jon Pike brave_search.",
+      "published_at": "2022-03-01",
+      "source_authority": 0.4,
+      "asserts": "Jon Pike brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "delphi",
+        "mining"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-013_gold",
+      "item_id": "syn-013",
+      "title": "Everest Labs: primary source",
+      "url": "https://www.example.com/everest",
+      "snippet": "Everest Labs \u2014 verified record: Mara Olsen.",
+      "published_at": "2026-05-10",
+      "source_authority": 0.7,
+      "asserts": "Mara Olsen",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "everest",
+        "labs"
+      ],
+      "requires_tokens": [
+        "2026"
+      ],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-013_generic_web_search",
+      "item_id": "syn-013",
+      "title": "Everest Labs: secondary mention (generic_web_search)",
+      "url": "https://blog.example-generic_web_search.com/everest",
+      "snippet": "Some sources claim Everest Labs is linked to Jon Pike generic_web_search.",
+      "published_at": "2022-03-01",
+      "source_authority": 0.4,
+      "asserts": "Jon Pike generic_web_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "everest",
+        "labs"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-013_official_domain_search",
+      "item_id": "syn-013",
+      "title": "Everest Labs: secondary mention (official_domain_search)",
+      "url": "https://blog.example-official_domain_search.com/everest",
+      "snippet": "Some sources claim Everest Labs is linked to Jon Pike official_domain_search.",
+      "published_at": "2022-03-01",
+      "source_authority": 0.4,
+      "asserts": "Jon Pike official_domain_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "everest",
+        "labs"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-013_brave_search",
+      "item_id": "syn-013",
+      "title": "Everest Labs: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/everest",
+      "snippet": "Some sources claim Everest Labs is linked to Jon Pike brave_search.",
+      "published_at": "2022-03-01",
+      "source_authority": 0.4,
+      "asserts": "Jon Pike brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "everest",
+        "labs"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-014_gold",
+      "item_id": "syn-014",
+      "title": "Fairwind Energy: primary source",
+      "url": "https://www.example.com/fairwind",
+      "snippet": "Fairwind Energy \u2014 verified record: Mara Olsen.",
+      "published_at": "2026-05-10",
+      "source_authority": 0.7,
+      "asserts": "Mara Olsen",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "fairwind",
+        "energy"
+      ],
+      "requires_tokens": [
+        "2026"
+      ],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-014_generic_web_search",
+      "item_id": "syn-014",
+      "title": "Fairwind Energy: secondary mention (generic_web_search)",
+      "url": "https://blog.example-generic_web_search.com/fairwind",
+      "snippet": "Some sources claim Fairwind Energy is linked to Jon Pike generic_web_search.",
+      "published_at": "2022-03-01",
+      "source_authority": 0.4,
+      "asserts": "Jon Pike generic_web_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "fairwind",
+        "energy"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-014_official_domain_search",
+      "item_id": "syn-014",
+      "title": "Fairwind Energy: secondary mention (official_domain_search)",
+      "url": "https://blog.example-official_domain_search.com/fairwind",
+      "snippet": "Some sources claim Fairwind Energy is linked to Jon Pike official_domain_search.",
+      "published_at": "2022-03-01",
+      "source_authority": 0.4,
+      "asserts": "Jon Pike official_domain_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "fairwind",
+        "energy"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-014_brave_search",
+      "item_id": "syn-014",
+      "title": "Fairwind Energy: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/fairwind",
+      "snippet": "Some sources claim Fairwind Energy is linked to Jon Pike brave_search.",
+      "published_at": "2022-03-01",
+      "source_authority": 0.4,
+      "asserts": "Jon Pike brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "fairwind",
+        "energy"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-015_gold",
+      "item_id": "syn-015",
+      "title": "Granite Capital: primary source",
+      "url": "https://www.example.com/granite",
+      "snippet": "Granite Capital \u2014 verified record: Mara Olsen.",
+      "published_at": "2026-05-10",
+      "source_authority": 0.7,
+      "asserts": "Mara Olsen",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "granite",
+        "capital"
+      ],
+      "requires_tokens": [
+        "2026"
+      ],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-015_generic_web_search",
+      "item_id": "syn-015",
+      "title": "Granite Capital: secondary mention (generic_web_search)",
+      "url": "https://blog.example-generic_web_search.com/granite",
+      "snippet": "Some sources claim Granite Capital is linked to Jon Pike generic_web_search.",
+      "published_at": "2022-03-01",
+      "source_authority": 0.4,
+      "asserts": "Jon Pike generic_web_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "granite",
+        "capital"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-015_official_domain_search",
+      "item_id": "syn-015",
+      "title": "Granite Capital: secondary mention (official_domain_search)",
+      "url": "https://blog.example-official_domain_search.com/granite",
+      "snippet": "Some sources claim Granite Capital is linked to Jon Pike official_domain_search.",
+      "published_at": "2022-03-01",
+      "source_authority": 0.4,
+      "asserts": "Jon Pike official_domain_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "granite",
+        "capital"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-015_brave_search",
+      "item_id": "syn-015",
+      "title": "Granite Capital: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/granite",
+      "snippet": "Some sources claim Granite Capital is linked to Jon Pike brave_search.",
+      "published_at": "2022-03-01",
+      "source_authority": 0.4,
+      "asserts": "Jon Pike brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "granite",
+        "capital"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-016_gold",
+      "item_id": "syn-016",
+      "title": "Helios Pharma: primary source",
+      "url": "https://www.example.com/helios",
+      "snippet": "Helios Pharma \u2014 verified record: Mara Olsen.",
+      "published_at": "2026-05-10",
+      "source_authority": 0.7,
+      "asserts": "Mara Olsen",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "helios",
+        "pharma"
+      ],
+      "requires_tokens": [
+        "2026"
+      ],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-016_generic_web_search",
+      "item_id": "syn-016",
+      "title": "Helios Pharma: secondary mention (generic_web_search)",
+      "url": "https://blog.example-generic_web_search.com/helios",
+      "snippet": "Some sources claim Helios Pharma is linked to Jon Pike generic_web_search.",
+      "published_at": "2022-03-01",
+      "source_authority": 0.4,
+      "asserts": "Jon Pike generic_web_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "helios",
+        "pharma"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-016_official_domain_search",
+      "item_id": "syn-016",
+      "title": "Helios Pharma: secondary mention (official_domain_search)",
+      "url": "https://blog.example-official_domain_search.com/helios",
+      "snippet": "Some sources claim Helios Pharma is linked to Jon Pike official_domain_search.",
+      "published_at": "2022-03-01",
+      "source_authority": 0.4,
+      "asserts": "Jon Pike official_domain_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "helios",
+        "pharma"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-016_brave_search",
+      "item_id": "syn-016",
+      "title": "Helios Pharma: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/helios",
+      "snippet": "Some sources claim Helios Pharma is linked to Jon Pike brave_search.",
+      "published_at": "2022-03-01",
+      "source_authority": 0.4,
+      "asserts": "Jon Pike brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "helios",
+        "pharma"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-017_gold",
+      "item_id": "syn-017",
+      "title": "Acme Robotics: primary source",
+      "url": "https://example-acme.gov/acme",
+      "snippet": "Acme Robotics \u2014 verified record: HQ-4821 Birch Lane.",
+      "published_at": "2024-02-01",
+      "source_authority": 0.92,
+      "asserts": "HQ-4821 Birch Lane",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "acme",
+        "robotics"
+      ],
+      "requires_tokens": [
+        "official"
+      ],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-017_generic_web_search",
+      "item_id": "syn-017",
+      "title": "Acme Robotics: secondary mention (generic_web_search)",
+      "url": "https://blog.example-generic_web_search.com/acme",
+      "snippet": "Some sources claim Acme Robotics is linked to HQ-0000 Old Mill generic_web_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "HQ-0000 Old Mill generic_web_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "acme",
+        "robotics"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-017_news_search",
+      "item_id": "syn-017",
+      "title": "Acme Robotics: secondary mention (news_search)",
+      "url": "https://blog.example-news_search.com/acme",
+      "snippet": "Some sources claim Acme Robotics is linked to HQ-0000 Old Mill news_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "HQ-0000 Old Mill news_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "acme",
+        "robotics"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-017_brave_search",
+      "item_id": "syn-017",
+      "title": "Acme Robotics: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/acme",
+      "snippet": "Some sources claim Acme Robotics is linked to HQ-0000 Old Mill brave_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "HQ-0000 Old Mill brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "acme",
+        "robotics"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-018_gold",
+      "item_id": "syn-018",
+      "title": "Borealis Foods: primary source",
+      "url": "https://example-borealis.gov/borealis",
+      "snippet": "Borealis Foods \u2014 verified record: HQ-4821 Birch Lane.",
+      "published_at": "2024-02-01",
+      "source_authority": 0.92,
+      "asserts": "HQ-4821 Birch Lane",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "borealis",
+        "foods"
+      ],
+      "requires_tokens": [
+        "official"
+      ],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-018_generic_web_search",
+      "item_id": "syn-018",
+      "title": "Borealis Foods: secondary mention (generic_web_search)",
+      "url": "https://blog.example-generic_web_search.com/borealis",
+      "snippet": "Some sources claim Borealis Foods is linked to HQ-0000 Old Mill generic_web_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "HQ-0000 Old Mill generic_web_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "borealis",
+        "foods"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-018_news_search",
+      "item_id": "syn-018",
+      "title": "Borealis Foods: secondary mention (news_search)",
+      "url": "https://blog.example-news_search.com/borealis",
+      "snippet": "Some sources claim Borealis Foods is linked to HQ-0000 Old Mill news_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "HQ-0000 Old Mill news_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "borealis",
+        "foods"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-018_brave_search",
+      "item_id": "syn-018",
+      "title": "Borealis Foods: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/borealis",
+      "snippet": "Some sources claim Borealis Foods is linked to HQ-0000 Old Mill brave_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "HQ-0000 Old Mill brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "borealis",
+        "foods"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-019_gold",
+      "item_id": "syn-019",
+      "title": "Cobalt Systems: primary source",
+      "url": "https://example-cobalt.gov/cobalt",
+      "snippet": "Cobalt Systems \u2014 verified record: HQ-4821 Birch Lane.",
+      "published_at": "2024-02-01",
+      "source_authority": 0.92,
+      "asserts": "HQ-4821 Birch Lane",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "cobalt",
+        "systems"
+      ],
+      "requires_tokens": [
+        "official"
+      ],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-019_generic_web_search",
+      "item_id": "syn-019",
+      "title": "Cobalt Systems: secondary mention (generic_web_search)",
+      "url": "https://blog.example-generic_web_search.com/cobalt",
+      "snippet": "Some sources claim Cobalt Systems is linked to HQ-0000 Old Mill generic_web_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "HQ-0000 Old Mill generic_web_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "cobalt",
+        "systems"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-019_news_search",
+      "item_id": "syn-019",
+      "title": "Cobalt Systems: secondary mention (news_search)",
+      "url": "https://blog.example-news_search.com/cobalt",
+      "snippet": "Some sources claim Cobalt Systems is linked to HQ-0000 Old Mill news_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "HQ-0000 Old Mill news_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "cobalt",
+        "systems"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-019_brave_search",
+      "item_id": "syn-019",
+      "title": "Cobalt Systems: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/cobalt",
+      "snippet": "Some sources claim Cobalt Systems is linked to HQ-0000 Old Mill brave_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "HQ-0000 Old Mill brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "cobalt",
+        "systems"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-020_gold",
+      "item_id": "syn-020",
+      "title": "Delphi Mining: primary source",
+      "url": "https://example-delphi.gov/delphi",
+      "snippet": "Delphi Mining \u2014 verified record: HQ-4821 Birch Lane.",
+      "published_at": "2024-02-01",
+      "source_authority": 0.92,
+      "asserts": "HQ-4821 Birch Lane",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "delphi",
+        "mining"
+      ],
+      "requires_tokens": [
+        "official"
+      ],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-020_generic_web_search",
+      "item_id": "syn-020",
+      "title": "Delphi Mining: secondary mention (generic_web_search)",
+      "url": "https://blog.example-generic_web_search.com/delphi",
+      "snippet": "Some sources claim Delphi Mining is linked to HQ-0000 Old Mill generic_web_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "HQ-0000 Old Mill generic_web_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "delphi",
+        "mining"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-020_news_search",
+      "item_id": "syn-020",
+      "title": "Delphi Mining: secondary mention (news_search)",
+      "url": "https://blog.example-news_search.com/delphi",
+      "snippet": "Some sources claim Delphi Mining is linked to HQ-0000 Old Mill news_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "HQ-0000 Old Mill news_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "delphi",
+        "mining"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-020_brave_search",
+      "item_id": "syn-020",
+      "title": "Delphi Mining: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/delphi",
+      "snippet": "Some sources claim Delphi Mining is linked to HQ-0000 Old Mill brave_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "HQ-0000 Old Mill brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "delphi",
+        "mining"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-021_gold",
+      "item_id": "syn-021",
+      "title": "Everest Labs: primary source",
+      "url": "https://example-everest.gov/everest",
+      "snippet": "Everest Labs \u2014 verified record: HQ-4821 Birch Lane.",
+      "published_at": "2024-02-01",
+      "source_authority": 0.92,
+      "asserts": "HQ-4821 Birch Lane",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "everest",
+        "labs"
+      ],
+      "requires_tokens": [
+        "official"
+      ],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-021_generic_web_search",
+      "item_id": "syn-021",
+      "title": "Everest Labs: secondary mention (generic_web_search)",
+      "url": "https://blog.example-generic_web_search.com/everest",
+      "snippet": "Some sources claim Everest Labs is linked to HQ-0000 Old Mill generic_web_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "HQ-0000 Old Mill generic_web_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "everest",
+        "labs"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-021_news_search",
+      "item_id": "syn-021",
+      "title": "Everest Labs: secondary mention (news_search)",
+      "url": "https://blog.example-news_search.com/everest",
+      "snippet": "Some sources claim Everest Labs is linked to HQ-0000 Old Mill news_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "HQ-0000 Old Mill news_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "everest",
+        "labs"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-021_brave_search",
+      "item_id": "syn-021",
+      "title": "Everest Labs: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/everest",
+      "snippet": "Some sources claim Everest Labs is linked to HQ-0000 Old Mill brave_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "HQ-0000 Old Mill brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "everest",
+        "labs"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-022_gold",
+      "item_id": "syn-022",
+      "title": "Fairwind Energy: primary source",
+      "url": "https://example-fairwind.gov/fairwind",
+      "snippet": "Fairwind Energy \u2014 verified record: HQ-4821 Birch Lane.",
+      "published_at": "2024-02-01",
+      "source_authority": 0.92,
+      "asserts": "HQ-4821 Birch Lane",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "fairwind",
+        "energy"
+      ],
+      "requires_tokens": [
+        "official"
+      ],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-022_generic_web_search",
+      "item_id": "syn-022",
+      "title": "Fairwind Energy: secondary mention (generic_web_search)",
+      "url": "https://blog.example-generic_web_search.com/fairwind",
+      "snippet": "Some sources claim Fairwind Energy is linked to HQ-0000 Old Mill generic_web_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "HQ-0000 Old Mill generic_web_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "fairwind",
+        "energy"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-022_news_search",
+      "item_id": "syn-022",
+      "title": "Fairwind Energy: secondary mention (news_search)",
+      "url": "https://blog.example-news_search.com/fairwind",
+      "snippet": "Some sources claim Fairwind Energy is linked to HQ-0000 Old Mill news_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "HQ-0000 Old Mill news_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "fairwind",
+        "energy"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-022_brave_search",
+      "item_id": "syn-022",
+      "title": "Fairwind Energy: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/fairwind",
+      "snippet": "Some sources claim Fairwind Energy is linked to HQ-0000 Old Mill brave_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "HQ-0000 Old Mill brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "fairwind",
+        "energy"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-023_gold",
+      "item_id": "syn-023",
+      "title": "Granite Capital: primary source",
+      "url": "https://example-granite.gov/granite",
+      "snippet": "Granite Capital \u2014 verified record: HQ-4821 Birch Lane.",
+      "published_at": "2024-02-01",
+      "source_authority": 0.92,
+      "asserts": "HQ-4821 Birch Lane",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "granite",
+        "capital"
+      ],
+      "requires_tokens": [
+        "official"
+      ],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-023_generic_web_search",
+      "item_id": "syn-023",
+      "title": "Granite Capital: secondary mention (generic_web_search)",
+      "url": "https://blog.example-generic_web_search.com/granite",
+      "snippet": "Some sources claim Granite Capital is linked to HQ-0000 Old Mill generic_web_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "HQ-0000 Old Mill generic_web_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "granite",
+        "capital"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-023_news_search",
+      "item_id": "syn-023",
+      "title": "Granite Capital: secondary mention (news_search)",
+      "url": "https://blog.example-news_search.com/granite",
+      "snippet": "Some sources claim Granite Capital is linked to HQ-0000 Old Mill news_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "HQ-0000 Old Mill news_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "granite",
+        "capital"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-023_brave_search",
+      "item_id": "syn-023",
+      "title": "Granite Capital: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/granite",
+      "snippet": "Some sources claim Granite Capital is linked to HQ-0000 Old Mill brave_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "HQ-0000 Old Mill brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "granite",
+        "capital"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-024_gold",
+      "item_id": "syn-024",
+      "title": "Helios Pharma: primary source",
+      "url": "https://example-helios.gov/helios",
+      "snippet": "Helios Pharma \u2014 verified record: HQ-4821 Birch Lane.",
+      "published_at": "2024-02-01",
+      "source_authority": 0.92,
+      "asserts": "HQ-4821 Birch Lane",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "helios",
+        "pharma"
+      ],
+      "requires_tokens": [
+        "official"
+      ],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-024_generic_web_search",
+      "item_id": "syn-024",
+      "title": "Helios Pharma: secondary mention (generic_web_search)",
+      "url": "https://blog.example-generic_web_search.com/helios",
+      "snippet": "Some sources claim Helios Pharma is linked to HQ-0000 Old Mill generic_web_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "HQ-0000 Old Mill generic_web_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "helios",
+        "pharma"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-024_news_search",
+      "item_id": "syn-024",
+      "title": "Helios Pharma: secondary mention (news_search)",
+      "url": "https://blog.example-news_search.com/helios",
+      "snippet": "Some sources claim Helios Pharma is linked to HQ-0000 Old Mill news_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "HQ-0000 Old Mill news_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "helios",
+        "pharma"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-024_brave_search",
+      "item_id": "syn-024",
+      "title": "Helios Pharma: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/helios",
+      "snippet": "Some sources claim Helios Pharma is linked to HQ-0000 Old Mill brave_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "HQ-0000 Old Mill brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "helios",
+        "pharma"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-025_gold",
+      "item_id": "syn-025",
+      "title": "Acme Robotics: primary source",
+      "url": "https://example-acme.gov/acme",
+      "snippet": "Acme Robotics \u2014 verified record: HQ-4821 Birch Lane.",
+      "published_at": "2024-02-01",
+      "source_authority": 0.92,
+      "asserts": "HQ-4821 Birch Lane",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "acme",
+        "robotics"
+      ],
+      "requires_tokens": [
+        "official"
+      ],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-025_generic_web_search",
+      "item_id": "syn-025",
+      "title": "Acme Robotics: secondary mention (generic_web_search)",
+      "url": "https://blog.example-generic_web_search.com/acme",
+      "snippet": "Some sources claim Acme Robotics is linked to HQ-0000 Old Mill generic_web_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "HQ-0000 Old Mill generic_web_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "acme",
+        "robotics"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-025_news_search",
+      "item_id": "syn-025",
+      "title": "Acme Robotics: secondary mention (news_search)",
+      "url": "https://blog.example-news_search.com/acme",
+      "snippet": "Some sources claim Acme Robotics is linked to HQ-0000 Old Mill news_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "HQ-0000 Old Mill news_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "acme",
+        "robotics"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-025_brave_search",
+      "item_id": "syn-025",
+      "title": "Acme Robotics: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/acme",
+      "snippet": "Some sources claim Acme Robotics is linked to HQ-0000 Old Mill brave_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "HQ-0000 Old Mill brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "acme",
+        "robotics"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-026_gold",
+      "item_id": "syn-026",
+      "title": "Borealis Foods: primary source",
+      "url": "https://example-borealis.gov/borealis",
+      "snippet": "Borealis Foods \u2014 verified record: HQ-4821 Birch Lane.",
+      "published_at": "2024-02-01",
+      "source_authority": 0.92,
+      "asserts": "HQ-4821 Birch Lane",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "borealis",
+        "foods"
+      ],
+      "requires_tokens": [
+        "official"
+      ],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-026_generic_web_search",
+      "item_id": "syn-026",
+      "title": "Borealis Foods: secondary mention (generic_web_search)",
+      "url": "https://blog.example-generic_web_search.com/borealis",
+      "snippet": "Some sources claim Borealis Foods is linked to HQ-0000 Old Mill generic_web_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "HQ-0000 Old Mill generic_web_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "borealis",
+        "foods"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-026_news_search",
+      "item_id": "syn-026",
+      "title": "Borealis Foods: secondary mention (news_search)",
+      "url": "https://blog.example-news_search.com/borealis",
+      "snippet": "Some sources claim Borealis Foods is linked to HQ-0000 Old Mill news_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "HQ-0000 Old Mill news_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "borealis",
+        "foods"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-026_brave_search",
+      "item_id": "syn-026",
+      "title": "Borealis Foods: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/borealis",
+      "snippet": "Some sources claim Borealis Foods is linked to HQ-0000 Old Mill brave_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "HQ-0000 Old Mill brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "borealis",
+        "foods"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-027_gold",
+      "item_id": "syn-027",
+      "title": "Cobalt Systems: primary source",
+      "url": "https://example-cobalt.gov/cobalt",
+      "snippet": "Cobalt Systems \u2014 verified record: HQ-4821 Birch Lane.",
+      "published_at": "2024-02-01",
+      "source_authority": 0.92,
+      "asserts": "HQ-4821 Birch Lane",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "cobalt",
+        "systems"
+      ],
+      "requires_tokens": [
+        "official"
+      ],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-027_generic_web_search",
+      "item_id": "syn-027",
+      "title": "Cobalt Systems: secondary mention (generic_web_search)",
+      "url": "https://blog.example-generic_web_search.com/cobalt",
+      "snippet": "Some sources claim Cobalt Systems is linked to HQ-0000 Old Mill generic_web_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "HQ-0000 Old Mill generic_web_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "cobalt",
+        "systems"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-027_news_search",
+      "item_id": "syn-027",
+      "title": "Cobalt Systems: secondary mention (news_search)",
+      "url": "https://blog.example-news_search.com/cobalt",
+      "snippet": "Some sources claim Cobalt Systems is linked to HQ-0000 Old Mill news_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "HQ-0000 Old Mill news_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "cobalt",
+        "systems"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-027_brave_search",
+      "item_id": "syn-027",
+      "title": "Cobalt Systems: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/cobalt",
+      "snippet": "Some sources claim Cobalt Systems is linked to HQ-0000 Old Mill brave_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "HQ-0000 Old Mill brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "cobalt",
+        "systems"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-028_gold",
+      "item_id": "syn-028",
+      "title": "Delphi Mining: primary source",
+      "url": "https://example-delphi.gov/delphi",
+      "snippet": "Delphi Mining \u2014 verified record: HQ-4821 Birch Lane.",
+      "published_at": "2024-02-01",
+      "source_authority": 0.92,
+      "asserts": "HQ-4821 Birch Lane",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "delphi",
+        "mining"
+      ],
+      "requires_tokens": [
+        "official"
+      ],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-028_generic_web_search",
+      "item_id": "syn-028",
+      "title": "Delphi Mining: secondary mention (generic_web_search)",
+      "url": "https://blog.example-generic_web_search.com/delphi",
+      "snippet": "Some sources claim Delphi Mining is linked to HQ-0000 Old Mill generic_web_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "HQ-0000 Old Mill generic_web_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "delphi",
+        "mining"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-028_news_search",
+      "item_id": "syn-028",
+      "title": "Delphi Mining: secondary mention (news_search)",
+      "url": "https://blog.example-news_search.com/delphi",
+      "snippet": "Some sources claim Delphi Mining is linked to HQ-0000 Old Mill news_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "HQ-0000 Old Mill news_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "delphi",
+        "mining"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-028_brave_search",
+      "item_id": "syn-028",
+      "title": "Delphi Mining: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/delphi",
+      "snippet": "Some sources claim Delphi Mining is linked to HQ-0000 Old Mill brave_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "HQ-0000 Old Mill brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "delphi",
+        "mining"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-029_gold",
+      "item_id": "syn-029",
+      "title": "Everest Labs: primary source",
+      "url": "https://example-everest.gov/everest",
+      "snippet": "Everest Labs \u2014 verified record: HQ-4821 Birch Lane.",
+      "published_at": "2024-02-01",
+      "source_authority": 0.92,
+      "asserts": "HQ-4821 Birch Lane",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "everest",
+        "labs"
+      ],
+      "requires_tokens": [
+        "official"
+      ],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-029_generic_web_search",
+      "item_id": "syn-029",
+      "title": "Everest Labs: secondary mention (generic_web_search)",
+      "url": "https://blog.example-generic_web_search.com/everest",
+      "snippet": "Some sources claim Everest Labs is linked to HQ-0000 Old Mill generic_web_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "HQ-0000 Old Mill generic_web_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "everest",
+        "labs"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-029_news_search",
+      "item_id": "syn-029",
+      "title": "Everest Labs: secondary mention (news_search)",
+      "url": "https://blog.example-news_search.com/everest",
+      "snippet": "Some sources claim Everest Labs is linked to HQ-0000 Old Mill news_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "HQ-0000 Old Mill news_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "everest",
+        "labs"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-029_brave_search",
+      "item_id": "syn-029",
+      "title": "Everest Labs: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/everest",
+      "snippet": "Some sources claim Everest Labs is linked to HQ-0000 Old Mill brave_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "HQ-0000 Old Mill brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "everest",
+        "labs"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-030_gold",
+      "item_id": "syn-030",
+      "title": "Fairwind Energy: primary source",
+      "url": "https://example-fairwind.gov/fairwind",
+      "snippet": "Fairwind Energy \u2014 verified record: HQ-4821 Birch Lane.",
+      "published_at": "2024-02-01",
+      "source_authority": 0.92,
+      "asserts": "HQ-4821 Birch Lane",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "fairwind",
+        "energy"
+      ],
+      "requires_tokens": [
+        "official"
+      ],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-030_generic_web_search",
+      "item_id": "syn-030",
+      "title": "Fairwind Energy: secondary mention (generic_web_search)",
+      "url": "https://blog.example-generic_web_search.com/fairwind",
+      "snippet": "Some sources claim Fairwind Energy is linked to HQ-0000 Old Mill generic_web_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "HQ-0000 Old Mill generic_web_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "fairwind",
+        "energy"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-030_news_search",
+      "item_id": "syn-030",
+      "title": "Fairwind Energy: secondary mention (news_search)",
+      "url": "https://blog.example-news_search.com/fairwind",
+      "snippet": "Some sources claim Fairwind Energy is linked to HQ-0000 Old Mill news_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "HQ-0000 Old Mill news_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "fairwind",
+        "energy"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-030_brave_search",
+      "item_id": "syn-030",
+      "title": "Fairwind Energy: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/fairwind",
+      "snippet": "Some sources claim Fairwind Energy is linked to HQ-0000 Old Mill brave_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "HQ-0000 Old Mill brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "fairwind",
+        "energy"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-031_gold",
+      "item_id": "syn-031",
+      "title": "Granite Capital: primary source",
+      "url": "https://example-granite.gov/granite",
+      "snippet": "Granite Capital \u2014 verified record: HQ-4821 Birch Lane.",
+      "published_at": "2024-02-01",
+      "source_authority": 0.92,
+      "asserts": "HQ-4821 Birch Lane",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "granite",
+        "capital"
+      ],
+      "requires_tokens": [
+        "official"
+      ],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-031_generic_web_search",
+      "item_id": "syn-031",
+      "title": "Granite Capital: secondary mention (generic_web_search)",
+      "url": "https://blog.example-generic_web_search.com/granite",
+      "snippet": "Some sources claim Granite Capital is linked to HQ-0000 Old Mill generic_web_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "HQ-0000 Old Mill generic_web_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "granite",
+        "capital"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-031_news_search",
+      "item_id": "syn-031",
+      "title": "Granite Capital: secondary mention (news_search)",
+      "url": "https://blog.example-news_search.com/granite",
+      "snippet": "Some sources claim Granite Capital is linked to HQ-0000 Old Mill news_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "HQ-0000 Old Mill news_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "granite",
+        "capital"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-031_brave_search",
+      "item_id": "syn-031",
+      "title": "Granite Capital: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/granite",
+      "snippet": "Some sources claim Granite Capital is linked to HQ-0000 Old Mill brave_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "HQ-0000 Old Mill brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "granite",
+        "capital"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-032_gold",
+      "item_id": "syn-032",
+      "title": "Helios Pharma: primary source",
+      "url": "https://example-helios.gov/helios",
+      "snippet": "Helios Pharma \u2014 verified record: HQ-4821 Birch Lane.",
+      "published_at": "2024-02-01",
+      "source_authority": 0.92,
+      "asserts": "HQ-4821 Birch Lane",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "helios",
+        "pharma"
+      ],
+      "requires_tokens": [
+        "official"
+      ],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-032_generic_web_search",
+      "item_id": "syn-032",
+      "title": "Helios Pharma: secondary mention (generic_web_search)",
+      "url": "https://blog.example-generic_web_search.com/helios",
+      "snippet": "Some sources claim Helios Pharma is linked to HQ-0000 Old Mill generic_web_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "HQ-0000 Old Mill generic_web_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "helios",
+        "pharma"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-032_news_search",
+      "item_id": "syn-032",
+      "title": "Helios Pharma: secondary mention (news_search)",
+      "url": "https://blog.example-news_search.com/helios",
+      "snippet": "Some sources claim Helios Pharma is linked to HQ-0000 Old Mill news_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "HQ-0000 Old Mill news_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "helios",
+        "pharma"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-032_brave_search",
+      "item_id": "syn-032",
+      "title": "Helios Pharma: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/helios",
+      "snippet": "Some sources claim Helios Pharma is linked to HQ-0000 Old Mill brave_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "HQ-0000 Old Mill brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "helios",
+        "pharma"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-033_gold",
+      "item_id": "syn-033",
+      "title": "Acme Robotics: primary source",
+      "url": "https://www.example.com/acme",
+      "snippet": "Acme Robotics \u2014 verified record: Trenton.",
+      "published_at": "2024-02-01",
+      "source_authority": 0.7,
+      "asserts": "Trenton",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "acme",
+        "robotics"
+      ],
+      "requires_tokens": [],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-033_news_search",
+      "item_id": "syn-033",
+      "title": "Acme Robotics: secondary mention (news_search)",
+      "url": "https://blog.example-news_search.com/acme",
+      "snippet": "Some sources claim Acme Robotics is linked to Oldcastle news_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Oldcastle news_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "acme",
+        "robotics"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-033_official_domain_search",
+      "item_id": "syn-033",
+      "title": "Acme Robotics: secondary mention (official_domain_search)",
+      "url": "https://blog.example-official_domain_search.com/acme",
+      "snippet": "Some sources claim Acme Robotics is linked to Oldcastle official_domain_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Oldcastle official_domain_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "acme",
+        "robotics"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-033_brave_search",
+      "item_id": "syn-033",
+      "title": "Acme Robotics: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/acme",
+      "snippet": "Some sources claim Acme Robotics is linked to Oldcastle brave_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Oldcastle brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "acme",
+        "robotics"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-034_gold",
+      "item_id": "syn-034",
+      "title": "Borealis Foods: primary source",
+      "url": "https://www.example.com/borealis",
+      "snippet": "Borealis Foods \u2014 verified record: Trenton.",
+      "published_at": "2024-02-01",
+      "source_authority": 0.7,
+      "asserts": "Trenton",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "borealis",
+        "foods"
+      ],
+      "requires_tokens": [],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-034_news_search",
+      "item_id": "syn-034",
+      "title": "Borealis Foods: secondary mention (news_search)",
+      "url": "https://blog.example-news_search.com/borealis",
+      "snippet": "Some sources claim Borealis Foods is linked to Oldcastle news_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Oldcastle news_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "borealis",
+        "foods"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-034_official_domain_search",
+      "item_id": "syn-034",
+      "title": "Borealis Foods: secondary mention (official_domain_search)",
+      "url": "https://blog.example-official_domain_search.com/borealis",
+      "snippet": "Some sources claim Borealis Foods is linked to Oldcastle official_domain_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Oldcastle official_domain_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "borealis",
+        "foods"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-034_brave_search",
+      "item_id": "syn-034",
+      "title": "Borealis Foods: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/borealis",
+      "snippet": "Some sources claim Borealis Foods is linked to Oldcastle brave_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Oldcastle brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "borealis",
+        "foods"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-035_gold",
+      "item_id": "syn-035",
+      "title": "Cobalt Systems: primary source",
+      "url": "https://www.example.com/cobalt",
+      "snippet": "Cobalt Systems \u2014 verified record: Trenton.",
+      "published_at": "2024-02-01",
+      "source_authority": 0.7,
+      "asserts": "Trenton",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "cobalt",
+        "systems"
+      ],
+      "requires_tokens": [],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-035_news_search",
+      "item_id": "syn-035",
+      "title": "Cobalt Systems: secondary mention (news_search)",
+      "url": "https://blog.example-news_search.com/cobalt",
+      "snippet": "Some sources claim Cobalt Systems is linked to Oldcastle news_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Oldcastle news_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "cobalt",
+        "systems"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-035_official_domain_search",
+      "item_id": "syn-035",
+      "title": "Cobalt Systems: secondary mention (official_domain_search)",
+      "url": "https://blog.example-official_domain_search.com/cobalt",
+      "snippet": "Some sources claim Cobalt Systems is linked to Oldcastle official_domain_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Oldcastle official_domain_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "cobalt",
+        "systems"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-035_brave_search",
+      "item_id": "syn-035",
+      "title": "Cobalt Systems: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/cobalt",
+      "snippet": "Some sources claim Cobalt Systems is linked to Oldcastle brave_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Oldcastle brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "cobalt",
+        "systems"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-036_gold",
+      "item_id": "syn-036",
+      "title": "Delphi Mining: primary source",
+      "url": "https://www.example.com/delphi",
+      "snippet": "Delphi Mining \u2014 verified record: Trenton.",
+      "published_at": "2024-02-01",
+      "source_authority": 0.7,
+      "asserts": "Trenton",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "delphi",
+        "mining"
+      ],
+      "requires_tokens": [],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-036_news_search",
+      "item_id": "syn-036",
+      "title": "Delphi Mining: secondary mention (news_search)",
+      "url": "https://blog.example-news_search.com/delphi",
+      "snippet": "Some sources claim Delphi Mining is linked to Oldcastle news_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Oldcastle news_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "delphi",
+        "mining"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-036_official_domain_search",
+      "item_id": "syn-036",
+      "title": "Delphi Mining: secondary mention (official_domain_search)",
+      "url": "https://blog.example-official_domain_search.com/delphi",
+      "snippet": "Some sources claim Delphi Mining is linked to Oldcastle official_domain_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Oldcastle official_domain_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "delphi",
+        "mining"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-036_brave_search",
+      "item_id": "syn-036",
+      "title": "Delphi Mining: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/delphi",
+      "snippet": "Some sources claim Delphi Mining is linked to Oldcastle brave_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Oldcastle brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "delphi",
+        "mining"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-037_gold",
+      "item_id": "syn-037",
+      "title": "Everest Labs: primary source",
+      "url": "https://www.example.com/everest",
+      "snippet": "Everest Labs \u2014 verified record: Trenton.",
+      "published_at": "2024-02-01",
+      "source_authority": 0.7,
+      "asserts": "Trenton",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "everest",
+        "labs"
+      ],
+      "requires_tokens": [],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-037_news_search",
+      "item_id": "syn-037",
+      "title": "Everest Labs: secondary mention (news_search)",
+      "url": "https://blog.example-news_search.com/everest",
+      "snippet": "Some sources claim Everest Labs is linked to Oldcastle news_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Oldcastle news_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "everest",
+        "labs"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-037_official_domain_search",
+      "item_id": "syn-037",
+      "title": "Everest Labs: secondary mention (official_domain_search)",
+      "url": "https://blog.example-official_domain_search.com/everest",
+      "snippet": "Some sources claim Everest Labs is linked to Oldcastle official_domain_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Oldcastle official_domain_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "everest",
+        "labs"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-037_brave_search",
+      "item_id": "syn-037",
+      "title": "Everest Labs: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/everest",
+      "snippet": "Some sources claim Everest Labs is linked to Oldcastle brave_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Oldcastle brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "everest",
+        "labs"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-038_gold",
+      "item_id": "syn-038",
+      "title": "Fairwind Energy: primary source",
+      "url": "https://www.example.com/fairwind",
+      "snippet": "Fairwind Energy \u2014 verified record: Trenton.",
+      "published_at": "2024-02-01",
+      "source_authority": 0.7,
+      "asserts": "Trenton",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "fairwind",
+        "energy"
+      ],
+      "requires_tokens": [],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-038_news_search",
+      "item_id": "syn-038",
+      "title": "Fairwind Energy: secondary mention (news_search)",
+      "url": "https://blog.example-news_search.com/fairwind",
+      "snippet": "Some sources claim Fairwind Energy is linked to Oldcastle news_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Oldcastle news_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "fairwind",
+        "energy"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-038_official_domain_search",
+      "item_id": "syn-038",
+      "title": "Fairwind Energy: secondary mention (official_domain_search)",
+      "url": "https://blog.example-official_domain_search.com/fairwind",
+      "snippet": "Some sources claim Fairwind Energy is linked to Oldcastle official_domain_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Oldcastle official_domain_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "fairwind",
+        "energy"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-038_brave_search",
+      "item_id": "syn-038",
+      "title": "Fairwind Energy: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/fairwind",
+      "snippet": "Some sources claim Fairwind Energy is linked to Oldcastle brave_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Oldcastle brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "fairwind",
+        "energy"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-039_gold",
+      "item_id": "syn-039",
+      "title": "Granite Capital: primary source",
+      "url": "https://www.example.com/granite",
+      "snippet": "Granite Capital \u2014 verified record: Trenton.",
+      "published_at": "2024-02-01",
+      "source_authority": 0.7,
+      "asserts": "Trenton",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "granite",
+        "capital"
+      ],
+      "requires_tokens": [],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-039_news_search",
+      "item_id": "syn-039",
+      "title": "Granite Capital: secondary mention (news_search)",
+      "url": "https://blog.example-news_search.com/granite",
+      "snippet": "Some sources claim Granite Capital is linked to Oldcastle news_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Oldcastle news_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "granite",
+        "capital"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-039_official_domain_search",
+      "item_id": "syn-039",
+      "title": "Granite Capital: secondary mention (official_domain_search)",
+      "url": "https://blog.example-official_domain_search.com/granite",
+      "snippet": "Some sources claim Granite Capital is linked to Oldcastle official_domain_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Oldcastle official_domain_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "granite",
+        "capital"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-039_brave_search",
+      "item_id": "syn-039",
+      "title": "Granite Capital: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/granite",
+      "snippet": "Some sources claim Granite Capital is linked to Oldcastle brave_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Oldcastle brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "granite",
+        "capital"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-040_gold",
+      "item_id": "syn-040",
+      "title": "Helios Pharma: primary source",
+      "url": "https://www.example.com/helios",
+      "snippet": "Helios Pharma \u2014 verified record: Trenton.",
+      "published_at": "2024-02-01",
+      "source_authority": 0.7,
+      "asserts": "Trenton",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "helios",
+        "pharma"
+      ],
+      "requires_tokens": [],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-040_news_search",
+      "item_id": "syn-040",
+      "title": "Helios Pharma: secondary mention (news_search)",
+      "url": "https://blog.example-news_search.com/helios",
+      "snippet": "Some sources claim Helios Pharma is linked to Oldcastle news_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Oldcastle news_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "helios",
+        "pharma"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-040_official_domain_search",
+      "item_id": "syn-040",
+      "title": "Helios Pharma: secondary mention (official_domain_search)",
+      "url": "https://blog.example-official_domain_search.com/helios",
+      "snippet": "Some sources claim Helios Pharma is linked to Oldcastle official_domain_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Oldcastle official_domain_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "helios",
+        "pharma"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-040_brave_search",
+      "item_id": "syn-040",
+      "title": "Helios Pharma: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/helios",
+      "snippet": "Some sources claim Helios Pharma is linked to Oldcastle brave_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Oldcastle brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "helios",
+        "pharma"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-041_gold",
+      "item_id": "syn-041",
+      "title": "Acme Robotics: primary source",
+      "url": "https://www.example.com/acme",
+      "snippet": "Acme Robotics \u2014 verified record: Trenton.",
+      "published_at": "2024-02-01",
+      "source_authority": 0.7,
+      "asserts": "Trenton",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "acme",
+        "robotics"
+      ],
+      "requires_tokens": [],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-041_news_search",
+      "item_id": "syn-041",
+      "title": "Acme Robotics: secondary mention (news_search)",
+      "url": "https://blog.example-news_search.com/acme",
+      "snippet": "Some sources claim Acme Robotics is linked to Oldcastle news_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Oldcastle news_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "acme",
+        "robotics"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-041_official_domain_search",
+      "item_id": "syn-041",
+      "title": "Acme Robotics: secondary mention (official_domain_search)",
+      "url": "https://blog.example-official_domain_search.com/acme",
+      "snippet": "Some sources claim Acme Robotics is linked to Oldcastle official_domain_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Oldcastle official_domain_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "acme",
+        "robotics"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-041_brave_search",
+      "item_id": "syn-041",
+      "title": "Acme Robotics: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/acme",
+      "snippet": "Some sources claim Acme Robotics is linked to Oldcastle brave_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Oldcastle brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "acme",
+        "robotics"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-042_gold",
+      "item_id": "syn-042",
+      "title": "Borealis Foods: primary source",
+      "url": "https://www.example.com/borealis",
+      "snippet": "Borealis Foods \u2014 verified record: Trenton.",
+      "published_at": "2024-02-01",
+      "source_authority": 0.7,
+      "asserts": "Trenton",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "borealis",
+        "foods"
+      ],
+      "requires_tokens": [],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-042_news_search",
+      "item_id": "syn-042",
+      "title": "Borealis Foods: secondary mention (news_search)",
+      "url": "https://blog.example-news_search.com/borealis",
+      "snippet": "Some sources claim Borealis Foods is linked to Oldcastle news_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Oldcastle news_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "borealis",
+        "foods"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-042_official_domain_search",
+      "item_id": "syn-042",
+      "title": "Borealis Foods: secondary mention (official_domain_search)",
+      "url": "https://blog.example-official_domain_search.com/borealis",
+      "snippet": "Some sources claim Borealis Foods is linked to Oldcastle official_domain_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Oldcastle official_domain_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "borealis",
+        "foods"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-042_brave_search",
+      "item_id": "syn-042",
+      "title": "Borealis Foods: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/borealis",
+      "snippet": "Some sources claim Borealis Foods is linked to Oldcastle brave_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Oldcastle brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "borealis",
+        "foods"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-043_gold",
+      "item_id": "syn-043",
+      "title": "Cobalt Systems: primary source",
+      "url": "https://www.example.com/cobalt",
+      "snippet": "Cobalt Systems \u2014 verified record: Trenton.",
+      "published_at": "2024-02-01",
+      "source_authority": 0.7,
+      "asserts": "Trenton",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "cobalt",
+        "systems"
+      ],
+      "requires_tokens": [],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-043_news_search",
+      "item_id": "syn-043",
+      "title": "Cobalt Systems: secondary mention (news_search)",
+      "url": "https://blog.example-news_search.com/cobalt",
+      "snippet": "Some sources claim Cobalt Systems is linked to Oldcastle news_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Oldcastle news_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "cobalt",
+        "systems"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-043_official_domain_search",
+      "item_id": "syn-043",
+      "title": "Cobalt Systems: secondary mention (official_domain_search)",
+      "url": "https://blog.example-official_domain_search.com/cobalt",
+      "snippet": "Some sources claim Cobalt Systems is linked to Oldcastle official_domain_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Oldcastle official_domain_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "cobalt",
+        "systems"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-043_brave_search",
+      "item_id": "syn-043",
+      "title": "Cobalt Systems: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/cobalt",
+      "snippet": "Some sources claim Cobalt Systems is linked to Oldcastle brave_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Oldcastle brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "cobalt",
+        "systems"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-044_gold",
+      "item_id": "syn-044",
+      "title": "Delphi Mining: primary source",
+      "url": "https://www.example.com/delphi",
+      "snippet": "Delphi Mining \u2014 verified record: Trenton.",
+      "published_at": "2024-02-01",
+      "source_authority": 0.7,
+      "asserts": "Trenton",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "delphi",
+        "mining"
+      ],
+      "requires_tokens": [],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-044_news_search",
+      "item_id": "syn-044",
+      "title": "Delphi Mining: secondary mention (news_search)",
+      "url": "https://blog.example-news_search.com/delphi",
+      "snippet": "Some sources claim Delphi Mining is linked to Oldcastle news_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Oldcastle news_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "delphi",
+        "mining"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-044_official_domain_search",
+      "item_id": "syn-044",
+      "title": "Delphi Mining: secondary mention (official_domain_search)",
+      "url": "https://blog.example-official_domain_search.com/delphi",
+      "snippet": "Some sources claim Delphi Mining is linked to Oldcastle official_domain_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Oldcastle official_domain_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "delphi",
+        "mining"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-044_brave_search",
+      "item_id": "syn-044",
+      "title": "Delphi Mining: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/delphi",
+      "snippet": "Some sources claim Delphi Mining is linked to Oldcastle brave_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Oldcastle brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "delphi",
+        "mining"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-045_gold",
+      "item_id": "syn-045",
+      "title": "Everest Labs: primary source",
+      "url": "https://www.example.com/everest",
+      "snippet": "Everest Labs \u2014 verified record: Trenton.",
+      "published_at": "2024-02-01",
+      "source_authority": 0.7,
+      "asserts": "Trenton",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "everest",
+        "labs"
+      ],
+      "requires_tokens": [],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-045_news_search",
+      "item_id": "syn-045",
+      "title": "Everest Labs: secondary mention (news_search)",
+      "url": "https://blog.example-news_search.com/everest",
+      "snippet": "Some sources claim Everest Labs is linked to Oldcastle news_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Oldcastle news_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "everest",
+        "labs"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-045_official_domain_search",
+      "item_id": "syn-045",
+      "title": "Everest Labs: secondary mention (official_domain_search)",
+      "url": "https://blog.example-official_domain_search.com/everest",
+      "snippet": "Some sources claim Everest Labs is linked to Oldcastle official_domain_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Oldcastle official_domain_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "everest",
+        "labs"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-045_brave_search",
+      "item_id": "syn-045",
+      "title": "Everest Labs: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/everest",
+      "snippet": "Some sources claim Everest Labs is linked to Oldcastle brave_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Oldcastle brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "everest",
+        "labs"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-046_gold",
+      "item_id": "syn-046",
+      "title": "Fairwind Energy: primary source",
+      "url": "https://www.example.com/fairwind",
+      "snippet": "Fairwind Energy \u2014 verified record: Trenton.",
+      "published_at": "2024-02-01",
+      "source_authority": 0.7,
+      "asserts": "Trenton",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "fairwind",
+        "energy"
+      ],
+      "requires_tokens": [],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-046_news_search",
+      "item_id": "syn-046",
+      "title": "Fairwind Energy: secondary mention (news_search)",
+      "url": "https://blog.example-news_search.com/fairwind",
+      "snippet": "Some sources claim Fairwind Energy is linked to Oldcastle news_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Oldcastle news_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "fairwind",
+        "energy"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-046_official_domain_search",
+      "item_id": "syn-046",
+      "title": "Fairwind Energy: secondary mention (official_domain_search)",
+      "url": "https://blog.example-official_domain_search.com/fairwind",
+      "snippet": "Some sources claim Fairwind Energy is linked to Oldcastle official_domain_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Oldcastle official_domain_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "fairwind",
+        "energy"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-046_brave_search",
+      "item_id": "syn-046",
+      "title": "Fairwind Energy: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/fairwind",
+      "snippet": "Some sources claim Fairwind Energy is linked to Oldcastle brave_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Oldcastle brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "fairwind",
+        "energy"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-047_gold",
+      "item_id": "syn-047",
+      "title": "Granite Capital: primary source",
+      "url": "https://www.example.com/granite",
+      "snippet": "Granite Capital \u2014 verified record: Trenton.",
+      "published_at": "2024-02-01",
+      "source_authority": 0.7,
+      "asserts": "Trenton",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "granite",
+        "capital"
+      ],
+      "requires_tokens": [],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-047_news_search",
+      "item_id": "syn-047",
+      "title": "Granite Capital: secondary mention (news_search)",
+      "url": "https://blog.example-news_search.com/granite",
+      "snippet": "Some sources claim Granite Capital is linked to Oldcastle news_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Oldcastle news_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "granite",
+        "capital"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-047_official_domain_search",
+      "item_id": "syn-047",
+      "title": "Granite Capital: secondary mention (official_domain_search)",
+      "url": "https://blog.example-official_domain_search.com/granite",
+      "snippet": "Some sources claim Granite Capital is linked to Oldcastle official_domain_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Oldcastle official_domain_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "granite",
+        "capital"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-047_brave_search",
+      "item_id": "syn-047",
+      "title": "Granite Capital: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/granite",
+      "snippet": "Some sources claim Granite Capital is linked to Oldcastle brave_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Oldcastle brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "granite",
+        "capital"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-048_gold",
+      "item_id": "syn-048",
+      "title": "Helios Pharma: primary source",
+      "url": "https://www.example.com/helios",
+      "snippet": "Helios Pharma \u2014 verified record: Trenton.",
+      "published_at": "2024-02-01",
+      "source_authority": 0.7,
+      "asserts": "Trenton",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "helios",
+        "pharma"
+      ],
+      "requires_tokens": [],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-048_news_search",
+      "item_id": "syn-048",
+      "title": "Helios Pharma: secondary mention (news_search)",
+      "url": "https://blog.example-news_search.com/helios",
+      "snippet": "Some sources claim Helios Pharma is linked to Oldcastle news_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Oldcastle news_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "helios",
+        "pharma"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-048_official_domain_search",
+      "item_id": "syn-048",
+      "title": "Helios Pharma: secondary mention (official_domain_search)",
+      "url": "https://blog.example-official_domain_search.com/helios",
+      "snippet": "Some sources claim Helios Pharma is linked to Oldcastle official_domain_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Oldcastle official_domain_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "helios",
+        "pharma"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-048_brave_search",
+      "item_id": "syn-048",
+      "title": "Helios Pharma: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/helios",
+      "snippet": "Some sources claim Helios Pharma is linked to Oldcastle brave_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Oldcastle brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "helios",
+        "pharma"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-049_gold",
+      "item_id": "syn-049",
+      "title": "Acme Robotics: primary source",
+      "url": "https://www.example.com/acme",
+      "snippet": "Acme Robotics \u2014 verified record: Ekaterina.",
+      "published_at": "2024-02-01",
+      "source_authority": 0.7,
+      "asserts": "Ekaterina",
+      "answer_on_fetch_only": true,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "acme",
+        "robotics"
+      ],
+      "requires_tokens": [],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-049_news_search",
+      "item_id": "syn-049",
+      "title": "Acme Robotics: secondary mention (news_search)",
+      "url": "https://blog.example-news_search.com/acme",
+      "snippet": "Some sources claim Acme Robotics is linked to Bartholomew news_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Bartholomew news_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "acme",
+        "robotics"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-049_official_domain_search",
+      "item_id": "syn-049",
+      "title": "Acme Robotics: secondary mention (official_domain_search)",
+      "url": "https://blog.example-official_domain_search.com/acme",
+      "snippet": "Some sources claim Acme Robotics is linked to Bartholomew official_domain_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Bartholomew official_domain_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "acme",
+        "robotics"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-049_brave_search",
+      "item_id": "syn-049",
+      "title": "Acme Robotics: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/acme",
+      "snippet": "Some sources claim Acme Robotics is linked to Bartholomew brave_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Bartholomew brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "acme",
+        "robotics"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-050_gold",
+      "item_id": "syn-050",
+      "title": "Borealis Foods: primary source",
+      "url": "https://www.example.com/borealis",
+      "snippet": "Borealis Foods \u2014 verified record: Ekaterina.",
+      "published_at": "2024-02-01",
+      "source_authority": 0.7,
+      "asserts": "Ekaterina",
+      "answer_on_fetch_only": true,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "borealis",
+        "foods"
+      ],
+      "requires_tokens": [],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-050_news_search",
+      "item_id": "syn-050",
+      "title": "Borealis Foods: secondary mention (news_search)",
+      "url": "https://blog.example-news_search.com/borealis",
+      "snippet": "Some sources claim Borealis Foods is linked to Bartholomew news_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Bartholomew news_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "borealis",
+        "foods"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-050_official_domain_search",
+      "item_id": "syn-050",
+      "title": "Borealis Foods: secondary mention (official_domain_search)",
+      "url": "https://blog.example-official_domain_search.com/borealis",
+      "snippet": "Some sources claim Borealis Foods is linked to Bartholomew official_domain_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Bartholomew official_domain_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "borealis",
+        "foods"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-050_brave_search",
+      "item_id": "syn-050",
+      "title": "Borealis Foods: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/borealis",
+      "snippet": "Some sources claim Borealis Foods is linked to Bartholomew brave_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Bartholomew brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "borealis",
+        "foods"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-051_gold",
+      "item_id": "syn-051",
+      "title": "Cobalt Systems: primary source",
+      "url": "https://www.example.com/cobalt",
+      "snippet": "Cobalt Systems \u2014 verified record: Ekaterina.",
+      "published_at": "2024-02-01",
+      "source_authority": 0.7,
+      "asserts": "Ekaterina",
+      "answer_on_fetch_only": true,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "cobalt",
+        "systems"
+      ],
+      "requires_tokens": [],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-051_news_search",
+      "item_id": "syn-051",
+      "title": "Cobalt Systems: secondary mention (news_search)",
+      "url": "https://blog.example-news_search.com/cobalt",
+      "snippet": "Some sources claim Cobalt Systems is linked to Bartholomew news_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Bartholomew news_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "cobalt",
+        "systems"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-051_official_domain_search",
+      "item_id": "syn-051",
+      "title": "Cobalt Systems: secondary mention (official_domain_search)",
+      "url": "https://blog.example-official_domain_search.com/cobalt",
+      "snippet": "Some sources claim Cobalt Systems is linked to Bartholomew official_domain_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Bartholomew official_domain_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "cobalt",
+        "systems"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-051_brave_search",
+      "item_id": "syn-051",
+      "title": "Cobalt Systems: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/cobalt",
+      "snippet": "Some sources claim Cobalt Systems is linked to Bartholomew brave_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Bartholomew brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "cobalt",
+        "systems"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-052_gold",
+      "item_id": "syn-052",
+      "title": "Delphi Mining: primary source",
+      "url": "https://www.example.com/delphi",
+      "snippet": "Delphi Mining \u2014 verified record: Ekaterina.",
+      "published_at": "2024-02-01",
+      "source_authority": 0.7,
+      "asserts": "Ekaterina",
+      "answer_on_fetch_only": true,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "delphi",
+        "mining"
+      ],
+      "requires_tokens": [],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-052_news_search",
+      "item_id": "syn-052",
+      "title": "Delphi Mining: secondary mention (news_search)",
+      "url": "https://blog.example-news_search.com/delphi",
+      "snippet": "Some sources claim Delphi Mining is linked to Bartholomew news_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Bartholomew news_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "delphi",
+        "mining"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-052_official_domain_search",
+      "item_id": "syn-052",
+      "title": "Delphi Mining: secondary mention (official_domain_search)",
+      "url": "https://blog.example-official_domain_search.com/delphi",
+      "snippet": "Some sources claim Delphi Mining is linked to Bartholomew official_domain_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Bartholomew official_domain_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "delphi",
+        "mining"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-052_brave_search",
+      "item_id": "syn-052",
+      "title": "Delphi Mining: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/delphi",
+      "snippet": "Some sources claim Delphi Mining is linked to Bartholomew brave_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Bartholomew brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "delphi",
+        "mining"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-053_gold",
+      "item_id": "syn-053",
+      "title": "Everest Labs: primary source",
+      "url": "https://www.example.com/everest",
+      "snippet": "Everest Labs \u2014 verified record: Ekaterina.",
+      "published_at": "2024-02-01",
+      "source_authority": 0.7,
+      "asserts": "Ekaterina",
+      "answer_on_fetch_only": true,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "everest",
+        "labs"
+      ],
+      "requires_tokens": [],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-053_news_search",
+      "item_id": "syn-053",
+      "title": "Everest Labs: secondary mention (news_search)",
+      "url": "https://blog.example-news_search.com/everest",
+      "snippet": "Some sources claim Everest Labs is linked to Bartholomew news_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Bartholomew news_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "everest",
+        "labs"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-053_official_domain_search",
+      "item_id": "syn-053",
+      "title": "Everest Labs: secondary mention (official_domain_search)",
+      "url": "https://blog.example-official_domain_search.com/everest",
+      "snippet": "Some sources claim Everest Labs is linked to Bartholomew official_domain_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Bartholomew official_domain_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "everest",
+        "labs"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-053_brave_search",
+      "item_id": "syn-053",
+      "title": "Everest Labs: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/everest",
+      "snippet": "Some sources claim Everest Labs is linked to Bartholomew brave_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Bartholomew brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "everest",
+        "labs"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-054_gold",
+      "item_id": "syn-054",
+      "title": "Fairwind Energy: primary source",
+      "url": "https://www.example.com/fairwind",
+      "snippet": "Fairwind Energy \u2014 verified record: Ekaterina.",
+      "published_at": "2024-02-01",
+      "source_authority": 0.7,
+      "asserts": "Ekaterina",
+      "answer_on_fetch_only": true,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "fairwind",
+        "energy"
+      ],
+      "requires_tokens": [],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-054_news_search",
+      "item_id": "syn-054",
+      "title": "Fairwind Energy: secondary mention (news_search)",
+      "url": "https://blog.example-news_search.com/fairwind",
+      "snippet": "Some sources claim Fairwind Energy is linked to Bartholomew news_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Bartholomew news_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "fairwind",
+        "energy"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-054_official_domain_search",
+      "item_id": "syn-054",
+      "title": "Fairwind Energy: secondary mention (official_domain_search)",
+      "url": "https://blog.example-official_domain_search.com/fairwind",
+      "snippet": "Some sources claim Fairwind Energy is linked to Bartholomew official_domain_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Bartholomew official_domain_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "fairwind",
+        "energy"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-054_brave_search",
+      "item_id": "syn-054",
+      "title": "Fairwind Energy: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/fairwind",
+      "snippet": "Some sources claim Fairwind Energy is linked to Bartholomew brave_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Bartholomew brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "fairwind",
+        "energy"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-055_gold",
+      "item_id": "syn-055",
+      "title": "Granite Capital: primary source",
+      "url": "https://www.example.com/granite",
+      "snippet": "Granite Capital \u2014 verified record: Ekaterina.",
+      "published_at": "2024-02-01",
+      "source_authority": 0.7,
+      "asserts": "Ekaterina",
+      "answer_on_fetch_only": true,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "granite",
+        "capital"
+      ],
+      "requires_tokens": [],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-055_news_search",
+      "item_id": "syn-055",
+      "title": "Granite Capital: secondary mention (news_search)",
+      "url": "https://blog.example-news_search.com/granite",
+      "snippet": "Some sources claim Granite Capital is linked to Bartholomew news_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Bartholomew news_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "granite",
+        "capital"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-055_official_domain_search",
+      "item_id": "syn-055",
+      "title": "Granite Capital: secondary mention (official_domain_search)",
+      "url": "https://blog.example-official_domain_search.com/granite",
+      "snippet": "Some sources claim Granite Capital is linked to Bartholomew official_domain_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Bartholomew official_domain_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "granite",
+        "capital"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-055_brave_search",
+      "item_id": "syn-055",
+      "title": "Granite Capital: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/granite",
+      "snippet": "Some sources claim Granite Capital is linked to Bartholomew brave_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Bartholomew brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "granite",
+        "capital"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-056_gold",
+      "item_id": "syn-056",
+      "title": "Helios Pharma: primary source",
+      "url": "https://www.example.com/helios",
+      "snippet": "Helios Pharma \u2014 verified record: Ekaterina.",
+      "published_at": "2024-02-01",
+      "source_authority": 0.7,
+      "asserts": "Ekaterina",
+      "answer_on_fetch_only": true,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "helios",
+        "pharma"
+      ],
+      "requires_tokens": [],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-056_news_search",
+      "item_id": "syn-056",
+      "title": "Helios Pharma: secondary mention (news_search)",
+      "url": "https://blog.example-news_search.com/helios",
+      "snippet": "Some sources claim Helios Pharma is linked to Bartholomew news_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Bartholomew news_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "helios",
+        "pharma"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-056_official_domain_search",
+      "item_id": "syn-056",
+      "title": "Helios Pharma: secondary mention (official_domain_search)",
+      "url": "https://blog.example-official_domain_search.com/helios",
+      "snippet": "Some sources claim Helios Pharma is linked to Bartholomew official_domain_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Bartholomew official_domain_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "helios",
+        "pharma"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-056_brave_search",
+      "item_id": "syn-056",
+      "title": "Helios Pharma: secondary mention (brave_search)",
+      "url": "https://blog.example-brave_search.com/helios",
+      "snippet": "Some sources claim Helios Pharma is linked to Bartholomew brave_search.",
+      "published_at": "2023-06-01",
+      "source_authority": 0.4,
+      "asserts": "Bartholomew brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "helios",
+        "pharma"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    }
+  ]
+}

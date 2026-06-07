@@ -1,0 +1,13 @@
+budget,condition,accuracy,correct_per_tool_call,mean_tool_calls,first_tool_hit_rate,n
+1,no_memory,0.0,0.0,1.0,0.0,24
+1,policy_memory,0.7917,0.7917,1.0,0.7917,24
+1,random_memory,0.25,0.25,1.0,0.25,24
+3,no_memory,0.25,0.0833,3.0,0.0,24
+3,policy_memory,0.7917,0.6552,1.208,0.7917,24
+3,random_memory,0.5,0.3077,1.625,0.25,24
+5,no_memory,0.5,0.1,5.0,0.0,24
+5,policy_memory,0.7917,0.6552,1.208,0.7917,24
+5,random_memory,0.5,0.2667,1.875,0.25,24
+10,no_memory,0.25,0.025,10.0,0.0,24
+10,policy_memory,0.7917,0.6552,1.208,0.7917,24
+10,random_memory,0.375,0.15,2.5,0.25,24

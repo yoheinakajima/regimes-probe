@@ -1,0 +1,25 @@
+"""Dataset adapters: synthetic (tests) + BrowseComp / LiveBrowseComp (real)."""
+
+from __future__ import annotations
+
+from regimes_probe.datasets.base import (
+    DatasetAdapter,
+    DatasetUnavailable,
+    Item,
+    items_to_jsonl,
+)
+from regimes_probe.datasets.browsecomp import BrowseCompAdapter, decrypt, encrypt
+from regimes_probe.datasets.livebrowsecomp import LiveBrowseCompAdapter
+from regimes_probe.datasets.synthetic import SyntheticBrowseAdapter
+
+__all__ = [
+    "DatasetAdapter",
+    "DatasetUnavailable",
+    "Item",
+    "items_to_jsonl",
+    "BrowseCompAdapter",
+    "decrypt",
+    "encrypt",
+    "LiveBrowseCompAdapter",
+    "SyntheticBrowseAdapter",
+]

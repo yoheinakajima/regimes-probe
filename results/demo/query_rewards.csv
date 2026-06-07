@@ -1,0 +1,8 @@
+signature_cluster,arm,mean_reward,count,w
+answer_shape_constrained,freshness_terms,2.4447,40,27.715
+freshness_sensitive,freshness_terms,2.3408,20,16.62
+freshness_sensitive+answer_shape_constrained+query_fragile+staleness_prone,freshness_terms,2.1735,14,12.318
+freshness_sensitive+answer_shape_constrained+query_fragile+staleness_prone,direct_question,-0.718,1,1.0
+freshness_sensitive+answer_shape_constrained+query_fragile+staleness_prone,exact_answer_shape,-0.718,1,1.0
+generic,freshness_terms,0.3079,12,10.764
+source_authority_sensitive,freshness_terms,2.482,40,27.715

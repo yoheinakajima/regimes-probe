@@ -1,0 +1,148 @@
+[
+  {
+    "promotion": {
+      "accepted": false,
+      "optimize_gate": {
+        "kind": "optimize",
+        "metric": "correct_per_tool_call",
+        "before": 0.90625,
+        "after": 0.90625,
+        "delta": 0.0,
+        "threshold": 0.01,
+        "passed": false
+      },
+      "confirm_gate": {
+        "kind": "confirm",
+        "metric": "correct_per_tool_call",
+        "before": 0.791667,
+        "after": 0.791667,
+        "delta": 0.0,
+        "threshold": 0.0,
+        "passed": true
+      },
+      "update": {
+        "mutations": [
+          {
+            "target": "stop.stop_threshold",
+            "old": 0.6,
+            "new": 0.7,
+            "delta": 0.1,
+            "tier": "safe",
+            "rationale": "stop_too_early: require more evidence before stopping"
+          }
+        ]
+      }
+    },
+    "proposal": {
+      "dominant_regimes": [
+        [
+          "stop_too_early",
+          3
+        ],
+        [
+          "under_search",
+          3
+        ]
+      ],
+      "mutations": [
+        {
+          "target": "stop.stop_threshold",
+          "delta": 0.1,
+          "tier": "safe",
+          "rationale": "stop_too_early: require more evidence before stopping"
+        }
+      ],
+      "rationale": "stop_too_early\u00d73; under_search\u00d73"
+    },
+    "mutation_records": [
+      {
+        "target": "stop.stop_threshold",
+        "old": 0.6,
+        "new": 0.7,
+        "delta": 0.1,
+        "tier": "safe",
+        "rationale": "stop_too_early: require more evidence before stopping"
+      }
+    ],
+    "baseline_optimize": {
+      "n": 32,
+      "accuracy": 0.90625,
+      "correct_per_tool_call": 0.90625,
+      "correct_per_dollar": 453.1249999999997,
+      "correct_per_second": 0.0,
+      "total_tool_calls": 32,
+      "mean_tool_calls": 1.0,
+      "first_tool_hit_rate": 0.90625,
+      "evidence_gain_per_call": 0.9859375000000001,
+      "primary_or_authoritative_source_rate": 0.90625,
+      "stale_source_error_rate": 0.0,
+      "false_stop_rate": 0.09375,
+      "over_search_rate": 0.0,
+      "under_search_rate": 0.09375,
+      "abstention_rate": 0.0,
+      "abstention_precision": 0.0,
+      "abstention_recall": 0.0,
+      "mean_attempt_reward": 2.03240625
+    },
+    "baseline_confirm": {
+      "n": 24,
+      "accuracy": 0.7916666666666666,
+      "correct_per_tool_call": 0.7916666666666666,
+      "correct_per_dollar": 395.8333333333331,
+      "correct_per_second": 0.0,
+      "total_tool_calls": 24,
+      "mean_tool_calls": 1.0,
+      "first_tool_hit_rate": 0.7916666666666666,
+      "evidence_gain_per_call": 0.9687500000000003,
+      "primary_or_authoritative_source_rate": 0.7916666666666666,
+      "stale_source_error_rate": 0.0,
+      "false_stop_rate": 0.20833333333333334,
+      "over_search_rate": 0.0,
+      "under_search_rate": 0.20833333333333334,
+      "abstention_rate": 0.0,
+      "abstention_precision": 0.0,
+      "abstention_recall": 0.0,
+      "mean_attempt_reward": 1.8324583333333335
+    },
+    "candidate_optimize": {
+      "n": 32,
+      "accuracy": 0.90625,
+      "correct_per_tool_call": 0.90625,
+      "correct_per_dollar": 453.1249999999997,
+      "correct_per_second": 0.0,
+      "total_tool_calls": 32,
+      "mean_tool_calls": 1.0,
+      "first_tool_hit_rate": 0.90625,
+      "evidence_gain_per_call": 0.9859375000000001,
+      "primary_or_authoritative_source_rate": 0.90625,
+      "stale_source_error_rate": 0.0,
+      "false_stop_rate": 0.09375,
+      "over_search_rate": 0.0,
+      "under_search_rate": 0.09375,
+      "abstention_rate": 0.0,
+      "abstention_precision": 0.0,
+      "abstention_recall": 0.0,
+      "mean_attempt_reward": 2.03240625
+    },
+    "candidate_confirm": {
+      "n": 24,
+      "accuracy": 0.7916666666666666,
+      "correct_per_tool_call": 0.7916666666666666,
+      "correct_per_dollar": 395.8333333333331,
+      "correct_per_second": 0.0,
+      "total_tool_calls": 24,
+      "mean_tool_calls": 1.0,
+      "first_tool_hit_rate": 0.7916666666666666,
+      "evidence_gain_per_call": 0.9687500000000003,
+      "primary_or_authoritative_source_rate": 0.7916666666666666,
+      "stale_source_error_rate": 0.0,
+      "false_stop_rate": 0.20833333333333334,
+      "over_search_rate": 0.0,
+      "under_search_rate": 0.20833333333333334,
+      "abstention_rate": 0.0,
+      "abstention_precision": 0.0,
+      "abstention_recall": 0.0,
+      "mean_attempt_reward": 1.8324583333333335
+    }
+  }
+]

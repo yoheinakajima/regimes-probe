@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.venv/
+venv/
+
+# User live provider config (secrets live in env vars, never here)
+config/tools.yaml
+
+# Local scratch run outputs (the committed results/demo + results/regimes-demo
+# are intentionally tracked as grounding artifacts; ignore everything else).
+results/*
+!results/.gitkeep
+!results/demo/
+!results/demo/**
+!results/regimes-demo/
+!results/regimes-demo/**

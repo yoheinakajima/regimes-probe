@@ -1,0 +1,900 @@
+{
+  "items": [
+    {
+      "id": "syn-001",
+      "question": "Who is currently the CEO of Acme Robotics?",
+      "answer": "Mara Olsen",
+      "answer_aliases": [],
+      "released_at": "2026-05-10",
+      "source": "synthetic",
+      "meta": {
+        "regime": "freshness",
+        "gold_tool": "news_search",
+        "gold_query_arm": "freshness_terms",
+        "known_domain": null,
+        "freshness_sensitive": true,
+        "answer_on_fetch_only": false
+      }
+    },
+    {
+      "id": "syn-002",
+      "question": "Who is currently the CEO of Borealis Foods?",
+      "answer": "Mara Olsen",
+      "answer_aliases": [],
+      "released_at": "2026-05-10",
+      "source": "synthetic",
+      "meta": {
+        "regime": "freshness",
+        "gold_tool": "news_search",
+        "gold_query_arm": "freshness_terms",
+        "known_domain": null,
+        "freshness_sensitive": true,
+        "answer_on_fetch_only": false
+      }
+    },
+    {
+      "id": "syn-003",
+      "question": "Who is currently the CEO of Cobalt Systems?",
+      "answer": "Mara Olsen",
+      "answer_aliases": [],
+      "released_at": "2026-05-10",
+      "source": "synthetic",
+      "meta": {
+        "regime": "freshness",
+        "gold_tool": "news_search",
+        "gold_query_arm": "freshness_terms",
+        "known_domain": null,
+        "freshness_sensitive": true,
+        "answer_on_fetch_only": false
+      }
+    },
+    {
+      "id": "syn-004",
+      "question": "Who is currently the CEO of Delphi Mining?",
+      "answer": "Mara Olsen",
+      "answer_aliases": [],
+      "released_at": "2026-05-10",
+      "source": "synthetic",
+      "meta": {
+        "regime": "freshness",
+        "gold_tool": "news_search",
+        "gold_query_arm": "freshness_terms",
+        "known_domain": null,
+        "freshness_sensitive": true,
+        "answer_on_fetch_only": false
+      }
+    },
+    {
+      "id": "syn-005",
+      "question": "Who is currently the CEO of Everest Labs?",
+      "answer": "Mara Olsen",
+      "answer_aliases": [],
+      "released_at": "2026-05-10",
+      "source": "synthetic",
+      "meta": {
+        "regime": "freshness",
+        "gold_tool": "news_search",
+        "gold_query_arm": "freshness_terms",
+        "known_domain": null,
+        "freshness_sensitive": true,
+        "answer_on_fetch_only": false
+      }
+    },
+    {
+      "id": "syn-006",
+      "question": "Who is currently the CEO of Fairwind Energy?",
+      "answer": "Mara Olsen",
+      "answer_aliases": [],
+      "released_at": "2026-05-10",
+      "source": "synthetic",
+      "meta": {
+        "regime": "freshness",
+        "gold_tool": "news_search",
+        "gold_query_arm": "freshness_terms",
+        "known_domain": null,
+        "freshness_sensitive": true,
+        "answer_on_fetch_only": false
+      }
+    },
+    {
+      "id": "syn-007",
+      "question": "Who is currently the CEO of Granite Capital?",
+      "answer": "Mara Olsen",
+      "answer_aliases": [],
+      "released_at": "2026-05-10",
+      "source": "synthetic",
+      "meta": {
+        "regime": "freshness",
+        "gold_tool": "news_search",
+        "gold_query_arm": "freshness_terms",
+        "known_domain": null,
+        "freshness_sensitive": true,
+        "answer_on_fetch_only": false
+      }
+    },
+    {
+      "id": "syn-008",
+      "question": "Who is currently the CEO of Helios Pharma?",
+      "answer": "Mara Olsen",
+      "answer_aliases": [],
+      "released_at": "2026-05-10",
+      "source": "synthetic",
+      "meta": {
+        "regime": "freshness",
+        "gold_tool": "news_search",
+        "gold_query_arm": "freshness_terms",
+        "known_domain": null,
+        "freshness_sensitive": true,
+        "answer_on_fetch_only": false
+      }
+    },
+    {
+      "id": "syn-009",
+      "question": "What is the latest flagship product released by Acme Robotics?",
+      "answer": "Mara Olsen",
+      "answer_aliases": [],
+      "released_at": "2026-05-10",
+      "source": "synthetic",
+      "meta": {
+        "regime": "freshness",
+        "gold_tool": "news_search",
+        "gold_query_arm": "freshness_terms",
+        "known_domain": null,
+        "freshness_sensitive": true,
+        "answer_on_fetch_only": false
+      }
+    },
+    {
+      "id": "syn-010",
+      "question": "What is the latest flagship product released by Borealis Foods?",
+      "answer": "Mara Olsen",
+      "answer_aliases": [],
+      "released_at": "2026-05-10",
+      "source": "synthetic",
+      "meta": {
+        "regime": "freshness",
+        "gold_tool": "news_search",
+        "gold_query_arm": "freshness_terms",
+        "known_domain": null,
+        "freshness_sensitive": true,
+        "answer_on_fetch_only": false
+      }
+    },
+    {
+      "id": "syn-011",
+      "question": "What is the latest flagship product released by Cobalt Systems?",
+      "answer": "Mara Olsen",
+      "answer_aliases": [],
+      "released_at": "2026-05-10",
+      "source": "synthetic",
+      "meta": {
+        "regime": "freshness",
+        "gold_tool": "news_search",
+        "gold_query_arm": "freshness_terms",
+        "known_domain": null,
+        "freshness_sensitive": true,
+        "answer_on_fetch_only": false
+      }
+    },
+    {
+      "id": "syn-012",
+      "question": "What is the latest flagship product released by Delphi Mining?",
+      "answer": "Mara Olsen",
+      "answer_aliases": [],
+      "released_at": "2026-05-10",
+      "source": "synthetic",
+      "meta": {
+        "regime": "freshness",
+        "gold_tool": "news_search",
+        "gold_query_arm": "freshness_terms",
+        "known_domain": null,
+        "freshness_sensitive": true,
+        "answer_on_fetch_only": false
+      }
+    },
+    {
+      "id": "syn-013",
+      "question": "What is the latest flagship product released by Everest Labs?",
+      "answer": "Mara Olsen",
+      "answer_aliases": [],
+      "released_at": "2026-05-10",
+      "source": "synthetic",
+      "meta": {
+        "regime": "freshness",
+        "gold_tool": "news_search",
+        "gold_query_arm": "freshness_terms",
+        "known_domain": null,
+        "freshness_sensitive": true,
+        "answer_on_fetch_only": false
+      }
+    },
+    {
+      "id": "syn-014",
+      "question": "What is the latest flagship product released by Fairwind Energy?",
+      "answer": "Mara Olsen",
+      "answer_aliases": [],
+      "released_at": "2026-05-10",
+      "source": "synthetic",
+      "meta": {
+        "regime": "freshness",
+        "gold_tool": "news_search",
+        "gold_query_arm": "freshness_terms",
+        "known_domain": null,
+        "freshness_sensitive": true,
+        "answer_on_fetch_only": false
+      }
+    },
+    {
+      "id": "syn-015",
+      "question": "What is the latest flagship product released by Granite Capital?",
+      "answer": "Mara Olsen",
+      "answer_aliases": [],
+      "released_at": "2026-05-10",
+      "source": "synthetic",
+      "meta": {
+        "regime": "freshness",
+        "gold_tool": "news_search",
+        "gold_query_arm": "freshness_terms",
+        "known_domain": null,
+        "freshness_sensitive": true,
+        "answer_on_fetch_only": false
+      }
+    },
+    {
+      "id": "syn-016",
+      "question": "What is the latest flagship product released by Helios Pharma?",
+      "answer": "Mara Olsen",
+      "answer_aliases": [],
+      "released_at": "2026-05-10",
+      "source": "synthetic",
+      "meta": {
+        "regime": "freshness",
+        "gold_tool": "news_search",
+        "gold_query_arm": "freshness_terms",
+        "known_domain": null,
+        "freshness_sensitive": true,
+        "answer_on_fetch_only": false
+      }
+    },
+    {
+      "id": "syn-017",
+      "question": "What is the official registered headquarters address of Acme Robotics?",
+      "answer": "HQ-4821 Birch Lane",
+      "answer_aliases": [],
+      "released_at": "2024-02-01",
+      "source": "synthetic",
+      "meta": {
+        "regime": "authority",
+        "gold_tool": "official_domain_search",
+        "gold_query_arm": "source_constrained",
+        "known_domain": "example-acme.gov",
+        "freshness_sensitive": false,
+        "answer_on_fetch_only": false
+      }
+    },
+    {
+      "id": "syn-018",
+      "question": "What is the official registered headquarters address of Borealis Foods?",
+      "answer": "HQ-4821 Birch Lane",
+      "answer_aliases": [],
+      "released_at": "2024-02-01",
+      "source": "synthetic",
+      "meta": {
+        "regime": "authority",
+        "gold_tool": "official_domain_search",
+        "gold_query_arm": "source_constrained",
+        "known_domain": "example-borealis.gov",
+        "freshness_sensitive": false,
+        "answer_on_fetch_only": false
+      }
+    },
+    {
+      "id": "syn-019",
+      "question": "What is the official registered headquarters address of Cobalt Systems?",
+      "answer": "HQ-4821 Birch Lane",
+      "answer_aliases": [],
+      "released_at": "2024-02-01",
+      "source": "synthetic",
+      "meta": {
+        "regime": "authority",
+        "gold_tool": "official_domain_search",
+        "gold_query_arm": "source_constrained",
+        "known_domain": "example-cobalt.gov",
+        "freshness_sensitive": false,
+        "answer_on_fetch_only": false
+      }
+    },
+    {
+      "id": "syn-020",
+      "question": "What is the official registered headquarters address of Delphi Mining?",
+      "answer": "HQ-4821 Birch Lane",
+      "answer_aliases": [],
+      "released_at": "2024-02-01",
+      "source": "synthetic",
+      "meta": {
+        "regime": "authority",
+        "gold_tool": "official_domain_search",
+        "gold_query_arm": "source_constrained",
+        "known_domain": "example-delphi.gov",
+        "freshness_sensitive": false,
+        "answer_on_fetch_only": false
+      }
+    },
+    {
+      "id": "syn-021",
+      "question": "What is the official registered headquarters address of Everest Labs?",
+      "answer": "HQ-4821 Birch Lane",
+      "answer_aliases": [],
+      "released_at": "2024-02-01",
+      "source": "synthetic",
+      "meta": {
+        "regime": "authority",
+        "gold_tool": "official_domain_search",
+        "gold_query_arm": "source_constrained",
+        "known_domain": "example-everest.gov",
+        "freshness_sensitive": false,
+        "answer_on_fetch_only": false
+      }
+    },
+    {
+      "id": "syn-022",
+      "question": "What is the official registered headquarters address of Fairwind Energy?",
+      "answer": "HQ-4821 Birch Lane",
+      "answer_aliases": [],
+      "released_at": "2024-02-01",
+      "source": "synthetic",
+      "meta": {
+        "regime": "authority",
+        "gold_tool": "official_domain_search",
+        "gold_query_arm": "source_constrained",
+        "known_domain": "example-fairwind.gov",
+        "freshness_sensitive": false,
+        "answer_on_fetch_only": false
+      }
+    },
+    {
+      "id": "syn-023",
+      "question": "What is the official registered headquarters address of Granite Capital?",
+      "answer": "HQ-4821 Birch Lane",
+      "answer_aliases": [],
+      "released_at": "2024-02-01",
+      "source": "synthetic",
+      "meta": {
+        "regime": "authority",
+        "gold_tool": "official_domain_search",
+        "gold_query_arm": "source_constrained",
+        "known_domain": "example-granite.gov",
+        "freshness_sensitive": false,
+        "answer_on_fetch_only": false
+      }
+    },
+    {
+      "id": "syn-024",
+      "question": "What is the official registered headquarters address of Helios Pharma?",
+      "answer": "HQ-4821 Birch Lane",
+      "answer_aliases": [],
+      "released_at": "2024-02-01",
+      "source": "synthetic",
+      "meta": {
+        "regime": "authority",
+        "gold_tool": "official_domain_search",
+        "gold_query_arm": "source_constrained",
+        "known_domain": "example-helios.gov",
+        "freshness_sensitive": false,
+        "answer_on_fetch_only": false
+      }
+    },
+    {
+      "id": "syn-025",
+      "question": "Under official regulation, what license number governs Acme Robotics?",
+      "answer": "HQ-4821 Birch Lane",
+      "answer_aliases": [],
+      "released_at": "2024-02-01",
+      "source": "synthetic",
+      "meta": {
+        "regime": "authority",
+        "gold_tool": "official_domain_search",
+        "gold_query_arm": "source_constrained",
+        "known_domain": "example-acme.gov",
+        "freshness_sensitive": false,
+        "answer_on_fetch_only": false
+      }
+    },
+    {
+      "id": "syn-026",
+      "question": "Under official regulation, what license number governs Borealis Foods?",
+      "answer": "HQ-4821 Birch Lane",
+      "answer_aliases": [],
+      "released_at": "2024-02-01",
+      "source": "synthetic",
+      "meta": {
+        "regime": "authority",
+        "gold_tool": "official_domain_search",
+        "gold_query_arm": "source_constrained",
+        "known_domain": "example-borealis.gov",
+        "freshness_sensitive": false,
+        "answer_on_fetch_only": false
+      }
+    },
+    {
+      "id": "syn-027",
+      "question": "Under official regulation, what license number governs Cobalt Systems?",
+      "answer": "HQ-4821 Birch Lane",
+      "answer_aliases": [],
+      "released_at": "2024-02-01",
+      "source": "synthetic",
+      "meta": {
+        "regime": "authority",
+        "gold_tool": "official_domain_search",
+        "gold_query_arm": "source_constrained",
+        "known_domain": "example-cobalt.gov",
+        "freshness_sensitive": false,
+        "answer_on_fetch_only": false
+      }
+    },
+    {
+      "id": "syn-028",
+      "question": "Under official regulation, what license number governs Delphi Mining?",
+      "answer": "HQ-4821 Birch Lane",
+      "answer_aliases": [],
+      "released_at": "2024-02-01",
+      "source": "synthetic",
+      "meta": {
+        "regime": "authority",
+        "gold_tool": "official_domain_search",
+        "gold_query_arm": "source_constrained",
+        "known_domain": "example-delphi.gov",
+        "freshness_sensitive": false,
+        "answer_on_fetch_only": false
+      }
+    },
+    {
+      "id": "syn-029",
+      "question": "Under official regulation, what license number governs Everest Labs?",
+      "answer": "HQ-4821 Birch Lane",
+      "answer_aliases": [],
+      "released_at": "2024-02-01",
+      "source": "synthetic",
+      "meta": {
+        "regime": "authority",
+        "gold_tool": "official_domain_search",
+        "gold_query_arm": "source_constrained",
+        "known_domain": "example-everest.gov",
+        "freshness_sensitive": false,
+        "answer_on_fetch_only": false
+      }
+    },
+    {
+      "id": "syn-030",
+      "question": "Under official regulation, what license number governs Fairwind Energy?",
+      "answer": "HQ-4821 Birch Lane",
+      "answer_aliases": [],
+      "released_at": "2024-02-01",
+      "source": "synthetic",
+      "meta": {
+        "regime": "authority",
+        "gold_tool": "official_domain_search",
+        "gold_query_arm": "source_constrained",
+        "known_domain": "example-fairwind.gov",
+        "freshness_sensitive": false,
+        "answer_on_fetch_only": false
+      }
+    },
+    {
+      "id": "syn-031",
+      "question": "Under official regulation, what license number governs Granite Capital?",
+      "answer": "HQ-4821 Birch Lane",
+      "answer_aliases": [],
+      "released_at": "2024-02-01",
+      "source": "synthetic",
+      "meta": {
+        "regime": "authority",
+        "gold_tool": "official_domain_search",
+        "gold_query_arm": "source_constrained",
+        "known_domain": "example-granite.gov",
+        "freshness_sensitive": false,
+        "answer_on_fetch_only": false
+      }
+    },
+    {
+      "id": "syn-032",
+      "question": "Under official regulation, what license number governs Helios Pharma?",
+      "answer": "HQ-4821 Birch Lane",
+      "answer_aliases": [],
+      "released_at": "2024-02-01",
+      "source": "synthetic",
+      "meta": {
+        "regime": "authority",
+        "gold_tool": "official_domain_search",
+        "gold_query_arm": "source_constrained",
+        "known_domain": "example-helios.gov",
+        "freshness_sensitive": false,
+        "answer_on_fetch_only": false
+      }
+    },
+    {
+      "id": "syn-033",
+      "question": "In which city was the company Acme Robotics founded?",
+      "answer": "Trenton",
+      "answer_aliases": [],
+      "released_at": "2024-02-01",
+      "source": "synthetic",
+      "meta": {
+        "regime": "generic",
+        "gold_tool": "generic_web_search",
+        "gold_query_arm": "direct_question",
+        "known_domain": null,
+        "freshness_sensitive": false,
+        "answer_on_fetch_only": false
+      }
+    },
+    {
+      "id": "syn-034",
+      "question": "In which city was the company Borealis Foods founded?",
+      "answer": "Trenton",
+      "answer_aliases": [],
+      "released_at": "2024-02-01",
+      "source": "synthetic",
+      "meta": {
+        "regime": "generic",
+        "gold_tool": "generic_web_search",
+        "gold_query_arm": "direct_question",
+        "known_domain": null,
+        "freshness_sensitive": false,
+        "answer_on_fetch_only": false
+      }
+    },
+    {
+      "id": "syn-035",
+      "question": "In which city was the company Cobalt Systems founded?",
+      "answer": "Trenton",
+      "answer_aliases": [],
+      "released_at": "2024-02-01",
+      "source": "synthetic",
+      "meta": {
+        "regime": "generic",
+        "gold_tool": "generic_web_search",
+        "gold_query_arm": "direct_question",
+        "known_domain": null,
+        "freshness_sensitive": false,
+        "answer_on_fetch_only": false
+      }
+    },
+    {
+      "id": "syn-036",
+      "question": "In which city was the company Delphi Mining founded?",
+      "answer": "Trenton",
+      "answer_aliases": [],
+      "released_at": "2024-02-01",
+      "source": "synthetic",
+      "meta": {
+        "regime": "generic",
+        "gold_tool": "generic_web_search",
+        "gold_query_arm": "direct_question",
+        "known_domain": null,
+        "freshness_sensitive": false,
+        "answer_on_fetch_only": false
+      }
+    },
+    {
+      "id": "syn-037",
+      "question": "In which city was the company Everest Labs founded?",
+      "answer": "Trenton",
+      "answer_aliases": [],
+      "released_at": "2024-02-01",
+      "source": "synthetic",
+      "meta": {
+        "regime": "generic",
+        "gold_tool": "generic_web_search",
+        "gold_query_arm": "direct_question",
+        "known_domain": null,
+        "freshness_sensitive": false,
+        "answer_on_fetch_only": false
+      }
+    },
+    {
+      "id": "syn-038",
+      "question": "In which city was the company Fairwind Energy founded?",
+      "answer": "Trenton",
+      "answer_aliases": [],
+      "released_at": "2024-02-01",
+      "source": "synthetic",
+      "meta": {
+        "regime": "generic",
+        "gold_tool": "generic_web_search",
+        "gold_query_arm": "direct_question",
+        "known_domain": null,
+        "freshness_sensitive": false,
+        "answer_on_fetch_only": false
+      }
+    },
+    {
+      "id": "syn-039",
+      "question": "In which city was the company Granite Capital founded?",
+      "answer": "Trenton",
+      "answer_aliases": [],
+      "released_at": "2024-02-01",
+      "source": "synthetic",
+      "meta": {
+        "regime": "generic",
+        "gold_tool": "generic_web_search",
+        "gold_query_arm": "direct_question",
+        "known_domain": null,
+        "freshness_sensitive": false,
+        "answer_on_fetch_only": false
+      }
+    },
+    {
+      "id": "syn-040",
+      "question": "In which city was the company Helios Pharma founded?",
+      "answer": "Trenton",
+      "answer_aliases": [],
+      "released_at": "2024-02-01",
+      "source": "synthetic",
+      "meta": {
+        "regime": "generic",
+        "gold_tool": "generic_web_search",
+        "gold_query_arm": "direct_question",
+        "known_domain": null,
+        "freshness_sensitive": false,
+        "answer_on_fetch_only": false
+      }
+    },
+    {
+      "id": "syn-041",
+      "question": "Which university is most associated with the researcher Acme Robotics?",
+      "answer": "Trenton",
+      "answer_aliases": [],
+      "released_at": "2024-02-01",
+      "source": "synthetic",
+      "meta": {
+        "regime": "generic",
+        "gold_tool": "generic_web_search",
+        "gold_query_arm": "direct_question",
+        "known_domain": null,
+        "freshness_sensitive": false,
+        "answer_on_fetch_only": false
+      }
+    },
+    {
+      "id": "syn-042",
+      "question": "Which university is most associated with the researcher Borealis Foods?",
+      "answer": "Trenton",
+      "answer_aliases": [],
+      "released_at": "2024-02-01",
+      "source": "synthetic",
+      "meta": {
+        "regime": "generic",
+        "gold_tool": "generic_web_search",
+        "gold_query_arm": "direct_question",
+        "known_domain": null,
+        "freshness_sensitive": false,
+        "answer_on_fetch_only": false
+      }
+    },
+    {
+      "id": "syn-043",
+      "question": "Which university is most associated with the researcher Cobalt Systems?",
+      "answer": "Trenton",
+      "answer_aliases": [],
+      "released_at": "2024-02-01",
+      "source": "synthetic",
+      "meta": {
+        "regime": "generic",
+        "gold_tool": "generic_web_search",
+        "gold_query_arm": "direct_question",
+        "known_domain": null,
+        "freshness_sensitive": false,
+        "answer_on_fetch_only": false
+      }
+    },
+    {
+      "id": "syn-044",
+      "question": "Which university is most associated with the researcher Delphi Mining?",
+      "answer": "Trenton",
+      "answer_aliases": [],
+      "released_at": "2024-02-01",
+      "source": "synthetic",
+      "meta": {
+        "regime": "generic",
+        "gold_tool": "generic_web_search",
+        "gold_query_arm": "direct_question",
+        "known_domain": null,
+        "freshness_sensitive": false,
+        "answer_on_fetch_only": false
+      }
+    },
+    {
+      "id": "syn-045",
+      "question": "Which university is most associated with the researcher Everest Labs?",
+      "answer": "Trenton",
+      "answer_aliases": [],
+      "released_at": "2024-02-01",
+      "source": "synthetic",
+      "meta": {
+        "regime": "generic",
+        "gold_tool": "generic_web_search",
+        "gold_query_arm": "direct_question",
+        "known_domain": null,
+        "freshness_sensitive": false,
+        "answer_on_fetch_only": false
+      }
+    },
+    {
+      "id": "syn-046",
+      "question": "Which university is most associated with the researcher Fairwind Energy?",
+      "answer": "Trenton",
+      "answer_aliases": [],
+      "released_at": "2024-02-01",
+      "source": "synthetic",
+      "meta": {
+        "regime": "generic",
+        "gold_tool": "generic_web_search",
+        "gold_query_arm": "direct_question",
+        "known_domain": null,
+        "freshness_sensitive": false,
+        "answer_on_fetch_only": false
+      }
+    },
+    {
+      "id": "syn-047",
+      "question": "Which university is most associated with the researcher Granite Capital?",
+      "answer": "Trenton",
+      "answer_aliases": [],
+      "released_at": "2024-02-01",
+      "source": "synthetic",
+      "meta": {
+        "regime": "generic",
+        "gold_tool": "generic_web_search",
+        "gold_query_arm": "direct_question",
+        "known_domain": null,
+        "freshness_sensitive": false,
+        "answer_on_fetch_only": false
+      }
+    },
+    {
+      "id": "syn-048",
+      "question": "Which university is most associated with the researcher Helios Pharma?",
+      "answer": "Trenton",
+      "answer_aliases": [],
+      "released_at": "2024-02-01",
+      "source": "synthetic",
+      "meta": {
+        "regime": "generic",
+        "gold_tool": "generic_web_search",
+        "gold_query_arm": "direct_question",
+        "known_domain": null,
+        "freshness_sensitive": false,
+        "answer_on_fetch_only": false
+      }
+    },
+    {
+      "id": "syn-049",
+      "question": "What is the middle name of the founder of Acme Robotics?",
+      "answer": "Ekaterina",
+      "answer_aliases": [],
+      "released_at": "2024-02-01",
+      "source": "synthetic",
+      "meta": {
+        "regime": "multihop",
+        "gold_tool": "generic_web_search",
+        "gold_query_arm": "keyword_compressed",
+        "known_domain": null,
+        "freshness_sensitive": false,
+        "answer_on_fetch_only": true
+      }
+    },
+    {
+      "id": "syn-050",
+      "question": "What is the middle name of the founder of Borealis Foods?",
+      "answer": "Ekaterina",
+      "answer_aliases": [],
+      "released_at": "2024-02-01",
+      "source": "synthetic",
+      "meta": {
+        "regime": "multihop",
+        "gold_tool": "generic_web_search",
+        "gold_query_arm": "keyword_compressed",
+        "known_domain": null,
+        "freshness_sensitive": false,
+        "answer_on_fetch_only": true
+      }
+    },
+    {
+      "id": "syn-051",
+      "question": "What is the middle name of the founder of Cobalt Systems?",
+      "answer": "Ekaterina",
+      "answer_aliases": [],
+      "released_at": "2024-02-01",
+      "source": "synthetic",
+      "meta": {
+        "regime": "multihop",
+        "gold_tool": "generic_web_search",
+        "gold_query_arm": "keyword_compressed",
+        "known_domain": null,
+        "freshness_sensitive": false,
+        "answer_on_fetch_only": true
+      }
+    },
+    {
+      "id": "syn-052",
+      "question": "What is the middle name of the founder of Delphi Mining?",
+      "answer": "Ekaterina",
+      "answer_aliases": [],
+      "released_at": "2024-02-01",
+      "source": "synthetic",
+      "meta": {
+        "regime": "multihop",
+        "gold_tool": "generic_web_search",
+        "gold_query_arm": "keyword_compressed",
+        "known_domain": null,
+        "freshness_sensitive": false,
+        "answer_on_fetch_only": true
+      }
+    },
+    {
+      "id": "syn-053",
+      "question": "What is the middle name of the founder of Everest Labs?",
+      "answer": "Ekaterina",
+      "answer_aliases": [],
+      "released_at": "2024-02-01",
+      "source": "synthetic",
+      "meta": {
+        "regime": "multihop",
+        "gold_tool": "generic_web_search",
+        "gold_query_arm": "keyword_compressed",
+        "known_domain": null,
+        "freshness_sensitive": false,
+        "answer_on_fetch_only": true
+      }
+    },
+    {
+      "id": "syn-054",
+      "question": "What is the middle name of the founder of Fairwind Energy?",
+      "answer": "Ekaterina",
+      "answer_aliases": [],
+      "released_at": "2024-02-01",
+      "source": "synthetic",
+      "meta": {
+        "regime": "multihop",
+        "gold_tool": "generic_web_search",
+        "gold_query_arm": "keyword_compressed",
+        "known_domain": null,
+        "freshness_sensitive": false,
+        "answer_on_fetch_only": true
+      }
+    },
+    {
+      "id": "syn-055",
+      "question": "What is the middle name of the founder of Granite Capital?",
+      "answer": "Ekaterina",
+      "answer_aliases": [],
+      "released_at": "2024-02-01",
+      "source": "synthetic",
+      "meta": {
+        "regime": "multihop",
+        "gold_tool": "generic_web_search",
+        "gold_query_arm": "keyword_compressed",
+        "known_domain": null,
+        "freshness_sensitive": false,
+        "answer_on_fetch_only": true
+      }
+    },
+    {
+      "id": "syn-056",
+      "question": "What is the middle name of the founder of Helios Pharma?",
+      "answer": "Ekaterina",
+      "answer_aliases": [],
+      "released_at": "2024-02-01",
+      "source": "synthetic",
+      "meta": {
+        "regime": "multihop",
+        "gold_tool": "generic_web_search",
+        "gold_query_arm": "keyword_compressed",
+        "known_domain": null,
+        "freshness_sensitive": false,
+        "answer_on_fetch_only": true
+      }
+    }
+  ]
+}

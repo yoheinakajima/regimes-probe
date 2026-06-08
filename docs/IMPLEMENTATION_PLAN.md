@@ -75,6 +75,20 @@ Status of each phase in this v0, with the modules that satisfy it. Legend:
   storing answers in memory. The regimes mutation space is restricted to safe
   numeric (and a couple of medium-risk threshold) parameters.
 
+## v0.2 — credibility scaffolding (no keys) ✅
+- `closed_book` + `no_memory_search` baselines alongside `random_memory` and
+  `policy_memory` (`agent/answerer.ClosedBookAnswerer`, `_common.full_pipeline`).
+- Same-conditions validator (`eval/conditions.py`) and headline-eligibility
+  (`eval/eligibility.py`), surfaced in `report.json` / `summary.md`.
+- Ablation scaffolding (`scripts/run_ablations.py`, `config/default.yaml`).
+- `scripts/inspect_memory_snapshot.py`, `scripts/compare_runs.py`,
+  `scripts/run_synthetic_full.py`, `scripts/validate_live_readiness.py`.
+- Real-data-shaped smoke test + placeholder fixtures (`fixtures/real_shaped/`).
+- Synthetic fixture enriched with failure-regime examples (residual failures by
+  design) so regime diagnostics are meaningful.
+- Docs: `REAL_BENCHMARK_READINESS`, `NEXT_LIVE_RUN`, `METHODOLOGY_RISKS`,
+  `FIRST_REAL_RESULT_CRITERIA`.
+
 ## Suggested next steps
 1. Wire `scripts/` to live providers behind `config/tools.yaml` (Phase 9 finish).
 2. Add a small recorded LiveBrowseComp/BrowseComp subset fixture for an offline

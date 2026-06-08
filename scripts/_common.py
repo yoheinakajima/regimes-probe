@@ -74,16 +74,44 @@ def base_argparser(description: str) -> argparse.ArgumentParser:
 # Shared no-key, no-network pipeline (used by make_report, run_synthetic_full,
 # and the real-data-shaped smoke test).
 # ---------------------------------------------------------------------------
+import hashlib
 import random as _random
 from typing import Optional
 
 from regimes_probe.activegraph_pack import replay_check
+from regimes_probe.agent.answerer import build_closed_book_knowledge
+from regimes_probe.agent.planner import build_closed_book_agent
+from regimes_probe.eval.conditions import ConditionSpec, same_conditions
+from regimes_probe.eval.eligibility import compute_eligibility
 from regimes_probe.eval.harness import experience_phase, run_condition
 from regimes_probe.eval.metrics import compute_metrics
 from regimes_probe.eval.report import ConditionRun, write_full_report
 from regimes_probe.eval.significance import bootstrap_correct_per_tool_call, mcnemar
 from regimes_probe.eval.split import build_split, partition
 from regimes_probe.policy.memory import PolicyMemory
+from regimes_probe.policy.policy_fragment import assert_no_answer_leakage
+
+_REAL_DATASETS = {"BrowseComp", "LiveBrowseComp", "browsecomp", "livebrowsecomp"}
+
+
+def _hash(*parts: Any) -> str:
+    return hashlib.sha256("|".join(str(p) for p in parts).encode()).hexdigest()[:12]
+
+
+def _condition_spec(cfg, search_tools, budget, split, memory_access) -> ConditionSpec:
+    return ConditionSpec(
+        answer_model=cfg.get("live", {}).get("answer_model", "deterministic_answerer"),
+        answer_prompt_version="v0",
+        enabled_tools=tuple(sorted(search_tools)),
+        tool_budget=budget,
+        split_id=_hash(split.mode, split.salt, tuple(split.confirm_ids)),
+        grader="normalized_match",
+        provider_config_id=_hash(tuple(sorted(search_tools))),
+        query_policy=cfg["policy"]["query_mode"],
+        verify_policy="default",
+        stop_policy=cfg["policy"]["stop_mode"],
+        memory_access=memory_access,
+    )
 
 
 def random_memory(items, agent, params, *, seed: int = 7) -> PolicyMemory:
@@ -114,6 +142,7 @@ def full_pipeline(
     dataset_label: str,
     dataset_version: str,
     on_step=None,
+    online_confirm: bool = False,
 ) -> dict[str, Any]:
     """Run the complete no-key pipeline and write report artifacts.
 
@@ -149,22 +178,38 @@ def full_pipeline(
     runs: list[ConditionRun] = []
     aligned: dict[int, tuple] = {}
     replay_log = None
+    budget_ok = True
     gate_budget = 3 if 3 in budgets else budgets[0]
+
+    # closed-book baseline (no tools at all): estimates intrinsic knowledge.
+    step("closed_book baseline on CONFIRM (no tool calls)")
+    cb_agent = build_closed_book_agent(agent.config, build_closed_book_knowledge(items))
+    cb = run_condition(con_items, cb_agent, providers, PolicyMemory(params.copy()),
+                       condition="closed_book", budget=0, weights=weights,
+                       explore=False, dataset_version=dataset_version)
+    runs.append(ConditionRun("closed_book", 0, cb.outcomes))
+
     for b in budgets:
-        step(f"budget {b}: no_memory / policy_memory / random_memory on CONFIRM")
+        step(f"budget {b}: no_memory_search / policy_memory / random_memory on CONFIRM")
         base = run_condition(con_items, agent, providers, PolicyMemory(params.copy()),
-                             condition="no_memory", budget=b, weights=weights,
+                             condition="no_memory_search", budget=b, weights=weights,
                              explore=False, dataset_version=dataset_version)
-        frozen = PolicyMemory.from_snapshot(snapshot, frozen=True)
-        pol = run_condition(con_items, agent, providers, frozen, condition="policy_memory",
-                            budget=b, weights=weights, explore=False, dataset_version=dataset_version)
+        # Headline path: a FROZEN snapshot, no updates during CONFIRM. The
+        # online-learning variant (non-headline) instead keeps learning on CONFIRM.
+        pol_mem = PolicyMemory.from_snapshot(snapshot, frozen=not online_confirm)
+        pol = run_condition(con_items, agent, providers, pol_mem,
+                            condition="policy_memory", budget=b, weights=weights,
+                            explore=False, update_memory=online_confirm,
+                            dataset_version=dataset_version)
         rnd = run_condition(con_items, agent, providers,
                             random_memory(opt_items, agent, params), condition="random_memory",
                             budget=b, weights=weights, explore=False, dataset_version=dataset_version)
-        runs += [ConditionRun("no_memory", b, base.outcomes),
+        runs += [ConditionRun("no_memory_search", b, base.outcomes),
                  ConditionRun("policy_memory", b, pol.outcomes),
                  ConditionRun("random_memory", b, rnd.outcomes)]
         aligned[b] = (base.outcomes, pol.outcomes, rnd.outcomes)
+        budget_ok = budget_ok and all(
+            o.tool_calls <= b for o in base.outcomes + pol.outcomes + rnd.outcomes)
         if b == gate_budget:
             replay_log = pol.log
 
@@ -181,6 +226,32 @@ def full_pipeline(
 
     step("replay check (graph is a deterministic projection of the log)")
     replay = replay_check(replay_log).to_dict() if replay_log is not None else {}
+
+    step("same-conditions check (baseline vs policy differ only in memory access)")
+    base_spec = _condition_spec(cfg, search_tools, gate_budget, split, "none")
+    pol_spec = _condition_spec(cfg, search_tools, gate_budget, split, "frozen_snapshot")
+    sc = same_conditions(base_spec, pol_spec)
+
+    step("headline-eligibility computation")
+    snap_dict = snapshot.to_dict()
+    try:
+        assert_no_answer_leakage(snap_dict, "policy_memory_snapshot")
+        leak_ok = not any(g in __import__("json").dumps(snap_dict)
+                          for it in items for g in it.gold_answers() if g)
+    except Exception:
+        leak_ok = False
+    dataset_is_real = dataset_label in _REAL_DATASETS
+    checks = {
+        "optimize_confirm_disjoint": set(split.optimize_ids).isdisjoint(split.confirm_ids),
+        "confirm_memory_frozen": not online_confirm,
+        "no_answer_leakage": leak_ok,
+        "same_conditions": sc.ok,
+        "replay_passed": bool(replay.get("projection_matches")),
+        "baseline_and_policy_completed": bool(aligned[gate_budget][0]) and bool(aligned[gate_budget][1]),
+        "budget_enforced": budget_ok,
+        "no_live_updates_during_confirm": not online_confirm,
+    }
+    eligibility = compute_eligibility(checks, dataset_is_real=dataset_is_real)
 
     meta = {
         "answer_model": cfg.get("live", {}).get("answer_model"),
@@ -207,13 +278,19 @@ def full_pipeline(
     step("write report artifacts")
     run_dir = write_full_report(run_id, runs=runs, snapshot=snapshot.to_dict(),
                                 replay=replay, significance=significance, meta=meta,
+                                eligibility=eligibility.to_dict(),
+                                same_conditions=sc.to_dict(),
+                                condition_specs={"no_memory_search": base_spec.to_dict(),
+                                                 "policy_memory": pol_spec.to_dict()},
                                 results_root=results_root)
 
     headline = {b: {
-        "no_memory": compute_metrics(aligned[b][0]),
+        "no_memory_search": compute_metrics(aligned[b][0]),
         "policy_memory": compute_metrics(aligned[b][1]),
         "random_memory": compute_metrics(aligned[b][2]),
     } for b in budgets}
     return {"run_dir": str(run_dir), "split": split, "headline": headline,
+            "closed_book": compute_metrics(cb.outcomes),
             "significance": significance, "replay": replay, "snapshot": snapshot,
+            "eligibility": eligibility.to_dict(), "same_conditions": sc.to_dict(),
             "budgets": budgets, "gate_budget": gate_budget}

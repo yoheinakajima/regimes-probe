@@ -172,6 +172,73 @@ def generate_synthetic_fixtures() -> tuple[dict, dict]:
                     "known_domain": known_domain,
                     "freshness_sensitive": fresh,
                     "answer_on_fetch_only": multihop,
+                    # a few generic facts are "intrinsically known" by the
+                    # closed-book model (simulated): the first 2 generic items.
+                    "intrinsic_knowable": (regime == "generic" and ei < 2),
                 },
             })
+
+    # ---- hard items that deliberately trigger generic failure regimes, so the
+    # regime diagnostics are meaningful and the synthetic result is NOT perfect.
+    _append_hard_items(items, docs, idx)
     return {"items": items}, {"documents": docs}
+
+
+def _append_hard_items(items: list[dict], docs: list[dict], start_idx: int) -> None:
+    i = start_idx
+
+    def add_item(regime, q, ans, **meta):
+        nonlocal i
+        i += 1
+        iid = f"syn-{i:03d}"
+        meta.setdefault("regime", regime)
+        items.append({"id": iid, "question": q, "answer": ans, "answer_aliases": [],
+                      "released_at": meta.get("released_at", "2025-01-01"),
+                      "source": "synthetic", "meta": meta})
+        return iid
+
+    # (A) obscure / evidence-sparse: NO gold doc anywhere — only a single
+    # low-authority distractor on the alphabetically-first tool, so the agent
+    # answers it (wrong, weak support) -> route_miss / query_miss / evidence_sparse
+    # / verification_miss.
+    for name, tok, wrong in [("Quillon Reach", "quillon", "Mistgrave"),
+                             ("Vexley Hollow", "vexley", "Dunmoor"),
+                             ("Thornfield Span", "thornfield", "Ashby")]:
+        iid = add_item("obscure", f"What is the obscure charter seat of the placeholder enclave {name}?",
+                       f"Unknown-{tok}", freshness_sensitive=False, answer_on_fetch_only=False)
+        docs.append({"doc_id": f"d_{iid}_brave", "item_id": iid, "title": f"{name} rumor",
+                     "url": f"https://blog.example-brave.test/{tok}",
+                     "snippet": f"Rumor links {name} to {wrong}.", "published_at": "2023-01-01",
+                     "source_authority": 0.3, "asserts": wrong, "answer_on_fetch_only": False,
+                     "is_distractor": True, "tools": ["brave_search"], "match_tokens": [tok, "enclave"],
+                     "requires_tokens": [], "base_rank": 0})
+
+    # (B) stale-gold freshness: the only supporting doc is the gold answer but it
+    # is OLD on a freshness-sensitive question -> stale_evidence (correct but stale).
+    for name, tok, ans in [("Halcyon Drift", "halcyon", "Captain Reyes"),
+                           ("Nimbus Lattice", "nimbus", "Captain Orr")]:
+        iid = add_item("stale_fresh", f"Who is currently the lead pilot of the placeholder fleet {name}?",
+                       ans, freshness_sensitive=True, answer_on_fetch_only=False)
+        docs.append({"doc_id": f"d_{iid}_gold", "item_id": iid, "title": f"{name} archive",
+                     "url": f"https://news.example.com/{tok}", "snippet": f"Archive: {ans}.",
+                     "published_at": "2021-05-01", "source_authority": 0.7, "asserts": ans,
+                     "answer_on_fetch_only": False, "tools": ["news_search", "generic_web_search"],
+                     "match_tokens": [tok, "pilot"], "requires_tokens": [], "base_rank": 0})
+
+    # (C) high-authority distractor: a 0.95-authority WRONG source on news plus a
+    # 0.7 gold on generic. At budget>=2 the agent gathers both, the high-auth
+    # distractor wins the vote -> contradiction_unresolved (wrong + conflict).
+    for name, tok, ans, wrong in [("Ferrous Pact", "ferrous", "Article 9", "Article 1"),
+                                  ("Verdant Accord", "verdant", "Clause 7", "Clause 99")]:
+        iid = add_item("authority_trap", f"Which placeholder clause governs the treaty body {name}?",
+                       ans, freshness_sensitive=False, answer_on_fetch_only=False)
+        docs.append({"doc_id": f"d_{iid}_gold", "item_id": iid, "title": f"{name} text",
+                     "url": f"https://www.example.com/{tok}", "snippet": f"Text: {ans}.",
+                     "published_at": "2024-01-01", "source_authority": 0.7, "asserts": ans,
+                     "answer_on_fetch_only": False, "tools": ["generic_web_search"],
+                     "match_tokens": [tok, "clause"], "requires_tokens": [], "base_rank": 0})
+        docs.append({"doc_id": f"d_{iid}_news", "item_id": iid, "title": f"{name} bulletin",
+                     "url": f"https://news.example.com/{tok}", "snippet": f"Bulletin asserts {wrong}.",
+                     "published_at": "2024-02-01", "source_authority": 0.95, "asserts": wrong,
+                     "answer_on_fetch_only": False, "is_distractor": True, "tools": ["news_search"],
+                     "match_tokens": [tok, "clause"], "requires_tokens": [], "base_rank": 0})

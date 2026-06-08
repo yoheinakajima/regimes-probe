@@ -53,6 +53,12 @@ def detect_regimes(o: AttemptOutcome) -> list[str]:
         labels.append("answer_extraction_miss")
     if o.correct and o.evidence_score < 0.5:
         labels.append("support_answer_mismatch")
+    # Wrong answer that the agent nonetheless accepted (stopped/answered) on weak
+    # support is a verification failure.
+    if (not o.correct) and (not o.abstained) and (not o.authority_ok):
+        labels.append("verification_miss")
+    if o.contradiction and not o.correct:
+        labels.append("contradiction_unresolved")
     return labels
 
 

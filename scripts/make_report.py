@@ -33,10 +33,13 @@ def main() -> int:
                             dataset_label="synthetic_browse",
                             dataset_version=SyntheticBrowseAdapter().version())
     print(f"wrote {summary['run_dir']}")
+    print(f"headline_eligible={summary['eligibility']['headline_eligible']} "
+          f"(reasons={summary['eligibility']['reasons']})")
+    print(f"closed_book accuracy={summary['closed_book']['accuracy']:.3f}")
     print("Headline (correct_per_tool_call) by budget:")
     for b in summary["budgets"]:
         h = summary["headline"][b]
-        print(f"  budget {b:>2}: no_memory={h['no_memory']['correct_per_tool_call']:.3f}  "
+        print(f"  budget {b:>2}: no_memory_search={h['no_memory_search']['correct_per_tool_call']:.3f}  "
               f"policy_memory={h['policy_memory']['correct_per_tool_call']:.3f}")
     print(f"replay projection_matches={summary['replay'].get('projection_matches')}")
     return 0

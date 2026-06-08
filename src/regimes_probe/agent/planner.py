@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
+from regimes_probe.agent.answerer import ClosedBookAnswerer
 from regimes_probe.agent.search_loop import (
     AttemptTrace,
     DirectInvoker,
@@ -39,13 +40,16 @@ class AgentConfig:
 
 
 class EpistemicAgent:
-    def __init__(self, config: AgentConfig, *, extractor: Optional[SignatureExtractor] = None) -> None:
+    def __init__(self, config: AgentConfig, *, extractor: Optional[SignatureExtractor] = None,
+                 answerer=None) -> None:
         self.config = config
         self.extractor = extractor or SignatureExtractor()
         self.router = Router(config.router)
         self.query_policy = QueryPolicy(config.query_mode)
         self.stopping_policy = StoppingPolicy(config.stop_mode, config.stop)
-        self.loop = SearchLoop(self.router, self.query_policy, self.stopping_policy)
+        self.answerer = answerer
+        self.loop = SearchLoop(self.router, self.query_policy, self.stopping_policy,
+                               answerer=answerer)
 
     def signature(self, item: Item) -> QuerySignature:
         return self.extractor.compute(item.question)
@@ -76,3 +80,8 @@ class EpistemicAgent:
             item, sig, memory, invoker, providers, loop_cfg,
             attempt_id=attempt_id, recorder=recorder,
         )
+
+
+def build_closed_book_agent(config: AgentConfig, knowledge: dict[str, str]) -> "EpistemicAgent":
+    """An agent that answers from intrinsic knowledge only (run with budget 0)."""
+    return EpistemicAgent(config, answerer=ClosedBookAnswerer(knowledge))

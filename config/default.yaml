@@ -81,6 +81,26 @@ regimes_loop:
   optimize_min_delta: 0.01
   confirm_max_regression: 0.0
 
+# Ablation scaffolding (all no-key runnable on the synthetic fixture). Each entry
+# overrides parts of the config above; run with scripts/run_ablations.py.
+ablations:
+  routing_only:                       # Level 1 only
+    policy: {query_mode: fixed, stop_mode: always_full}
+  routing_plus_query_policy:
+    policy: {query_mode: learned, stop_mode: always_full}
+  routing_plus_query_plus_stop_verify:   # full Level 2
+    policy: {query_mode: learned, stop_mode: learned}
+  correctness_only_reward:
+    reward: {preset: correctness_only}
+  full_epistemic_reward:
+    reward: {preset: full}
+  frozen_memory_confirm:              # headline path
+    memory: {confirm_updates_memory: false}
+  online_learning_confirm:            # NON-headline; CONFIRM keeps learning
+    memory: {confirm_updates_memory: true}
+    _online_confirm: true
+    _non_headline: true
+
 # Live model/search settings (inert without keys). See MODEL_AND_TOOL_CHOICES.md.
 live:
   answer_model: "gpt-5.5"

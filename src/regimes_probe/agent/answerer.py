@@ -41,7 +41,7 @@ class DeterministicAnswerer:
 
     name = "deterministic_answerer"
 
-    def answer(self, observations: list[EvidenceObservation]) -> CandidateAnswer:
+    def answer(self, observations: list[EvidenceObservation], *, item=None) -> CandidateAnswer:
         votes: dict[str, float] = {}
         counts: dict[str, int] = {}
         urls: dict[str, list[str]] = {}
@@ -66,3 +66,36 @@ class DeterministicAnswerer:
             support_authority=best_auth,
             support_urls=urls[best],
         )
+
+
+class ClosedBookAnswerer:
+    """Answer from *intrinsic knowledge* with NO tool calls (closed-book).
+
+    For the offline harness this is a deterministic stand-in: a fixed knowledge
+    map of ``item_id -> answer`` simulates "the model already knows this fact".
+    For a live run, closed-book is simply the real answerer with tools disabled
+    (no knowledge map needed) — this class is the no-key simulation only, and is
+    clearly labelled in reports.
+    """
+
+    name = "closed_book_answerer"
+
+    def __init__(self, knowledge: Optional[dict[str, str]] = None) -> None:
+        self.knowledge = knowledge or {}
+
+    def answer(self, observations: list[EvidenceObservation], *, item=None) -> CandidateAnswer:
+        # Closed-book ignores any (absent) evidence; it answers only what it
+        # "knows" intrinsically.
+        if item is not None and item.id in self.knowledge:
+            return CandidateAnswer(self.knowledge[item.id], 0, 1.0, ["intrinsic:closed_book"])
+        return CandidateAnswer(None, 0, 0.0, [])
+
+
+def build_closed_book_knowledge(items, *, flag: str = "intrinsic_knowable") -> dict[str, str]:
+    """Build the simulated intrinsic-knowledge map for synthetic items.
+
+    Only items whose ``meta[flag]`` is true are "known" — modelling a model that
+    knows a subset of facts without searching. This is a deliberate harness
+    simulation, NOT answer leakage into policy memory.
+    """
+    return {it.id: it.answer for it in items if it.meta.get(flag) and it.answer}

@@ -224,7 +224,7 @@ class SearchLoop:
             supported = any(o.supports for o in obs)
             rec.on_evidence(step, obs)
 
-            candidate = self.answerer.answer(observations)
+            candidate = self.answerer.answer(observations, item=item)
             rec.on_candidate(step, candidate)
             vstate = verify(
                 candidate.to_dict() if candidate.answer else None,
@@ -269,6 +269,9 @@ class SearchLoop:
                     pending_fetch_url = fetch_targets[0].url
             step += 1
 
+        # Recompute once after the loop so a zero-budget (closed-book) attempt,
+        # which never entered the loop body, still produces a candidate.
+        candidate = self.answerer.answer(observations, item=item)
         final_answer = candidate.answer
         return AttemptTrace(
             attempt_id=attempt_id,

@@ -115,3 +115,27 @@ single budget.
 A learned-policy improvement is reported as real only when it (a) is positive on `CONFIRM`,
 (b) exceeds the `random_memory_control`, and (c) clears the bootstrap CI / paired-test
 threshold.
+
+## Addendum (v0.2): baselines and headline gating
+
+The protocol's baseline set is now explicit and offline-runnable:
+
+- **`closed_book`** (no tools, budget 0) — estimates intrinsic model knowledge.
+  Required for real runs so apparent "routing" gains cannot be intrinsic recall.
+- **`no_memory_search`** — search + tools, no policy memory (the Level 1
+  baseline; was `no_memory`).
+- **`random_memory`** — uninformative-priors control.
+- **`policy_memory`** — frozen snapshot (treatment).
+
+Two guards gate whether a run may be reported as a headline:
+
+1. **Same-conditions** (`eval/conditions.py`): baseline and policy must be
+   identical except memory access.
+2. **Headline eligibility** (`eval/eligibility.py`): OPTIMIZE/CONFIRM disjoint,
+   CONFIRM memory frozen, no-answer-leakage passes, same-conditions passes,
+   replay passes, both runs completed, budgets enforced, no live updates during
+   CONFIRM — and the dataset is real (a synthetic fixture is never a headline).
+
+`scripts/run_synthetic_full.py` runs all of the above offline;
+`scripts/run_ablations.py` runs the Level-1/Level-2/reward/online ablations on
+the fixture. See `docs/FIRST_REAL_RESULT_CRITERIA.md`.

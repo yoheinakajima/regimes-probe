@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from regimes_probe.eval.conditions import ConditionSpec, SameConditionsResult, same_conditions
+from regimes_probe.eval.eligibility import Eligibility, compute_eligibility
 from regimes_probe.eval.grader import GradeResult, grade, normalize_answer
 from regimes_probe.eval.harness import (
     ConditionResult,
@@ -21,6 +23,8 @@ from regimes_probe.eval.significance import (
 from regimes_probe.eval.split import Split, build_split, partition
 
 __all__ = [
+    "ConditionSpec", "SameConditionsResult", "same_conditions",
+    "Eligibility", "compute_eligibility",
     "GradeResult", "grade", "normalize_answer",
     "ConditionResult", "experience_phase", "run_condition",
     "AttemptOutcome", "compute_metrics",

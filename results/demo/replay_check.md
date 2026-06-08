@@ -1,8 +1,8 @@
 # Replay check
 
-- events: 912
-- objects: 280
-- relations: 144
+- events: 998
+- objects: 319
+- relations: 166
 - projection_matches: **True**
 - detail: ok
 

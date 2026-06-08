@@ -33,6 +33,9 @@ class AttemptOutcome:
     found_hit: bool
     cluster_key: str
     attempt_reward: float
+    authority_ok: bool = True
+    contradiction: bool = False
+    support_found: bool = True
 
     def to_row(self) -> dict[str, Any]:
         return {
@@ -53,6 +56,9 @@ class AttemptOutcome:
             "found_hit": int(self.found_hit),
             "cluster_key": self.cluster_key,
             "attempt_reward": round(self.attempt_reward, 6),
+            "authority_ok": int(self.authority_ok),
+            "contradiction": int(self.contradiction),
+            "support_found": int(self.support_found),
             "regime": "",  # filled by the regime detectors if run
         }
 

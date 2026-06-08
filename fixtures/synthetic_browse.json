@@ -13,7 +13,8 @@
         "gold_query_arm": "freshness_terms",
         "known_domain": null,
         "freshness_sensitive": true,
-        "answer_on_fetch_only": false
+        "answer_on_fetch_only": false,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -29,7 +30,8 @@
         "gold_query_arm": "freshness_terms",
         "known_domain": null,
         "freshness_sensitive": true,
-        "answer_on_fetch_only": false
+        "answer_on_fetch_only": false,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -45,7 +47,8 @@
         "gold_query_arm": "freshness_terms",
         "known_domain": null,
         "freshness_sensitive": true,
-        "answer_on_fetch_only": false
+        "answer_on_fetch_only": false,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -61,7 +64,8 @@
         "gold_query_arm": "freshness_terms",
         "known_domain": null,
         "freshness_sensitive": true,
-        "answer_on_fetch_only": false
+        "answer_on_fetch_only": false,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -77,7 +81,8 @@
         "gold_query_arm": "freshness_terms",
         "known_domain": null,
         "freshness_sensitive": true,
-        "answer_on_fetch_only": false
+        "answer_on_fetch_only": false,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -93,7 +98,8 @@
         "gold_query_arm": "freshness_terms",
         "known_domain": null,
         "freshness_sensitive": true,
-        "answer_on_fetch_only": false
+        "answer_on_fetch_only": false,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -109,7 +115,8 @@
         "gold_query_arm": "freshness_terms",
         "known_domain": null,
         "freshness_sensitive": true,
-        "answer_on_fetch_only": false
+        "answer_on_fetch_only": false,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -125,7 +132,8 @@
         "gold_query_arm": "freshness_terms",
         "known_domain": null,
         "freshness_sensitive": true,
-        "answer_on_fetch_only": false
+        "answer_on_fetch_only": false,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -141,7 +149,8 @@
         "gold_query_arm": "freshness_terms",
         "known_domain": null,
         "freshness_sensitive": true,
-        "answer_on_fetch_only": false
+        "answer_on_fetch_only": false,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -157,7 +166,8 @@
         "gold_query_arm": "freshness_terms",
         "known_domain": null,
         "freshness_sensitive": true,
-        "answer_on_fetch_only": false
+        "answer_on_fetch_only": false,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -173,7 +183,8 @@
         "gold_query_arm": "freshness_terms",
         "known_domain": null,
         "freshness_sensitive": true,
-        "answer_on_fetch_only": false
+        "answer_on_fetch_only": false,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -189,7 +200,8 @@
         "gold_query_arm": "freshness_terms",
         "known_domain": null,
         "freshness_sensitive": true,
-        "answer_on_fetch_only": false
+        "answer_on_fetch_only": false,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -205,7 +217,8 @@
         "gold_query_arm": "freshness_terms",
         "known_domain": null,
         "freshness_sensitive": true,
-        "answer_on_fetch_only": false
+        "answer_on_fetch_only": false,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -221,7 +234,8 @@
         "gold_query_arm": "freshness_terms",
         "known_domain": null,
         "freshness_sensitive": true,
-        "answer_on_fetch_only": false
+        "answer_on_fetch_only": false,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -237,7 +251,8 @@
         "gold_query_arm": "freshness_terms",
         "known_domain": null,
         "freshness_sensitive": true,
-        "answer_on_fetch_only": false
+        "answer_on_fetch_only": false,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -253,7 +268,8 @@
         "gold_query_arm": "freshness_terms",
         "known_domain": null,
         "freshness_sensitive": true,
-        "answer_on_fetch_only": false
+        "answer_on_fetch_only": false,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -269,7 +285,8 @@
         "gold_query_arm": "source_constrained",
         "known_domain": "example-acme.gov",
         "freshness_sensitive": false,
-        "answer_on_fetch_only": false
+        "answer_on_fetch_only": false,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -285,7 +302,8 @@
         "gold_query_arm": "source_constrained",
         "known_domain": "example-borealis.gov",
         "freshness_sensitive": false,
-        "answer_on_fetch_only": false
+        "answer_on_fetch_only": false,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -301,7 +319,8 @@
         "gold_query_arm": "source_constrained",
         "known_domain": "example-cobalt.gov",
         "freshness_sensitive": false,
-        "answer_on_fetch_only": false
+        "answer_on_fetch_only": false,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -317,7 +336,8 @@
         "gold_query_arm": "source_constrained",
         "known_domain": "example-delphi.gov",
         "freshness_sensitive": false,
-        "answer_on_fetch_only": false
+        "answer_on_fetch_only": false,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -333,7 +353,8 @@
         "gold_query_arm": "source_constrained",
         "known_domain": "example-everest.gov",
         "freshness_sensitive": false,
-        "answer_on_fetch_only": false
+        "answer_on_fetch_only": false,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -349,7 +370,8 @@
         "gold_query_arm": "source_constrained",
         "known_domain": "example-fairwind.gov",
         "freshness_sensitive": false,
-        "answer_on_fetch_only": false
+        "answer_on_fetch_only": false,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -365,7 +387,8 @@
         "gold_query_arm": "source_constrained",
         "known_domain": "example-granite.gov",
         "freshness_sensitive": false,
-        "answer_on_fetch_only": false
+        "answer_on_fetch_only": false,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -381,7 +404,8 @@
         "gold_query_arm": "source_constrained",
         "known_domain": "example-helios.gov",
         "freshness_sensitive": false,
-        "answer_on_fetch_only": false
+        "answer_on_fetch_only": false,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -397,7 +421,8 @@
         "gold_query_arm": "source_constrained",
         "known_domain": "example-acme.gov",
         "freshness_sensitive": false,
-        "answer_on_fetch_only": false
+        "answer_on_fetch_only": false,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -413,7 +438,8 @@
         "gold_query_arm": "source_constrained",
         "known_domain": "example-borealis.gov",
         "freshness_sensitive": false,
-        "answer_on_fetch_only": false
+        "answer_on_fetch_only": false,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -429,7 +455,8 @@
         "gold_query_arm": "source_constrained",
         "known_domain": "example-cobalt.gov",
         "freshness_sensitive": false,
-        "answer_on_fetch_only": false
+        "answer_on_fetch_only": false,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -445,7 +472,8 @@
         "gold_query_arm": "source_constrained",
         "known_domain": "example-delphi.gov",
         "freshness_sensitive": false,
-        "answer_on_fetch_only": false
+        "answer_on_fetch_only": false,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -461,7 +489,8 @@
         "gold_query_arm": "source_constrained",
         "known_domain": "example-everest.gov",
         "freshness_sensitive": false,
-        "answer_on_fetch_only": false
+        "answer_on_fetch_only": false,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -477,7 +506,8 @@
         "gold_query_arm": "source_constrained",
         "known_domain": "example-fairwind.gov",
         "freshness_sensitive": false,
-        "answer_on_fetch_only": false
+        "answer_on_fetch_only": false,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -493,7 +523,8 @@
         "gold_query_arm": "source_constrained",
         "known_domain": "example-granite.gov",
         "freshness_sensitive": false,
-        "answer_on_fetch_only": false
+        "answer_on_fetch_only": false,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -509,7 +540,8 @@
         "gold_query_arm": "source_constrained",
         "known_domain": "example-helios.gov",
         "freshness_sensitive": false,
-        "answer_on_fetch_only": false
+        "answer_on_fetch_only": false,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -525,7 +557,8 @@
         "gold_query_arm": "direct_question",
         "known_domain": null,
         "freshness_sensitive": false,
-        "answer_on_fetch_only": false
+        "answer_on_fetch_only": false,
+        "intrinsic_knowable": true
       }
     },
     {
@@ -541,7 +574,8 @@
         "gold_query_arm": "direct_question",
         "known_domain": null,
         "freshness_sensitive": false,
-        "answer_on_fetch_only": false
+        "answer_on_fetch_only": false,
+        "intrinsic_knowable": true
       }
     },
     {
@@ -557,7 +591,8 @@
         "gold_query_arm": "direct_question",
         "known_domain": null,
         "freshness_sensitive": false,
-        "answer_on_fetch_only": false
+        "answer_on_fetch_only": false,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -573,7 +608,8 @@
         "gold_query_arm": "direct_question",
         "known_domain": null,
         "freshness_sensitive": false,
-        "answer_on_fetch_only": false
+        "answer_on_fetch_only": false,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -589,7 +625,8 @@
         "gold_query_arm": "direct_question",
         "known_domain": null,
         "freshness_sensitive": false,
-        "answer_on_fetch_only": false
+        "answer_on_fetch_only": false,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -605,7 +642,8 @@
         "gold_query_arm": "direct_question",
         "known_domain": null,
         "freshness_sensitive": false,
-        "answer_on_fetch_only": false
+        "answer_on_fetch_only": false,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -621,7 +659,8 @@
         "gold_query_arm": "direct_question",
         "known_domain": null,
         "freshness_sensitive": false,
-        "answer_on_fetch_only": false
+        "answer_on_fetch_only": false,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -637,7 +676,8 @@
         "gold_query_arm": "direct_question",
         "known_domain": null,
         "freshness_sensitive": false,
-        "answer_on_fetch_only": false
+        "answer_on_fetch_only": false,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -653,7 +693,8 @@
         "gold_query_arm": "direct_question",
         "known_domain": null,
         "freshness_sensitive": false,
-        "answer_on_fetch_only": false
+        "answer_on_fetch_only": false,
+        "intrinsic_knowable": true
       }
     },
     {
@@ -669,7 +710,8 @@
         "gold_query_arm": "direct_question",
         "known_domain": null,
         "freshness_sensitive": false,
-        "answer_on_fetch_only": false
+        "answer_on_fetch_only": false,
+        "intrinsic_knowable": true
       }
     },
     {
@@ -685,7 +727,8 @@
         "gold_query_arm": "direct_question",
         "known_domain": null,
         "freshness_sensitive": false,
-        "answer_on_fetch_only": false
+        "answer_on_fetch_only": false,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -701,7 +744,8 @@
         "gold_query_arm": "direct_question",
         "known_domain": null,
         "freshness_sensitive": false,
-        "answer_on_fetch_only": false
+        "answer_on_fetch_only": false,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -717,7 +761,8 @@
         "gold_query_arm": "direct_question",
         "known_domain": null,
         "freshness_sensitive": false,
-        "answer_on_fetch_only": false
+        "answer_on_fetch_only": false,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -733,7 +778,8 @@
         "gold_query_arm": "direct_question",
         "known_domain": null,
         "freshness_sensitive": false,
-        "answer_on_fetch_only": false
+        "answer_on_fetch_only": false,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -749,7 +795,8 @@
         "gold_query_arm": "direct_question",
         "known_domain": null,
         "freshness_sensitive": false,
-        "answer_on_fetch_only": false
+        "answer_on_fetch_only": false,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -765,7 +812,8 @@
         "gold_query_arm": "direct_question",
         "known_domain": null,
         "freshness_sensitive": false,
-        "answer_on_fetch_only": false
+        "answer_on_fetch_only": false,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -781,7 +829,8 @@
         "gold_query_arm": "keyword_compressed",
         "known_domain": null,
         "freshness_sensitive": false,
-        "answer_on_fetch_only": true
+        "answer_on_fetch_only": true,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -797,7 +846,8 @@
         "gold_query_arm": "keyword_compressed",
         "known_domain": null,
         "freshness_sensitive": false,
-        "answer_on_fetch_only": true
+        "answer_on_fetch_only": true,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -813,7 +863,8 @@
         "gold_query_arm": "keyword_compressed",
         "known_domain": null,
         "freshness_sensitive": false,
-        "answer_on_fetch_only": true
+        "answer_on_fetch_only": true,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -829,7 +880,8 @@
         "gold_query_arm": "keyword_compressed",
         "known_domain": null,
         "freshness_sensitive": false,
-        "answer_on_fetch_only": true
+        "answer_on_fetch_only": true,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -845,7 +897,8 @@
         "gold_query_arm": "keyword_compressed",
         "known_domain": null,
         "freshness_sensitive": false,
-        "answer_on_fetch_only": true
+        "answer_on_fetch_only": true,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -861,7 +914,8 @@
         "gold_query_arm": "keyword_compressed",
         "known_domain": null,
         "freshness_sensitive": false,
-        "answer_on_fetch_only": true
+        "answer_on_fetch_only": true,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -877,7 +931,8 @@
         "gold_query_arm": "keyword_compressed",
         "known_domain": null,
         "freshness_sensitive": false,
-        "answer_on_fetch_only": true
+        "answer_on_fetch_only": true,
+        "intrinsic_knowable": false
       }
     },
     {
@@ -893,7 +948,99 @@
         "gold_query_arm": "keyword_compressed",
         "known_domain": null,
         "freshness_sensitive": false,
-        "answer_on_fetch_only": true
+        "answer_on_fetch_only": true,
+        "intrinsic_knowable": false
+      }
+    },
+    {
+      "id": "syn-057",
+      "question": "What is the obscure charter seat of the placeholder enclave Quillon Reach?",
+      "answer": "Unknown-quillon",
+      "answer_aliases": [],
+      "released_at": "2025-01-01",
+      "source": "synthetic",
+      "meta": {
+        "freshness_sensitive": false,
+        "answer_on_fetch_only": false,
+        "regime": "obscure"
+      }
+    },
+    {
+      "id": "syn-058",
+      "question": "What is the obscure charter seat of the placeholder enclave Vexley Hollow?",
+      "answer": "Unknown-vexley",
+      "answer_aliases": [],
+      "released_at": "2025-01-01",
+      "source": "synthetic",
+      "meta": {
+        "freshness_sensitive": false,
+        "answer_on_fetch_only": false,
+        "regime": "obscure"
+      }
+    },
+    {
+      "id": "syn-059",
+      "question": "What is the obscure charter seat of the placeholder enclave Thornfield Span?",
+      "answer": "Unknown-thornfield",
+      "answer_aliases": [],
+      "released_at": "2025-01-01",
+      "source": "synthetic",
+      "meta": {
+        "freshness_sensitive": false,
+        "answer_on_fetch_only": false,
+        "regime": "obscure"
+      }
+    },
+    {
+      "id": "syn-060",
+      "question": "Who is currently the lead pilot of the placeholder fleet Halcyon Drift?",
+      "answer": "Captain Reyes",
+      "answer_aliases": [],
+      "released_at": "2025-01-01",
+      "source": "synthetic",
+      "meta": {
+        "freshness_sensitive": true,
+        "answer_on_fetch_only": false,
+        "regime": "stale_fresh"
+      }
+    },
+    {
+      "id": "syn-061",
+      "question": "Who is currently the lead pilot of the placeholder fleet Nimbus Lattice?",
+      "answer": "Captain Orr",
+      "answer_aliases": [],
+      "released_at": "2025-01-01",
+      "source": "synthetic",
+      "meta": {
+        "freshness_sensitive": true,
+        "answer_on_fetch_only": false,
+        "regime": "stale_fresh"
+      }
+    },
+    {
+      "id": "syn-062",
+      "question": "Which placeholder clause governs the treaty body Ferrous Pact?",
+      "answer": "Article 9",
+      "answer_aliases": [],
+      "released_at": "2025-01-01",
+      "source": "synthetic",
+      "meta": {
+        "freshness_sensitive": false,
+        "answer_on_fetch_only": false,
+        "regime": "authority_trap"
+      }
+    },
+    {
+      "id": "syn-063",
+      "question": "Which placeholder clause governs the treaty body Verdant Accord?",
+      "answer": "Clause 7",
+      "answer_aliases": [],
+      "released_at": "2025-01-01",
+      "source": "synthetic",
+      "meta": {
+        "freshness_sensitive": false,
+        "answer_on_fetch_only": false,
+        "regime": "authority_trap"
       }
     }
   ]

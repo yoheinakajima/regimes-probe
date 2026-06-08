@@ -58,6 +58,9 @@ def _outcome(trace, grade, reward, *, condition: str, budget: int) -> AttemptOut
         found_hit=reward.flags["found_hit"],
         cluster_key=trace.signature.cluster_key,
         attempt_reward=reward.attempt_reward,
+        authority_ok=trace.vstate.authority_ok,
+        contradiction=trace.vstate.contradiction,
+        support_found=trace.vstate.support_found,
     )
 
 

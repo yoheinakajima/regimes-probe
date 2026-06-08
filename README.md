@@ -82,7 +82,7 @@ See `docs/BENCHMARK_TARGETS.md`. Unit tests never require real benchmark data.
 
 ```bash
 pip install -e .            # or: pip install -e '.[dev,activegraph]'
-python -m pytest -q         # 50 tests, no keys/network
+python -m pytest -q         # 60 tests, no keys/network
 
 # The whole no-key pipeline in one command (the first demo):
 python scripts/run_synthetic_full.py --run-id demo   # split -> baseline -> experience ->
@@ -97,26 +97,31 @@ python scripts/run_confirm.py    --run-id demo --budget 1   # frozen policy memo
 python scripts/run_budget_curve.py               # budget curve: no_memory vs policy_memory
 python scripts/make_report.py    --run-id demo   # full report + replay check -> results/demo/
 python scripts/run_regimes_loop.py --run-id rl   # regimes improvement loop with OPTIMIZE/CONFIRM gating
+python scripts/run_ablations.py                  # Level1/Level2/reward/online ablations
+python scripts/inspect_memory_snapshot.py results/demo/memory_snapshot.json   # audit a snapshot
+python scripts/compare_runs.py results/a/report.json results/b/report.json    # diff two runs
 
 # Real-benchmark readiness (validates config only; calls NO providers):
 python scripts/validate_live_readiness.py        # add --strict to gate on gaps
 ```
 
 Representative **synthetic-fixture** result (committed under `results/demo/`) —
-this validates the *mechanism and harness*, **not** any real benchmark:
+this validates the *mechanism and harness*, **not** any real benchmark. The
+report's `headline_eligible` is **false** (dataset is synthetic), by design:
 
-| budget | no_memory `correct_per_tool_call` | policy_memory `correct_per_tool_call` | random_memory (control) |
-| --- | --- | --- | --- |
-| 1 | 0.000 | 0.792 | 0.250 |
-| 3 | 0.083 | 0.655 | 0.308 |
+| budget | closed_book | no_memory_search | random_memory (control) | policy_memory |
+| --- | --- | --- | --- | --- |
+| 1 | 0.036 acc | 0.000 | 0.286 | **0.750** |
+| 3 | 0.036 acc | 0.095 | 0.275 | **0.656** |
 
-Paired McNemar at budget 3 shows answers flipping wrong→correct with no
-wrong-direction flips; the replay check confirms the graph is a deterministic
+(`correct_per_tool_call`, except `closed_book` which makes 0 tool calls so only
+its accuracy is shown.) Paired McNemar at budget 3 shows 13 answers flipping
+wrong→correct with no reverse flips; `random_memory` lands well below
+`policy_memory`; the replay check confirms the graph is a deterministic
 projection of the log. **These are numbers on an engineered synthetic fixture
-(Study 0/1).** They demonstrate that the contextual bandit learns the routing/
-query/stop choices the fixture rewards — they say nothing about BrowseComp or
-LiveBrowseComp. Read `docs/STATUS.md` (claim ledger) and
-`docs/METHODOLOGY_RISKS.md` before drawing conclusions.
+(Study 0/1)** — the policy is intentionally *not* perfect (residual failures feed
+the regime diagnostics). They say nothing about BrowseComp or LiveBrowseComp.
+Read `docs/STATUS.md` (claim ledger) and `docs/METHODOLOGY_RISKS.md` first.
 
 ## Toward a real run (no keys needed yet)
 
@@ -153,8 +158,8 @@ query / verification-and-stopping policies, grading and reward, evaluation
 protocol, leakage controls, reporting, implementation plan, and `STATUS.md`.
 
 For the path to a real benchmark: `docs/REAL_BENCHMARK_READINESS.md`,
-`docs/NEXT_LIVE_RUN.md`, and `docs/METHODOLOGY_RISKS.md` (read this one before
-believing any number).
+`docs/NEXT_LIVE_RUN.md`, `docs/FIRST_REAL_RESULT_CRITERIA.md`, and
+`docs/METHODOLOGY_RISKS.md` (read this one before believing any number).
 
 ## Repository layout
 

@@ -215,3 +215,31 @@ derivable from it. Headline claims use `conditions[*].confirm` only.
   }
 }
 ```
+
+## Addendum (v0.2): conditions, controls, and eligibility
+
+`report.json` now also carries:
+
+- `headline_eligible` (bool) and `eligibility` — the structural-guard verdict
+  from `eval/eligibility.py` (see `docs/FIRST_REAL_RESULT_CRITERIA.md`). A
+  synthetic/placeholder run is always `headline_eligible: false` with the reason
+  recorded.
+- `same_conditions` — the `eval/conditions.py` result asserting the baseline and
+  policy runs differ only in memory access.
+- `condition_specs` — the captured `ConditionSpec` fingerprint per compared
+  condition (model, prompt version, tools, budget, split id, grader, provider
+  config id, query/verify/stop policy, memory access).
+
+Conditions distinguished in reports/CSVs:
+
+- `closed_book` — no tools (budget 0); intrinsic-knowledge estimate.
+- `no_memory_search` — search, no policy memory (the Level 1 baseline; formerly
+  labelled `no_memory`).
+- `random_memory` — uninformative priors control.
+- `policy_memory` — frozen snapshot (the treatment).
+
+`summary.md` leads with a **Headline eligibility** banner (eligible / mechanism /
+dataset-real + reasons) before any metric, so a synthetic run can never be
+mistaken for a benchmark result. `scripts/compare_runs.py` diffs two reports
+(budget curves, metric deltas, McNemar) and `scripts/inspect_memory_snapshot.py`
+audits a snapshot for answer leakage.

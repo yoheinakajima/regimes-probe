@@ -88,6 +88,9 @@ def write_full_report(
     promotions: Optional[list[dict[str, Any]]] = None,
     significance: Optional[dict[str, Any]] = None,
     meta: Optional[dict[str, Any]] = None,
+    eligibility: Optional[dict[str, Any]] = None,
+    same_conditions: Optional[dict[str, Any]] = None,
+    condition_specs: Optional[dict[str, Any]] = None,
     results_root: str | Path = "results",
 ) -> Path:
     """Write every artifact and return the run directory."""
@@ -122,6 +125,10 @@ def write_full_report(
     report = {
         "run_id": run_id,
         "meta": meta,
+        "headline_eligible": (eligibility or {}).get("headline_eligible", False),
+        "eligibility": eligibility or {},
+        "same_conditions": same_conditions or {},
+        "condition_specs": condition_specs or {},
         "conditions": [
             {"condition": r.condition, "budget": r.budget, "metrics": r.metrics}
             for r in runs
@@ -137,7 +144,8 @@ def write_full_report(
 
     # --- summary.md ---
     (run_dir / "summary.md").write_text(
-        _summary_md(run_id, runs, meta, promotions, significance or {}, replay or {}),
+        _summary_md(run_id, runs, meta, promotions, significance or {}, replay or {},
+                    eligibility or {}, same_conditions or {}),
         encoding="utf-8",
     )
     return run_dir
@@ -158,10 +166,28 @@ def _replay_md(replay: dict[str, Any]) -> str:
     )
 
 
-def _summary_md(run_id, runs, meta, promotions, significance, replay) -> str:
+def _summary_md(run_id, runs, meta, promotions, significance, replay,
+                eligibility=None, same_conditions=None) -> str:
+    eligibility = eligibility or {}
+    same_conditions = same_conditions or {}
     lines: list[str] = []
     A = lines.append
     A(f"# regimes-probe run `{run_id}`\n")
+
+    # Eligibility banner — the most important line in the report.
+    he = eligibility.get("headline_eligible")
+    A("## Headline eligibility\n")
+    A(f"- **headline_eligible: {he}**")
+    A(f"- mechanism_ok: {eligibility.get('mechanism_ok')}")
+    A(f"- dataset_is_real: {eligibility.get('dataset_is_real')}")
+    if eligibility.get("reasons"):
+        A("- reasons not headline-eligible:")
+        for r in eligibility["reasons"]:
+            A(f"  - {r}")
+    if same_conditions:
+        A(f"- same_conditions.ok: {same_conditions.get('ok')} "
+          f"(unexpected diffs: {same_conditions.get('unexpected_diffs')})")
+    A("")
 
     # Headline: best paired improvement on the main metric if present.
     headline = meta.get("headline") or _auto_headline(runs)
@@ -238,15 +264,16 @@ def _summary_md(run_id, runs, meta, promotions, significance, replay) -> str:
 
 def _auto_headline(runs: list[ConditionRun]) -> str:
     by = {(r.condition, r.budget): r.metrics for r in runs}
-    conds = sorted({r.condition for r in runs})
-    if {"no_memory", "policy_memory"} <= set(conds):
-        budgets = sorted({r.budget for r in runs})
+    conds = {r.condition for r in runs}
+    base_name = "no_memory_search" if "no_memory_search" in conds else "no_memory"
+    if {base_name, "policy_memory"} <= conds:
+        budgets = sorted({r.budget for r in runs if r.condition in (base_name, "policy_memory")})
         parts = []
         for b in budgets:
-            base = by.get(("no_memory", b), {}).get("correct_per_tool_call", 0.0)
+            base = by.get((base_name, b), {}).get("correct_per_tool_call", 0.0)
             pol = by.get(("policy_memory", b), {}).get("correct_per_tool_call", 0.0)
             parts.append(f"budget {b}: {base:.3f} → {pol:.3f}")
-        return ("Frozen policy memory vs no-memory baseline, correct_per_tool_call — "
+        return (f"Frozen policy memory vs {base_name} baseline, correct_per_tool_call — "
                 + "; ".join(parts) + ".")
     return "See metrics table."
 

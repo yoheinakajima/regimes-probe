@@ -4711,6 +4711,193 @@
       ],
       "requires_tokens": [],
       "base_rank": 1
+    },
+    {
+      "doc_id": "d_syn-057_brave",
+      "item_id": "syn-057",
+      "title": "Quillon Reach rumor",
+      "url": "https://blog.example-brave.test/quillon",
+      "snippet": "Rumor links Quillon Reach to Mistgrave.",
+      "published_at": "2023-01-01",
+      "source_authority": 0.3,
+      "asserts": "Mistgrave",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "quillon",
+        "enclave"
+      ],
+      "requires_tokens": [],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-058_brave",
+      "item_id": "syn-058",
+      "title": "Vexley Hollow rumor",
+      "url": "https://blog.example-brave.test/vexley",
+      "snippet": "Rumor links Vexley Hollow to Dunmoor.",
+      "published_at": "2023-01-01",
+      "source_authority": 0.3,
+      "asserts": "Dunmoor",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "vexley",
+        "enclave"
+      ],
+      "requires_tokens": [],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-059_brave",
+      "item_id": "syn-059",
+      "title": "Thornfield Span rumor",
+      "url": "https://blog.example-brave.test/thornfield",
+      "snippet": "Rumor links Thornfield Span to Ashby.",
+      "published_at": "2023-01-01",
+      "source_authority": 0.3,
+      "asserts": "Ashby",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "thornfield",
+        "enclave"
+      ],
+      "requires_tokens": [],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-060_gold",
+      "item_id": "syn-060",
+      "title": "Halcyon Drift archive",
+      "url": "https://news.example.com/halcyon",
+      "snippet": "Archive: Captain Reyes.",
+      "published_at": "2021-05-01",
+      "source_authority": 0.7,
+      "asserts": "Captain Reyes",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "news_search",
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "halcyon",
+        "pilot"
+      ],
+      "requires_tokens": [],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-061_gold",
+      "item_id": "syn-061",
+      "title": "Nimbus Lattice archive",
+      "url": "https://news.example.com/nimbus",
+      "snippet": "Archive: Captain Orr.",
+      "published_at": "2021-05-01",
+      "source_authority": 0.7,
+      "asserts": "Captain Orr",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "news_search",
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "nimbus",
+        "pilot"
+      ],
+      "requires_tokens": [],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-062_gold",
+      "item_id": "syn-062",
+      "title": "Ferrous Pact text",
+      "url": "https://www.example.com/ferrous",
+      "snippet": "Text: Article 9.",
+      "published_at": "2024-01-01",
+      "source_authority": 0.7,
+      "asserts": "Article 9",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "ferrous",
+        "clause"
+      ],
+      "requires_tokens": [],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-062_news",
+      "item_id": "syn-062",
+      "title": "Ferrous Pact bulletin",
+      "url": "https://news.example.com/ferrous",
+      "snippet": "Bulletin asserts Article 1.",
+      "published_at": "2024-02-01",
+      "source_authority": 0.95,
+      "asserts": "Article 1",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "ferrous",
+        "clause"
+      ],
+      "requires_tokens": [],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-063_gold",
+      "item_id": "syn-063",
+      "title": "Verdant Accord text",
+      "url": "https://www.example.com/verdant",
+      "snippet": "Text: Clause 7.",
+      "published_at": "2024-01-01",
+      "source_authority": 0.7,
+      "asserts": "Clause 7",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "verdant",
+        "clause"
+      ],
+      "requires_tokens": [],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_syn-063_news",
+      "item_id": "syn-063",
+      "title": "Verdant Accord bulletin",
+      "url": "https://news.example.com/verdant",
+      "snippet": "Bulletin asserts Clause 99.",
+      "published_at": "2024-02-01",
+      "source_authority": 0.95,
+      "asserts": "Clause 99",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "verdant",
+        "clause"
+      ],
+      "requires_tokens": [],
+      "base_rank": 0
     }
   ]
 }

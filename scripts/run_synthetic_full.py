@@ -62,11 +62,18 @@ def main() -> int:
           f"disjoint={set(sp.optimize_ids).isdisjoint(sp.confirm_ids)}")
     print(f"replay projection_matches: {summary['replay'].get('projection_matches')}")
     print(f"memory snapshot answer-free: True (assert_no_answer_leakage enforced)")
+    el = summary["eligibility"]
+    print(f"headline_eligible    : {el['headline_eligible']}  "
+          f"(mechanism_ok={el['mechanism_ok']}, dataset_is_real={el['dataset_is_real']})")
+    if el["reasons"]:
+        print(f"  reasons            : {el['reasons']}")
+    print(f"closed_book accuracy : {summary['closed_book']['accuracy']:.3f} "
+          f"(intrinsic-knowledge estimate; 0 tool calls)")
     print("\ncorrect_per_tool_call by budget (CONFIRM, held out):")
-    print(f"  {'budget':>6} | {'no_memory':>10} | {'policy_mem':>10} | {'random_mem':>10}")
+    print(f"  {'budget':>6} | {'no_mem_search':>13} | {'policy_mem':>10} | {'random_mem':>10}")
     for b in summary["budgets"]:
         h = summary["headline"][b]
-        print(f"  {b:>6} | {h['no_memory']['correct_per_tool_call']:>10.3f} | "
+        print(f"  {b:>6} | {h['no_memory_search']['correct_per_tool_call']:>13.3f} | "
               f"{h['policy_memory']['correct_per_tool_call']:>10.3f} | "
               f"{h['random_memory']['correct_per_tool_call']:>10.3f}")
     mc = summary["significance"]["mcnemar"]

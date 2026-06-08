@@ -67,7 +67,7 @@ def _outcome(trace, grade, reward, *, condition: str, budget: int) -> AttemptOut
         contaminated_results=sum(getattr(c, "contaminated_results", 0) for c in trace.calls),
         total_results=sum(1 for c in trace.calls for o in c.observations
                           if not getattr(o, "failed", False)),
-        candidate_entity_count=len({e["text"].lower()
+        candidate_entity_count=len({(e.get("candidate_text") or e.get("text") or "").lower()
                                     for c in trace.calls
                                     for e in getattr(c, "candidate_entities", [])}),
         followup_query_count=sum(1 for c in trace.calls if getattr(c, "stage", 1) >= 2),
@@ -77,7 +77,50 @@ def _outcome(trace, grade, reward, *, condition: str, budget: int) -> AttemptOut
         answer_found_after_stage=next(
             (getattr(c, "stage", 1) for c in trace.calls if c.supported), 0),
         stage_depth_used=max((getattr(c, "stage", 1) for c in trace.calls), default=0),
+        iterative=_iterative_stats(trace),
     )
+
+
+def _iterative_stats(trace) -> dict:
+    """Per-attempt candidate-hypothesis-policy stats (aggregated by compute_metrics)."""
+    fups = [c for c in trace.calls if getattr(c, "stage", 1) >= 2]
+    if not fups:
+        return {}
+    selected_roles = [c.selected_role for c in fups if getattr(c, "selected_role", None)]
+    role_matches = sum(1 for c in fups
+                       if getattr(c, "selected_role", None) in getattr(c, "target_roles", []))
+    rejection_reasons = [rc.get("rejection_reason") for c in fups
+                         for rc in getattr(c, "rejected_candidates", [])
+                         if rc.get("rejection_reason")]
+    # candidate switches between consecutive follow-ups
+    switches = 0
+    prev = None
+    for c in fups:
+        sc = getattr(c, "selected_candidate", None)
+        if prev is not None and sc != prev:
+            switches += 1
+        prev = sc
+    # repeated follow-up queries (same normalized query text)
+    seen: set = set()
+    repeated = 0
+    for c in fups:
+        q = (c.query or "").lower().strip()
+        if q in seen:
+            repeated += 1
+        seen.add(q)
+    return {
+        "n_followups": len(fups),
+        "selected_roles": selected_roles,
+        "role_matches": role_matches,
+        "rejection_reasons": rejection_reasons,
+        "sticky": sum(1 for c in fups if getattr(c, "sticky_penalty", 0.0) > 0),
+        "no_progress": sum(1 for c in fups if getattr(c, "no_progress", False)),
+        "evidence_improved": sum(1 for c in fups if getattr(c, "evidence_improved", False)),
+        "switches": switches,
+        "repeated_queries": repeated,
+        "beam_size_sum": sum(len(getattr(c, "candidate_entities", [])) for c in fups),
+        "beam_size_n": len(fups),
+    }
 
 
 def run_condition(

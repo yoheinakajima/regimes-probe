@@ -242,3 +242,55 @@ given cluster** — exactly as it learns tool and query-form choice.
 **Sequencing:** evaluate Firecrawl scrape/fetch only **after** candidate-entity
 targeting works — fetching a page the staged search would not have found just adds
 cost. Iterative clue resolution comes before scrape.
+
+## Level 2c: typed candidate hypotheses (role + evidence-progress gating)
+
+**Motivation (iterative v0 run).** Staged search worked structurally but latched
+onto the *wrong* intermediate candidate and re-exploited it: source/publisher names
+(`Brittle Paper`), broad orgs (`World Health Organization`), broad locations
+(`Tennessee`), generic concepts (`Art Deco`, `Antagonist`), program/source names
+(`National Sheriffs`). That is a **hypothesis-selection** failure, not a provider
+or contamination failure — and it is generic to multi-step search, not BrowseComp-
+specific.
+
+`agent/clue_resolution.py` now treats each extracted candidate as a **typed
+hypothesis** (`CandidateHypothesis`) and carries it forward only if it is
+role-compatible with the unresolved target and follow-up evidence improves.
+
+- **Generic roles**: `person`, `organization`, `location`, `title_or_work`,
+  `publication_or_source`, `event`, `concept`, `date_or_time`, `unknown`
+  (`classify_entity_role`, deterministic, gold-free).
+- **Target-role inference** (`infer_target_roles`): maps question cues to a small
+  set of `target_roles` + `intermediate_roles` (who/founder/author → person;
+  which TV series/book/manga → title_or_work; restaurant/museum → organization;
+  town/monument/where → location; year/when → date_or_time as answer shape).
+- **Role-compatible scoring** (`adjusted_score`): boost candidates whose role is in
+  `target_roles` (+) or plausible `intermediate_roles`; apply
+  `source_entity_penalty` (publisher/platform unless a source is wanted),
+  `location_penalty` (broad locations unless a place is wanted, via a generic
+  continents/states/countries lexicon), `genericity_penalty` (concepts; broad
+  `World/National/…` orgs; domain-only candidates; obvious clue terms that don't
+  narrow; contaminated-only candidates). Cross-domain corroboration boosts.
+- **Evidence-progress gate**: a candidate is preferred for the next hop only if its
+  follow-up improved evidence; a follow-up that adds nothing is marked
+  `no_progress` and downweighted.
+- **Anti-sticky beam** (`HypothesisBeam`, beam_size 3): apply `sticky_penalty` to a
+  candidate that made no progress, **force exploration** of the next-best after a
+  candidate fails twice, avoid repeating equivalent follow-up queries, and record
+  rejected candidates + reasons. This prevents loops like
+  `Art Deco → Art Deco → Art Deco`.
+- **Composition**: follow-up = `"{candidate}"` + one *unresolved* distinctive clue
+  span (preferred) or an answer-shape hint — never `candidate + generic filler`,
+  never a repeated query, never an already-failed clue.
+
+Debug (`debug_questions.jsonl`, `scripts/debug_run_failures.py`) shows
+`target_roles`, the candidate hypotheses with role + raw/adjusted scores + each
+penalty, the selected candidate + role + reason, the rejected candidates +
+`rejection_reason`, and the sticky / no-progress flags per stage. Metrics:
+`selected_candidate_role_counts`, `candidate_role_match_rate`,
+`candidate_rejection_counts`, `sticky_candidate_count`,
+`no_progress_followup_count`, `evidence_improved_after_candidate_rate`,
+`mean_beam_size`, `candidate_switch_count`, `repeated_candidate_query_count`.
+
+**Sequencing:** scrape/fetch still comes *after* candidate targeting improves —
+scraping the wrong page only yields richer wrong evidence.

@@ -63,7 +63,9 @@ def main() -> int:
               f"contaminated_results={r.get('contaminated_results', 0)} "
               f"stage_depth={r.get('stage_depth_used', 1)} "
               f"followups={r.get('followup_query_count', 0)}")
-        # Stage chain (iterative clue resolution): query -> results -> candidate entities.
+        if r.get("target_roles"):
+            print(f"  target_roles: {r['target_roles']}")
+        # Stage chain (iterative clue resolution): query -> results -> typed candidates.
         for c in r.get("calls", []):
             cands = c.get("candidate_entities", [])
             print(f"  Stage {c.get('stage', 1)} [{c.get('tool')}/{c.get('query_arm')}]: "
@@ -71,13 +73,19 @@ def main() -> int:
                   + (f", contaminated={c.get('contaminated_results')}"
                      if c.get('contaminated_results') else "")
                   + (f", q={c.get('query_quality')}" if c.get('query_quality') else "")
-                  + (f", clues={c.get('clue_ids')}" if c.get('clue_ids') else ""))
+                  + (f", no_progress" if c.get('no_progress') else "")
+                  + (f", sticky={c.get('sticky_penalty')}" if c.get('sticky_penalty') else ""))
             if c.get("selected_candidate"):
-                print(f"        selected entity: {c['selected_candidate']} "
-                      f"({c.get('selection_reason', '')})")
+                print(f"        → selected: {c['selected_candidate']} "
+                      f"[{c.get('selected_role')}]  {c.get('selection_reason', '')}")
             if cands:
-                print(f"        candidate entities: "
-                      f"{[(e.get('text'), e.get('score')) for e in cands]}")
+                print("        candidate hypotheses:")
+                for e in cands[:5]:
+                    print(f"          {e.get('candidate_text')!r:30} role={e.get('role'):22} "
+                          f"raw={e.get('raw_score')} adj={e.get('adjusted_score')}")
+            for e in c.get("rejected_candidates", [])[:4]:
+                print(f"          ✗ {e.get('candidate_text')!r:28} role={e.get('role'):22} "
+                      f"reason={e.get('rejection_reason')}")
             qcands = c.get("query_candidates", [])
             if qcands:
                 print(f"        query candidates ({c.get('n_query_candidates', len(qcands))}, "

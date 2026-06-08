@@ -90,6 +90,7 @@ class DebugRecord:
     contaminated_results: int = 0
     stage_depth_used: int = 1
     followup_query_count: int = 0
+    target_roles: list[str] = field(default_factory=list)
     evidence_titles: list[str] = field(default_factory=list)
     evidence_urls: list[str] = field(default_factory=list)
     evidence_snippet_previews: list[str] = field(default_factory=list)
@@ -130,8 +131,20 @@ def build_debug_record(*, item, trace, grade, reward, condition: str, budget: in
         cand_prev = [{"arm": q.get("arm"), "query_preview": _prev(q.get("query", ""), preview),
                       "expected_search_quality": q.get("expected_search_quality")}
                      for q in getattr(c, "query_candidates", [])[:6]]
-        ent_prev = [{"text": _prev(e.get("text", ""), 80), "score": e.get("score")}
-                    for e in getattr(c, "candidate_entities", [])[:5]]
+        # Candidate hypotheses (bounded): role + raw/adjusted scores + penalties.
+        ent_prev = [{"candidate_text": _prev(e.get("candidate_text", e.get("text", "")), 80),
+                     "role": e.get("role"), "raw_score": e.get("raw_score"),
+                     "adjusted_score": e.get("adjusted_score"),
+                     "role_match_score": e.get("role_match_score"),
+                     "source_entity_penalty": e.get("source_entity_penalty"),
+                     "location_penalty": e.get("location_penalty"),
+                     "genericity_penalty": e.get("genericity_penalty"),
+                     "sticky_penalty": e.get("sticky_penalty")}
+                    for e in getattr(c, "candidate_entities", [])[:6]]
+        rej_prev = [{"candidate_text": _prev(e.get("candidate_text", ""), 80),
+                     "role": e.get("role"), "rejection_reason": e.get("rejection_reason"),
+                     "adjusted_score": e.get("adjusted_score")}
+                    for e in getattr(c, "rejected_candidates", [])[:6]]
         calls_info.append({
             "call_index": c.call_index, "tool": c.tool, "query_arm": c.query_arm,
             "query_preview": _prev(c.query, preview),
@@ -141,12 +154,17 @@ def build_debug_record(*, item, trace, grade, reward, condition: str, budget: in
             "n_query_candidates": getattr(c, "n_query_candidates", 0),
             "n_query_candidates_dropped": getattr(c, "n_query_candidates_dropped", 0),
             "query_candidates": cand_prev,
-            # iterative clue resolution
+            # iterative clue resolution (typed candidate hypotheses)
             "stage": getattr(c, "stage", 1),
             "parent_query_id": getattr(c, "parent_query_id", None),
+            "target_roles": list(getattr(c, "target_roles", [])),
             "candidate_entities": ent_prev,
             "selected_candidate": getattr(c, "selected_candidate", None),
+            "selected_role": getattr(c, "selected_role", None),
             "selection_reason": _prev(getattr(c, "selection_reason", "") or "", preview),
+            "rejected_candidates": rej_prev,
+            "sticky_penalty": round(float(getattr(c, "sticky_penalty", 0.0)), 3),
+            "no_progress": bool(getattr(c, "no_progress", False)),
             "evidence_improved": bool(getattr(c, "evidence_improved", False)),
             "n_results": n_ok, "contaminated_results": c_cont,
             "failed": bool(getattr(c, "failed", False)),
@@ -203,6 +221,8 @@ def build_debug_record(*, item, trace, grade, reward, condition: str, budget: in
         contaminated_results=contaminated_results,
         stage_depth_used=max((getattr(c, "stage", 1) for c in trace.calls), default=1),
         followup_query_count=sum(1 for c in trace.calls if getattr(c, "stage", 1) >= 2),
+        target_roles=list(next((getattr(c, "target_roles", []) for c in trace.calls
+                                if getattr(c, "target_roles", [])), [])),
         evidence_titles=[e["title_preview"] for e in evidence],
         evidence_urls=[e["url"] for e in evidence],
         evidence_snippet_previews=[e["snippet_preview"] for e in evidence])

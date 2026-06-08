@@ -178,3 +178,17 @@ The BrowseComp dry runs isolated the bottleneck step by step:
 not have found just adds cost without addressing `exact_answer_missing`. All three
 levels are off by default and are recorded in the manifest/report so a run states
 exactly which were active.
+
+### Candidate-hypothesis gating (iterative v0 → v1)
+
+Iterative v0 (staged search) introduced multi-hop resolution but **over-selected
+wrong intermediate candidates** and re-exploited them (sources, broad orgs, broad
+locations, generic concepts). The next generic layer types each candidate by role,
+infers the target role(s) from the question, and carries a candidate forward only
+if it is role-compatible AND its follow-up improves evidence — with an anti-sticky
+beam that forces exploration after repeated no-progress. This is a general
+epistemic-policy rule for multi-step search, not a BrowseComp-specific patch.
+Metrics (`candidate_role_match_rate`, `sticky_candidate_count`,
+`evidence_improved_after_candidate_rate`, `candidate_switch_count`, …) make the
+selection behavior measurable. Scrape/fetch is evaluated only after candidate
+targeting improves, since scraping wrong pages only produces richer wrong evidence.

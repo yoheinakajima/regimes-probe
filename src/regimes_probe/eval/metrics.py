@@ -46,6 +46,8 @@ class AttemptOutcome:
     evidence_improved_after_followup: bool = False
     answer_found_after_stage: int = 0
     stage_depth_used: int = 1
+    # candidate-hypothesis policy (per-attempt aggregables)
+    iterative: dict = field(default_factory=dict)
 
     def to_row(self) -> dict[str, Any]:
         return {
@@ -79,6 +81,40 @@ class AttemptOutcome:
 
 def _safe_div(a: float, b: float) -> float:
     return a / b if b else 0.0
+
+
+def _iterative_metrics(stats: list[dict]) -> dict[str, Any]:
+    """Aggregate candidate-hypothesis-policy stats across a cell's attempts."""
+    from collections import Counter
+    role_counts: Counter = Counter()
+    rejection_counts: Counter = Counter()
+    followups = role_matches = sticky = no_progress = improved = 0
+    switches = repeated = beam_sum = beam_n = 0
+    for s in stats:
+        if not s:
+            continue
+        followups += s.get("n_followups", 0)
+        role_matches += s.get("role_matches", 0)
+        sticky += s.get("sticky", 0)
+        no_progress += s.get("no_progress", 0)
+        improved += s.get("evidence_improved", 0)
+        switches += s.get("switches", 0)
+        repeated += s.get("repeated_queries", 0)
+        beam_sum += s.get("beam_size_sum", 0)
+        beam_n += s.get("beam_size_n", 0)
+        role_counts.update(s.get("selected_roles", []))
+        rejection_counts.update(s.get("rejection_reasons", []))
+    return {
+        "selected_candidate_role_counts": dict(role_counts),
+        "candidate_role_match_rate": _safe_div(role_matches, followups),
+        "candidate_rejection_counts": dict(rejection_counts),
+        "sticky_candidate_count": sticky,
+        "no_progress_followup_count": no_progress,
+        "evidence_improved_after_candidate_rate": _safe_div(improved, followups),
+        "mean_beam_size": _safe_div(beam_sum, beam_n),
+        "candidate_switch_count": switches,
+        "repeated_candidate_query_count": repeated,
+    }
 
 
 def compute_metrics(outcomes: list[AttemptOutcome]) -> dict[str, Any]:
@@ -124,6 +160,8 @@ def compute_metrics(outcomes: list[AttemptOutcome]) -> dict[str, Any]:
         "answer_found_after_stage_mean": _safe_div(
             sum(o.answer_found_after_stage for o in outcomes if o.answer_found_after_stage),
             sum(1 for o in outcomes if o.answer_found_after_stage)),
+        # candidate-hypothesis policy aggregates
+        **_iterative_metrics([o.iterative for o in outcomes]),
         "correct_per_tool_call": _safe_div(correct, calls),
         "correct_per_dollar": _safe_div(correct, cost) if cost else 0.0,
         "correct_per_second": _safe_div(correct, latency) if latency else 0.0,

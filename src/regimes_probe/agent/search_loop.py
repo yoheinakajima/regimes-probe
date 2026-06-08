@@ -111,6 +111,12 @@ class CallRecord:
     selected_candidate: Optional[str] = None
     selection_reason: Optional[str] = None
     evidence_improved: bool = False
+    # candidate-hypothesis policy
+    target_roles: list[str] = field(default_factory=list)
+    selected_role: Optional[str] = None
+    rejected_candidates: list[dict[str, Any]] = field(default_factory=list)
+    sticky_penalty: float = 0.0
+    no_progress: bool = False
 
     @property
     def contaminated_results(self) -> int:
@@ -135,6 +141,11 @@ class CallRecord:
             "selected_candidate": self.selected_candidate,
             "selection_reason": self.selection_reason,
             "evidence_improved": self.evidence_improved,
+            "target_roles": list(self.target_roles),
+            "selected_role": self.selected_role,
+            "rejected_candidates": self.rejected_candidates,
+            "sticky_penalty": round(float(self.sticky_penalty), 3),
+            "no_progress": self.no_progress,
             "cost": self.cost,
             "latency": self.latency,
             "stop_arm": self.stop_arm,
@@ -252,17 +263,24 @@ class SearchLoop:
         clue_spans: list[str] = []
         answer_shape: list[str] = []
         clue_terms: list[str] = []
+        target_roles: list[str] = []
+        intermediate_roles: list[str] = []
+        beam = None
         if iterative:
             from regimes_probe.policy.query_decomposition import (
                 answer_shape_terms, extract_clues)
+            from regimes_probe.agent.clue_resolution import (
+                HypothesisBeam, infer_target_roles)
             _cl = extract_clues(item.question)
             clue_spans = _dedupe_keep(_cl.phrase_spans + _cl.entities)
             answer_shape = answer_shape_terms(item.question)
             clue_terms = [t for s in clue_spans for t in s.split()]
-        ranked_entities: list = []
+            target_roles, intermediate_roles = infer_target_roles(item.question)
+            beam = HypothesisBeam(beam_size=3)
         used_clue_spans: set[str] = set()
         stage = 1
         prev_vscore = 0.0
+        current_selected_norm: Optional[str] = None
 
         calls: list[CallRecord] = []
         observations: list[EvidenceObservation] = []
@@ -274,28 +292,37 @@ class SearchLoop:
         while len(calls) < config.budget:
             query_text_hash, clue_ids = "", []
             stage_info: dict[str, Any] = {}
+            current_selected_norm = None
+            beam_sel = beam.select() if (iterative and beam is not None and calls) else None
             if pending_fetch_url is not None and fetch_available:
                 tool = fetch_tool
                 query = pending_fetch_url
                 query_arm = "fetch"
                 opts: dict[str, Any] = {}
                 pending_fetch_url = None
-            elif iterative and ranked_entities and calls:
-                # Stage >= 2: combine the top candidate entity with the next clue.
-                from regimes_probe.agent.clue_resolution import compose_followup_query
-                fq = compose_followup_query(
-                    ranked_entities[0], clue_spans=clue_spans,
-                    used_clue_spans=used_clue_spans, answer_shape=answer_shape)
+            elif beam_sel is not None:
+                # Stage >= 2: carry the best ROLE-COMPATIBLE candidate hypothesis
+                # forward (beam handles anti-sticky / forced exploration).
+                from regimes_probe.agent.clue_resolution import compose_followup_from_hypothesis
+                fq = compose_followup_from_hypothesis(
+                    beam_sel.hypothesis, clue_spans=clue_spans,
+                    used_clue_spans=used_clue_spans, answer_shape=answer_shape, beam=beam)
                 tool = tool_seq[step] if step < len(tool_seq) else tool_seq[-1]
                 query, query_arm, opts = fq.query, fq.query_arm, {}
                 if fq.clue_used:
                     used_clue_spans.add(fq.clue_used.lower())
                 stage += 1
+                current_selected_norm = beam_sel.hypothesis.normalized_text
                 stage_info = {
                     "stage": stage, "parent_query_id": calls[-1].call_index,
-                    "candidate_entities": [e.to_dict() for e in ranked_entities[:5]],
+                    "candidate_entities": [h.to_dict() for h in
+                                           list(beam.pool.values())[:6]],
                     "selected_candidate": fq.selected_candidate,
-                    "selection_reason": fq.reason}
+                    "selected_role": beam_sel.hypothesis.role,
+                    "selection_reason": f"{fq.reason} | {beam_sel.reason}",
+                    "rejected_candidates": beam_sel.rejected,
+                    "sticky_penalty": beam_sel.hypothesis.sticky_penalty,
+                    "target_roles": list(target_roles)}
             else:
                 tool = tool_seq[step] if step < len(tool_seq) else tool_seq[-1]
                 qplan = self.query_policy.formulate(
@@ -361,12 +388,20 @@ class SearchLoop:
             rec.on_stop(step, decision.to_dict())
 
             # Did this call improve evidence vs before it? (Used by the iterative
-            # metrics and recorded per call.)
-            evidence_improved = bool(vstate.score > prev_vscore + 1e-9)
+            # metrics, the evidence-progress gate, and recorded per call.)
+            evidence_improved = bool(vstate.score > prev_vscore + 1e-9
+                                     or (supported and not any(c.supported for c in calls)))
             prev_vscore = max(prev_vscore, vstate.score)
-            if iterative:
-                from regimes_probe.agent.clue_resolution import extract_candidate_entities
-                ranked_entities = extract_candidate_entities(observations, clue_terms)
+            no_progress_flag = False
+            if iterative and beam is not None:
+                from regimes_probe.agent.clue_resolution import build_hypotheses
+                if current_selected_norm is not None:
+                    beam.record_progress(current_selected_norm, evidence_improved)
+                    no_progress_flag = not evidence_improved
+                beam.observe(build_hypotheses(
+                    observations, question=item.question, target_roles=target_roles,
+                    intermediate_roles=intermediate_roles, clue_terms=clue_terms,
+                    stage_found=stage))
 
             calls.append(
                 CallRecord(
@@ -394,6 +429,11 @@ class SearchLoop:
                     selected_candidate=stage_info.get("selected_candidate"),
                     selection_reason=stage_info.get("selection_reason"),
                     evidence_improved=evidence_improved,
+                    target_roles=list(target_roles),
+                    selected_role=stage_info.get("selected_role"),
+                    rejected_candidates=stage_info.get("rejected_candidates", []),
+                    sticky_penalty=stage_info.get("sticky_penalty", 0.0),
+                    no_progress=no_progress_flag,
                 )
             )
 

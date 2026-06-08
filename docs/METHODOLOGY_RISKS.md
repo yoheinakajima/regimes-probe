@@ -191,3 +191,15 @@ set — and the risk surface. Keep the experiment honest:
   it is `offline_fork=true` and never headline-eligible. A fork that would change
   the realized query distribution refuses (cache miss) rather than spending — so
   do not read a "successful" fork as evidence the new policy generalizes.
+- **Sticky wrong-candidate exploitation in staged search.** Iterative clue
+  resolution can latch onto a high-frequency but low-progress intermediate
+  (a publisher like `Brittle Paper`, a broad org like `World Health Organization`,
+  a broad location like `Tennessee`, a concept like `Art Deco`) and re-query it.
+  This is a hypothesis-selection failure, not a provider or contamination failure.
+  The candidate-hypothesis policy types each candidate by role, requires role
+  compatibility with the inferred target and **evidence progress** before carrying
+  it forward, and uses an anti-sticky beam (force exploration after two no-progress
+  follow-ups). When auditing a run, watch `candidate_role_match_rate` (should be
+  high), `sticky_candidate_count` / `no_progress_followup_count` (should be low),
+  and `repeated_candidate_query_count` (should be ~0). This is a generic multi-step
+  search rule, not BrowseComp tuning.

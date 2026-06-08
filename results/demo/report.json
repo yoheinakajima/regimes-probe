@@ -27,7 +27,17 @@
       10
     ],
     "memory_condition": "frozen_policy_memory",
-    "policy_condition": "query=learned,stop=learned"
+    "policy_condition": "query=learned,stop=learned",
+    "limitations": [
+      "Dataset is `synthetic_browse` \u2014 a synthetic/placeholder harness, NOT a real benchmark score.",
+      "The synthetic answerer models a competent extractor; it isolates retrieval/epistemic policy.",
+      "No live providers were called; only fixture-backed, deterministic tools."
+    ],
+    "not_claimed": [
+      "No claim of BrowseComp or LiveBrowseComp performance.",
+      "No claim base model weights changed (they do not).",
+      "No claim benchmark answers are stored in policy memory (they are not)."
+    ]
   },
   "conditions": [
     {

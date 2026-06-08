@@ -95,12 +95,12 @@ Frozen policy memory vs no-memory baseline, correct_per_tool_call — budget 1: 
 
 ## Limitations
 
-- Results below are on the synthetic harness unless a real dataset is named above.
-- The synthetic answerer models a competent extractor; it isolates retrieval/epistemic policy, not extraction.
-- Live provider results are non-deterministic; only fixture-backed runs are byte-reproducible.
+- Dataset is `synthetic_browse` — a synthetic/placeholder harness, NOT a real benchmark score.
+- The synthetic answerer models a competent extractor; it isolates retrieval/epistemic policy.
+- No live providers were called; only fixture-backed, deterministic tools.
 
 ## What is NOT claimed
 
-- No claim that base model weights changed (they do not).
-- No claim that benchmark answers are stored in policy memory (they are not).
-- No claim of improvement on any dataset not listed in this report.
+- No claim of BrowseComp or LiveBrowseComp performance.
+- No claim base model weights changed (they do not).
+- No claim benchmark answers are stored in policy memory (they are not).

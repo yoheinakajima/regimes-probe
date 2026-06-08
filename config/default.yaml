@@ -13,6 +13,10 @@ dataset:
   default: "synthetic"            # what the no-key quickstart uses
   synthetic_path: "fixtures/synthetic_browse.json"
   fake_corpus_path: "fixtures/fake_search_corpus.json"
+  # Real datasets (leave blank for the no-key path; see docs/NEXT_LIVE_RUN.md):
+  browsecomp_csv: ""              # path to the downloaded BrowseComp obfuscated CSV
+  livebrowsecomp_hf: "Forival/LiveBrowseComp"   # HF dataset id (needs network)
+  livebrowsecomp_local_jsonl: ""  # offline JSONL cache (alternative to HF)
 
 split:
   confirm_fraction: 0.4

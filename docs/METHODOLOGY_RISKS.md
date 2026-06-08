@@ -1,0 +1,115 @@
+# Methodology risks (read before believing any number)
+
+This project is easy to fool yourself with. This document lists the ways a
+result here could be *misleading* and the controls that defend against each. It
+is deliberately skeptical. Pair it with `docs/STATUS.md` (the claim ledger) and
+`docs/LEAKAGE_CONTROLS.md`.
+
+## The single most important caveat
+
+**The synthetic result is proof of the harness, not of the idea.**
+`results/demo/` shows that *given a fixture engineered so the right tool/query/
+stop choice changes the outcome*, the contextual bandit learns those choices and
+`correct_per_tool_call` rises. That validates the **mechanism and plumbing**. It
+says **nothing** about whether the same mechanism helps on real browsing
+questions. No BrowseComp/LiveBrowseComp claim follows from it.
+
+## Specific risks
+
+### 1. The random_memory control sitting "in between" is ambiguous
+On the synthetic set, ordering is `no_memory < random_memory < policy_memory`.
+That is the *hoped-for* ordering, but a non-trivial `random_memory` score can
+mean either of two very different things:
+- **Benign:** random priors occasionally route to the right tool by luck, and the
+  fixture is simply learnable — `policy_memory` ≫ `random_memory` is the real
+  signal.
+- **Concerning:** the *structure* of having any per-signature priors leaks
+  exploitable information (e.g., the fixture is so easy that almost any bias
+  helps), inflating both memory conditions.
+
+**Defense:** require `policy_memory` to beat `random_memory` by a margin that
+exceeds the bootstrap CI, on **held-out CONFIRM**, on real data. If
+`random_memory ≈ policy_memory`, treat the signal as not established.
+
+### 2. The fixture may be too easy
+The synthetic corpus gives exactly one gold tool/arm per item and distinct
+distractors, so retrieving the gold document anywhere yields the right answer.
+Real retrieval is noisier, answers are contested, and freshness/authority matter
+more. Easy fixtures over-state learnability.
+
+**Defense:** the real benchmarks are the test; the fixture only gates the harness.
+
+### 3. Intrinsic knowledge (the model already knows the answer)
+If the answerer can answer without searching, "tool routing" is irrelevant and
+any apparent gain is noise.
+
+**Defense (required for real runs):** run a **closed-book** baseline (no tools)
+and a **no-search** baseline. LiveBrowseComp is primary precisely because recent
+facts reduce intrinsic-knowledge dependence. Report the closed-book number
+alongside every result.
+
+### 4. Conditions differing in more than the independent variable
+If `no_memory` and `policy_memory` differ in model, prompt, tool config, budget,
+or grading, the comparison is invalid.
+
+**Defense:** identical model / tools / answer prompt / judge / budget across
+conditions; the **only** difference is the frozen policy memory. Pin exact model
+ids in `report.json` meta.
+
+### 5. Single-budget cherry-picking
+A method can win at one budget and lose elsewhere.
+
+**Defense:** report the **budget curve** (`[1,3,5,10]`), not one cap.
+
+### 6. Answer leakage into "procedural" memory
+The whole premise collapses if benchmark answers leak into memory.
+
+**Defense:** policy memory stores rewards/priors/embeddings/hashes only;
+`assert_no_answer_leakage` runs on every object and the frozen snapshot;
+`tests/test_policy_memory_no_answer_leakage.py` checks no gold string appears.
+On real data, **re-run this check on the actual traces** and grep the committed
+snapshot.
+
+### 7. Non-determinism / cache effects masquerading as learning
+Live providers are non-deterministic; repeated runs and provider caches can move
+numbers independent of the policy.
+
+**Defense:** record every tool response in the event log; verify the replay
+check passes; report repeated-run variance; note cache risks in the report.
+
+### 8. OPTIMIZE leaking into the headline
+In-sample improvement is nearly free and meaningless on its own.
+
+**Defense:** OPTIMIZE never appears as a headline; **CONFIRM is the only
+headline**, evaluated against a frozen snapshot that was frozen *before* CONFIRM.
+
+### 9. Grading artifacts
+Normalized exact-match can both over- and under-count; an LLM judge introduces
+its own bias and non-determinism.
+
+**Defense:** log the grading method per item; if using an LLM judge, cache and
+log it; report exact-match and judged numbers separately.
+
+### 10. Multiple comparisons / seed mining
+Trying many configs/seeds and reporting the best is p-hacking.
+
+**Defense:** pre-register the conditions; report all seeds with mean ± CI;
+promotions in the regimes loop go through OPTIMIZE→CONFIRM gating and are all
+recorded (accepted *and* rejected).
+
+## Minimum bar for a credible real result
+
+A learned-policy improvement is reportable only if **all** hold:
+1. Same model / tools / prompt / budget across conditions.
+2. Closed-book and no-search baselines reported.
+3. `policy_memory` beats `random_memory` and `no_memory` on **CONFIRM** beyond
+   the bootstrap CI.
+4. The improvement holds across the budget curve.
+5. No-answer-leakage check passes on the real traces, and the committed snapshot
+   contains no answer text.
+6. The replay check passes.
+7. Only CONFIRM is used as the headline; OPTIMIZE is disclosed but not claimed.
+8. Limitations and "what is not claimed" are stated in `summary.md`.
+
+Until then, the honest statement is: **the scaffold demonstrates the intended
+mechanism on a synthetic fixture.**

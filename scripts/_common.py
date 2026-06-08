@@ -68,3 +68,152 @@ def base_argparser(description: str) -> argparse.ArgumentParser:
     p.add_argument("--run-id", default=None)
     p.add_argument("--results-root", default=str(ROOT / "results"))
     return p
+
+
+# ---------------------------------------------------------------------------
+# Shared no-key, no-network pipeline (used by make_report, run_synthetic_full,
+# and the real-data-shaped smoke test).
+# ---------------------------------------------------------------------------
+import random as _random
+from typing import Optional
+
+from regimes_probe.activegraph_pack import replay_check
+from regimes_probe.eval.harness import experience_phase, run_condition
+from regimes_probe.eval.metrics import compute_metrics
+from regimes_probe.eval.report import ConditionRun, write_full_report
+from regimes_probe.eval.significance import bootstrap_correct_per_tool_call, mcnemar
+from regimes_probe.eval.split import build_split, partition
+from regimes_probe.policy.memory import PolicyMemory
+
+
+def random_memory(items, agent, params, *, seed: int = 7) -> PolicyMemory:
+    """Random-memory control: real priors, but uninformative (shuffled rewards)."""
+    rng = _random.Random(seed)
+    mem = PolicyMemory(params.copy())
+    families = {
+        "tool": ["generic_web_search", "news_search", "official_domain_search", "brave_search"],
+        "query": ["direct_question", "freshness_terms", "source_constrained", "keyword_compressed"],
+        "stop": ["stop_now", "search_more", "fetch_page"],
+    }
+    for it in items:
+        sig = agent.signature(it)
+        rewards = {fam: {rng.choice(arms): rng.uniform(-1, 1)} for fam, arms in families.items()}
+        mem.observe(sig, f"rand-{it.id}", rewards, correct=bool(rng.random() < 0.5), tool_calls=1)
+    return mem
+
+
+def full_pipeline(
+    cfg: dict[str, Any],
+    items,
+    providers,
+    search_tools: list[str],
+    agent,
+    *,
+    run_id: str,
+    results_root: str | Path,
+    dataset_label: str,
+    dataset_version: str,
+    on_step=None,
+) -> dict[str, Any]:
+    """Run the complete no-key pipeline and write report artifacts.
+
+    Steps: deterministic split -> no_memory baseline -> experience on OPTIMIZE ->
+    freeze snapshot -> policy_memory on CONFIRM -> random_memory control ->
+    budget curve -> significance -> replay check -> report. Returns a summary.
+    """
+    def step(msg: str) -> None:
+        if on_step:
+            on_step(msg)
+
+    weights = reward_weights(cfg)
+    params = bandit_params(cfg)
+    budgets = cfg.get("budgets", [1, 3, 5, 10])
+    mem_cfg = cfg.get("memory", {})
+    sp = cfg.get("split", {})
+
+    step("build deterministic OPTIMIZE/CONFIRM split")
+    split = build_split(items, confirm_fraction=sp.get("confirm_fraction", 0.4),
+                        salt=sp.get("salt", "regimes-probe-v0"), mode=sp.get("mode", "hash"))
+    split.assert_disjoint()
+    opt_items, con_items = partition(items, split)
+
+    step(f"experience phase on OPTIMIZE ({len(opt_items)} items) -> frozen snapshot")
+    mem = PolicyMemory(params.copy(), nearest_k=mem_cfg.get("nearest_k", 8))
+    experience_phase(opt_items, agent, providers, mem,
+                     budget=mem_cfg.get("experience_budget", 5),
+                     passes=mem_cfg.get("experience_passes", 4),
+                     weights=weights, dataset_version=dataset_version)
+    snapshot = mem.snapshot(meta={"dataset_version": dataset_version,
+                                  "n_optimize": len(opt_items)})
+
+    runs: list[ConditionRun] = []
+    aligned: dict[int, tuple] = {}
+    replay_log = None
+    gate_budget = 3 if 3 in budgets else budgets[0]
+    for b in budgets:
+        step(f"budget {b}: no_memory / policy_memory / random_memory on CONFIRM")
+        base = run_condition(con_items, agent, providers, PolicyMemory(params.copy()),
+                             condition="no_memory", budget=b, weights=weights,
+                             explore=False, dataset_version=dataset_version)
+        frozen = PolicyMemory.from_snapshot(snapshot, frozen=True)
+        pol = run_condition(con_items, agent, providers, frozen, condition="policy_memory",
+                            budget=b, weights=weights, explore=False, dataset_version=dataset_version)
+        rnd = run_condition(con_items, agent, providers,
+                            random_memory(opt_items, agent, params), condition="random_memory",
+                            budget=b, weights=weights, explore=False, dataset_version=dataset_version)
+        runs += [ConditionRun("no_memory", b, base.outcomes),
+                 ConditionRun("policy_memory", b, pol.outcomes),
+                 ConditionRun("random_memory", b, rnd.outcomes)]
+        aligned[b] = (base.outcomes, pol.outcomes, rnd.outcomes)
+        if b == gate_budget:
+            replay_log = pol.log
+
+    step("paired statistical tests (McNemar + bootstrap CI) at the gate budget")
+    base_out, pol_out, _ = aligned[gate_budget]
+    bmap = {o.item_id: o for o in base_out}
+    pmap = {o.item_id: o for o in pol_out}
+    ids = [i for i in bmap if i in pmap]
+    mc = mcnemar([bmap[i].correct for i in ids], [pmap[i].correct for i in ids])
+    ci = bootstrap_correct_per_tool_call([int(pmap[i].correct) for i in ids],
+                                         [pmap[i].tool_calls for i in ids])
+    significance = {"budget": gate_budget, "mcnemar": mc.to_dict(),
+                    "policy_correct_per_tool_call_ci": ci.to_dict()}
+
+    step("replay check (graph is a deterministic projection of the log)")
+    replay = replay_check(replay_log).to_dict() if replay_log is not None else {}
+
+    meta = {
+        "answer_model": cfg.get("live", {}).get("answer_model"),
+        "search_baseline": cfg.get("live", {}).get("search_baseline"),
+        "tools_enabled": search_tools,
+        "embedder": "hash_embedder",
+        "dataset": dataset_label,
+        "dataset_version": dataset_version,
+        "split": split.to_dict() | {"optimize_ids": "...", "confirm_ids": "..."},
+        "budgets": budgets,
+        "memory_condition": "frozen_policy_memory",
+        "policy_condition": f"query={cfg['policy']['query_mode']},stop={cfg['policy']['stop_mode']}",
+        "limitations": [
+            f"Dataset is `{dataset_label}` — a synthetic/placeholder harness, NOT a real benchmark score.",
+            "The synthetic answerer models a competent extractor; it isolates retrieval/epistemic policy.",
+            "No live providers were called; only fixture-backed, deterministic tools.",
+        ],
+        "not_claimed": [
+            "No claim of BrowseComp or LiveBrowseComp performance.",
+            "No claim base model weights changed (they do not).",
+            "No claim benchmark answers are stored in policy memory (they are not).",
+        ],
+    }
+    step("write report artifacts")
+    run_dir = write_full_report(run_id, runs=runs, snapshot=snapshot.to_dict(),
+                                replay=replay, significance=significance, meta=meta,
+                                results_root=results_root)
+
+    headline = {b: {
+        "no_memory": compute_metrics(aligned[b][0]),
+        "policy_memory": compute_metrics(aligned[b][1]),
+        "random_memory": compute_metrics(aligned[b][2]),
+    } for b in budgets}
+    return {"run_dir": str(run_dir), "split": split, "headline": headline,
+            "significance": significance, "replay": replay, "snapshot": snapshot,
+            "budgets": budgets, "gate_budget": gate_budget}

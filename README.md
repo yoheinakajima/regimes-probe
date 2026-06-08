@@ -10,6 +10,12 @@ search *policy* from traces.**
 > call** on held-out browsing questions — **without changing base model weights**
 > and **without storing benchmark answers**.
 
+> **Current status (be precise):** the scaffold **demonstrates the intended
+> mechanism on a synthetic fixture**. It has **not** been run on BrowseComp or
+> LiveBrowseComp, and **no real benchmark performance is claimed**. See
+> [`docs/STATUS.md`](docs/STATUS.md), [`docs/METHODOLOGY_RISKS.md`](docs/METHODOLOGY_RISKS.md),
+> and [`docs/REAL_BENCHMARK_READINESS.md`](docs/REAL_BENCHMARK_READINESS.md).
+
 It learns a *procedural* policy for **where to look, how to search, when to
 verify, and when to stop** — not factual answers.
 
@@ -76,9 +82,14 @@ See `docs/BENCHMARK_TARGETS.md`. Unit tests never require real benchmark data.
 
 ```bash
 pip install -e .            # or: pip install -e '.[dev,activegraph]'
-python -m pytest -q         # 42 tests, no keys/network
+python -m pytest -q         # 50 tests, no keys/network
 
-# Synthetic, no-key demo (the first demo):
+# The whole no-key pipeline in one command (the first demo):
+python scripts/run_synthetic_full.py --run-id demo   # split -> baseline -> experience ->
+                                                     # freeze -> CONFIRM -> controls ->
+                                                     # report -> replay -> STATUS print
+
+# ...or step by step:
 python scripts/build_split.py    --run-id demo   # deterministic OPTIMIZE/CONFIRM split
 python scripts/run_baseline.py   --budget 1      # no-memory baseline on CONFIRM
 python scripts/run_experience.py --run-id demo   # experience phase on OPTIMIZE -> frozen snapshot
@@ -86,19 +97,37 @@ python scripts/run_confirm.py    --run-id demo --budget 1   # frozen policy memo
 python scripts/run_budget_curve.py               # budget curve: no_memory vs policy_memory
 python scripts/make_report.py    --run-id demo   # full report + replay check -> results/demo/
 python scripts/run_regimes_loop.py --run-id rl   # regimes improvement loop with OPTIMIZE/CONFIRM gating
+
+# Real-benchmark readiness (validates config only; calls NO providers):
+python scripts/validate_live_readiness.py        # add --strict to gate on gaps
 ```
 
-Representative synthetic result (committed under `results/demo/`):
+Representative **synthetic-fixture** result (committed under `results/demo/`) —
+this validates the *mechanism and harness*, **not** any real benchmark:
 
-| budget | no_memory `correct_per_tool_call` | policy_memory `correct_per_tool_call` |
-| --- | --- | --- |
-| 1 | 0.000 | 0.792 |
-| 3 | 0.083 | 0.655 |
+| budget | no_memory `correct_per_tool_call` | policy_memory `correct_per_tool_call` | random_memory (control) |
+| --- | --- | --- | --- |
+| 1 | 0.000 | 0.792 | 0.250 |
+| 3 | 0.083 | 0.655 | 0.308 |
 
 Paired McNemar at budget 3 shows answers flipping wrong→correct with no
 wrong-direction flips; the replay check confirms the graph is a deterministic
-projection of the log. These are **synthetic-harness** numbers (Study 0/1); see
-`docs/STATUS.md` for the grounded claim ledger and what is *not* claimed.
+projection of the log. **These are numbers on an engineered synthetic fixture
+(Study 0/1).** They demonstrate that the contextual bandit learns the routing/
+query/stop choices the fixture rewards — they say nothing about BrowseComp or
+LiveBrowseComp. Read `docs/STATUS.md` (claim ledger) and
+`docs/METHODOLOGY_RISKS.md` before drawing conclusions.
+
+## Toward a real run (no keys needed yet)
+
+The path to a credible real result is documented, and the real-data *adapter
+path* is already exercised offline on placeholder fixtures
+(`fixtures/real_shaped/`, `tests/test_real_data_shape.py`):
+
+- `docs/REAL_BENCHMARK_READINESS.md` — what's done vs. what's blocked on
+  keys/data/decisions.
+- `docs/NEXT_LIVE_RUN.md` — exact step-by-step for the first live run.
+- `python scripts/validate_live_readiness.py` — config validation, no calls.
 
 ## Live runs
 
@@ -122,6 +151,10 @@ architecture, research plan, benchmark targets, model/tool choices, ActiveGraph
 design, event schema, policy memory, contextual bandit, regimes loop, routing /
 query / verification-and-stopping policies, grading and reward, evaluation
 protocol, leakage controls, reporting, implementation plan, and `STATUS.md`.
+
+For the path to a real benchmark: `docs/REAL_BENCHMARK_READINESS.md`,
+`docs/NEXT_LIVE_RUN.md`, and `docs/METHODOLOGY_RISKS.md` (read this one before
+believing any number).
 
 ## Repository layout
 

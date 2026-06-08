@@ -50,7 +50,14 @@ Status of each phase in this v0, with the modules that satisfy it. Legend:
 - Adapters load available data; tests don't require data; dataset
   version/checksum stored; missing data raises a clear error
   (`datasets/browsecomp.py`, `datasets/livebrowsecomp.py`). Decode helpers are
-  round-trip tested. Real-data smoke runs are future work.
+  round-trip tested.
+- A no-key **real-data-shaped smoke test** exercises the full adapter path
+  (decode → split → report → leakage → replay) on placeholder fixtures
+  (`fixtures/real_shaped/`, `tests/test_real_data_shape.py`,
+  `scripts/build_real_shaped_fixtures.py`).
+- Loading the *actual* benchmark data and confirming the real field/canary
+  schema remains future work (needs dataset access). See
+  `docs/REAL_BENCHMARK_READINESS.md`.
 
 ## Phase 9 — live tool adapters ◑
 - OpenAI Responses `web_search` (+ low/unlimited context), page fetch, and

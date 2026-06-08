@@ -6,11 +6,17 @@ the honesty contract for the project (mirrors the `regimes` discipline).
 
 Last updated for: v0 (synthetic harness, Study 0 + Study 1).
 
+**One-line summary:** the scaffold demonstrates the intended mechanism on a
+synthetic fixture; **no BrowseComp/LiveBrowseComp performance is claimed.** The
+skeptic's companion to this ledger is `docs/METHODOLOGY_RISKS.md`; the path to a
+real result is `docs/REAL_BENCHMARK_READINESS.md` + `docs/NEXT_LIVE_RUN.md`.
+
 ## ✅ Verified claims (with artifacts)
 
 | claim | evidence |
 | --- | --- |
-| The harness runs with no API keys and no network. | `python -m pytest -q` → 42 passing; `scripts/*` run offline. |
+| The harness runs with no API keys and no network. | `python -m pytest -q` → 50 passing; `scripts/*` run offline; `scripts/run_synthetic_full.py` runs the whole pipeline offline. |
+| The **real-benchmark adapter path** works on real-data-shaped inputs (no keys). | `tests/test_real_data_shape.py` (BrowseComp decode + LiveBrowseComp JSONL + split + report + leakage + replay on `fixtures/real_shaped/` placeholders). |
 | The graph is a deterministic projection of the event log (replay passes). | `results/demo/replay_check.md` (`projection_matches: true`); `tests/test_fake_tool_replay.py`. |
 | Fake tool calls are replayable; replay detects divergence. | `tests/test_fake_tool_replay.py::test_recording_then_replay_reproduces_responses`, `::test_replay_divergence_is_detected`. |
 | The project also runs with the standard library + PyYAML only (no `activegraph`). | `EventLog` fallback in `activegraph_pack/behaviors.py`; verified by blocking the import. |

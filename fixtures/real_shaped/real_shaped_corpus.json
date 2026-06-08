@@ -1,0 +1,668 @@
+{
+  "documents": [
+    {
+      "doc_id": "d_rsq-001_gold",
+      "item_id": "rsq-001",
+      "title": "rsq-001 primary source",
+      "url": "https://placeholder.example/rsq-001",
+      "snippet": "Placeholder record states: Novograd.",
+      "published_at": "2025-11-02",
+      "source_authority": 0.9,
+      "asserts": "Novograd",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "capital",
+        "country"
+      ],
+      "requires_tokens": [],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_rsq-001_news_search",
+      "item_id": "rsq-001",
+      "title": "rsq-001 secondary (news_search)",
+      "url": "https://blog.example-news_search.test/rsq-001",
+      "snippet": "Unverified placeholder claim: Old Vexen news_search.",
+      "published_at": "2023-01-01",
+      "source_authority": 0.35,
+      "asserts": "Old Vexen news_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "capital",
+        "country"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_rsq-001_official_domain_search",
+      "item_id": "rsq-001",
+      "title": "rsq-001 secondary (official_domain_search)",
+      "url": "https://blog.example-official_domain_search.test/rsq-001",
+      "snippet": "Unverified placeholder claim: Old Vexen official_domain_search.",
+      "published_at": "2023-01-01",
+      "source_authority": 0.35,
+      "asserts": "Old Vexen official_domain_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "capital",
+        "country"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_rsq-001_brave_search",
+      "item_id": "rsq-001",
+      "title": "rsq-001 secondary (brave_search)",
+      "url": "https://blog.example-brave_search.test/rsq-001",
+      "snippet": "Unverified placeholder claim: Old Vexen brave_search.",
+      "published_at": "2023-01-01",
+      "source_authority": 0.35,
+      "asserts": "Old Vexen brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "capital",
+        "country"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_rsq-002_gold",
+      "item_id": "rsq-002",
+      "title": "rsq-002 primary source",
+      "url": "https://placeholder.example/rsq-002",
+      "snippet": "Placeholder record states: Edrin Vael.",
+      "published_at": "2026-04-12",
+      "source_authority": 0.9,
+      "asserts": "Edrin Vael",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "greyhold",
+        "current"
+      ],
+      "requires_tokens": [],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_rsq-002_generic_web_search",
+      "item_id": "rsq-002",
+      "title": "rsq-002 secondary (generic_web_search)",
+      "url": "https://blog.example-generic_web_search.test/rsq-002",
+      "snippet": "Unverified placeholder claim: Mira Sloan generic_web_search.",
+      "published_at": "2023-01-01",
+      "source_authority": 0.35,
+      "asserts": "Mira Sloan generic_web_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "greyhold",
+        "current"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_rsq-002_official_domain_search",
+      "item_id": "rsq-002",
+      "title": "rsq-002 secondary (official_domain_search)",
+      "url": "https://blog.example-official_domain_search.test/rsq-002",
+      "snippet": "Unverified placeholder claim: Mira Sloan official_domain_search.",
+      "published_at": "2023-01-01",
+      "source_authority": 0.35,
+      "asserts": "Mira Sloan official_domain_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "greyhold",
+        "current"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_rsq-002_brave_search",
+      "item_id": "rsq-002",
+      "title": "rsq-002 secondary (brave_search)",
+      "url": "https://blog.example-brave_search.test/rsq-002",
+      "snippet": "Unverified placeholder claim: Mira Sloan brave_search.",
+      "published_at": "2023-01-01",
+      "source_authority": 0.35,
+      "asserts": "Mira Sloan brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "greyhold",
+        "current"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_rsq-003_gold",
+      "item_id": "rsq-003",
+      "title": "rsq-003 primary source",
+      "url": "https://placeholder.example/rsq-003",
+      "snippet": "Placeholder record states: AUR-7781.",
+      "published_at": "2025-06-01",
+      "source_authority": 0.9,
+      "asserts": "AUR-7781",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "official",
+        "charter"
+      ],
+      "requires_tokens": [],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_rsq-003_generic_web_search",
+      "item_id": "rsq-003",
+      "title": "rsq-003 secondary (generic_web_search)",
+      "url": "https://blog.example-generic_web_search.test/rsq-003",
+      "snippet": "Unverified placeholder claim: AUR-0000 generic_web_search.",
+      "published_at": "2023-01-01",
+      "source_authority": 0.35,
+      "asserts": "AUR-0000 generic_web_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "official",
+        "charter"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_rsq-003_news_search",
+      "item_id": "rsq-003",
+      "title": "rsq-003 secondary (news_search)",
+      "url": "https://blog.example-news_search.test/rsq-003",
+      "snippet": "Unverified placeholder claim: AUR-0000 news_search.",
+      "published_at": "2023-01-01",
+      "source_authority": 0.35,
+      "asserts": "AUR-0000 news_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "official",
+        "charter"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_rsq-003_brave_search",
+      "item_id": "rsq-003",
+      "title": "rsq-003 secondary (brave_search)",
+      "url": "https://blog.example-brave_search.test/rsq-003",
+      "snippet": "Unverified placeholder claim: AUR-0000 brave_search.",
+      "published_at": "2023-01-01",
+      "source_authority": 0.35,
+      "asserts": "AUR-0000 brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "official",
+        "charter"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_rsq-004_gold",
+      "item_id": "rsq-004",
+      "title": "rsq-004 primary source",
+      "url": "https://placeholder.example/rsq-004",
+      "snippet": "Placeholder record states: Marrowend.",
+      "published_at": "2024-02-09",
+      "source_authority": 0.9,
+      "asserts": "Marrowend",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "company",
+        "tindle"
+      ],
+      "requires_tokens": [],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_rsq-004_generic_web_search",
+      "item_id": "rsq-004",
+      "title": "rsq-004 secondary (generic_web_search)",
+      "url": "https://blog.example-generic_web_search.test/rsq-004",
+      "snippet": "Unverified placeholder claim: Caldis generic_web_search.",
+      "published_at": "2023-01-01",
+      "source_authority": 0.35,
+      "asserts": "Caldis generic_web_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "company",
+        "tindle"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_rsq-004_news_search",
+      "item_id": "rsq-004",
+      "title": "rsq-004 secondary (news_search)",
+      "url": "https://blog.example-news_search.test/rsq-004",
+      "snippet": "Unverified placeholder claim: Caldis news_search.",
+      "published_at": "2023-01-01",
+      "source_authority": 0.35,
+      "asserts": "Caldis news_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "company",
+        "tindle"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_rsq-004_official_domain_search",
+      "item_id": "rsq-004",
+      "title": "rsq-004 secondary (official_domain_search)",
+      "url": "https://blog.example-official_domain_search.test/rsq-004",
+      "snippet": "Unverified placeholder claim: Caldis official_domain_search.",
+      "published_at": "2023-01-01",
+      "source_authority": 0.35,
+      "asserts": "Caldis official_domain_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "company",
+        "tindle"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_rsq-005_gold",
+      "item_id": "rsq-005",
+      "title": "rsq-005 primary source",
+      "url": "https://placeholder.example/rsq-005",
+      "snippet": "Placeholder record states: Aurelia.",
+      "published_at": "2024-09-21",
+      "source_authority": 0.9,
+      "asserts": "Aurelia",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "founder",
+        "circle"
+      ],
+      "requires_tokens": [],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_rsq-005_news_search",
+      "item_id": "rsq-005",
+      "title": "rsq-005 secondary (news_search)",
+      "url": "https://blog.example-news_search.test/rsq-005",
+      "snippet": "Unverified placeholder claim: Bartholomew news_search.",
+      "published_at": "2023-01-01",
+      "source_authority": 0.35,
+      "asserts": "Bartholomew news_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "founder",
+        "circle"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_rsq-005_official_domain_search",
+      "item_id": "rsq-005",
+      "title": "rsq-005 secondary (official_domain_search)",
+      "url": "https://blog.example-official_domain_search.test/rsq-005",
+      "snippet": "Unverified placeholder claim: Bartholomew official_domain_search.",
+      "published_at": "2023-01-01",
+      "source_authority": 0.35,
+      "asserts": "Bartholomew official_domain_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "founder",
+        "circle"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_rsq-005_brave_search",
+      "item_id": "rsq-005",
+      "title": "rsq-005 secondary (brave_search)",
+      "url": "https://blog.example-brave_search.test/rsq-005",
+      "snippet": "Unverified placeholder claim: Bartholomew brave_search.",
+      "published_at": "2023-01-01",
+      "source_authority": 0.35,
+      "asserts": "Bartholomew brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "founder",
+        "circle"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_rsq-006_gold",
+      "item_id": "rsq-006",
+      "title": "rsq-006 primary source",
+      "url": "https://placeholder.example/rsq-006",
+      "snippet": "Placeholder record states: SF-12 Cirrus.",
+      "published_at": "2026-05-03",
+      "source_authority": 0.9,
+      "asserts": "SF-12 Cirrus",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "skyforge",
+        "airship"
+      ],
+      "requires_tokens": [],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_rsq-006_generic_web_search",
+      "item_id": "rsq-006",
+      "title": "rsq-006 secondary (generic_web_search)",
+      "url": "https://blog.example-generic_web_search.test/rsq-006",
+      "snippet": "Unverified placeholder claim: SF-01 Drift generic_web_search.",
+      "published_at": "2023-01-01",
+      "source_authority": 0.35,
+      "asserts": "SF-01 Drift generic_web_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "skyforge",
+        "airship"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_rsq-006_official_domain_search",
+      "item_id": "rsq-006",
+      "title": "rsq-006 secondary (official_domain_search)",
+      "url": "https://blog.example-official_domain_search.test/rsq-006",
+      "snippet": "Unverified placeholder claim: SF-01 Drift official_domain_search.",
+      "published_at": "2023-01-01",
+      "source_authority": 0.35,
+      "asserts": "SF-01 Drift official_domain_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "skyforge",
+        "airship"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_rsq-006_brave_search",
+      "item_id": "rsq-006",
+      "title": "rsq-006 secondary (brave_search)",
+      "url": "https://blog.example-brave_search.test/rsq-006",
+      "snippet": "Unverified placeholder claim: SF-01 Drift brave_search.",
+      "published_at": "2023-01-01",
+      "source_authority": 0.35,
+      "asserts": "SF-01 Drift brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "skyforge",
+        "airship"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_rsq-007_gold",
+      "item_id": "rsq-007",
+      "title": "rsq-007 primary source",
+      "url": "https://placeholder.example/rsq-007",
+      "snippet": "Placeholder record states: indigo.",
+      "published_at": "2023-08-15",
+      "source_authority": 0.9,
+      "asserts": "indigo",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "calderwood",
+        "banner"
+      ],
+      "requires_tokens": [],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_rsq-007_news_search",
+      "item_id": "rsq-007",
+      "title": "rsq-007 secondary (news_search)",
+      "url": "https://blog.example-news_search.test/rsq-007",
+      "snippet": "Unverified placeholder claim: amber news_search.",
+      "published_at": "2023-01-01",
+      "source_authority": 0.35,
+      "asserts": "amber news_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "calderwood",
+        "banner"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_rsq-007_official_domain_search",
+      "item_id": "rsq-007",
+      "title": "rsq-007 secondary (official_domain_search)",
+      "url": "https://blog.example-official_domain_search.test/rsq-007",
+      "snippet": "Unverified placeholder claim: amber official_domain_search.",
+      "published_at": "2023-01-01",
+      "source_authority": 0.35,
+      "asserts": "amber official_domain_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "calderwood",
+        "banner"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_rsq-007_brave_search",
+      "item_id": "rsq-007",
+      "title": "rsq-007 secondary (brave_search)",
+      "url": "https://blog.example-brave_search.test/rsq-007",
+      "snippet": "Unverified placeholder claim: amber brave_search.",
+      "published_at": "2023-01-01",
+      "source_authority": 0.35,
+      "asserts": "amber brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "calderwood",
+        "banner"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_rsq-008_gold",
+      "item_id": "rsq-008",
+      "title": "rsq-008 primary source",
+      "url": "https://placeholder.example/rsq-008",
+      "snippet": "Placeholder record states: District 14.",
+      "published_at": "2025-01-30",
+      "source_authority": 0.9,
+      "asserts": "District 14",
+      "answer_on_fetch_only": false,
+      "tools": [
+        "official_domain_search"
+      ],
+      "match_tokens": [
+        "assigned",
+        "district"
+      ],
+      "requires_tokens": [],
+      "base_rank": 0
+    },
+    {
+      "doc_id": "d_rsq-008_generic_web_search",
+      "item_id": "rsq-008",
+      "title": "rsq-008 secondary (generic_web_search)",
+      "url": "https://blog.example-generic_web_search.test/rsq-008",
+      "snippet": "Unverified placeholder claim: District 99 generic_web_search.",
+      "published_at": "2023-01-01",
+      "source_authority": 0.35,
+      "asserts": "District 99 generic_web_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "generic_web_search"
+      ],
+      "match_tokens": [
+        "assigned",
+        "district"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_rsq-008_news_search",
+      "item_id": "rsq-008",
+      "title": "rsq-008 secondary (news_search)",
+      "url": "https://blog.example-news_search.test/rsq-008",
+      "snippet": "Unverified placeholder claim: District 99 news_search.",
+      "published_at": "2023-01-01",
+      "source_authority": 0.35,
+      "asserts": "District 99 news_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "news_search"
+      ],
+      "match_tokens": [
+        "assigned",
+        "district"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    },
+    {
+      "doc_id": "d_rsq-008_brave_search",
+      "item_id": "rsq-008",
+      "title": "rsq-008 secondary (brave_search)",
+      "url": "https://blog.example-brave_search.test/rsq-008",
+      "snippet": "Unverified placeholder claim: District 99 brave_search.",
+      "published_at": "2023-01-01",
+      "source_authority": 0.35,
+      "asserts": "District 99 brave_search",
+      "answer_on_fetch_only": false,
+      "is_distractor": true,
+      "tools": [
+        "brave_search"
+      ],
+      "match_tokens": [
+        "assigned",
+        "district"
+      ],
+      "requires_tokens": [],
+      "base_rank": 1
+    }
+  ]
+}

@@ -134,28 +134,38 @@ produced **no accuracy gain** on BrowseComp: the dominant failure seam was
 query surfaced spam / benchmark-mirroring pages rather than the evidence page that
 carries the answer. The bottleneck was **query formulation**, not tool choice.
 
-`policy/query_decomposition.py` (deterministic v0; no model, no network) turns one
-long question into 3–6 **targeted candidate queries**, one per arm:
+**v0 → v1.** v0 fixed the whole-prompt problem and reduced contamination, but
+extracted single capitalized tokens, yielding weak/broad queries (`African One`,
+`Mexican`, `Name December 2023`, `Between Asia 1945-1955`). Accuracy stayed 0.
+**v1 extracts clue SPANS and scores query quality.**
 
-| arm | what it sends |
+`policy/query_decomposition.py` (deterministic v1; no model, no network) splits the
+question into clauses, extracts **clue spans** per clause, and composes 3–6
+targeted, length-capped candidate queries, one per arm:
+
+| arm | what it sends (v1: spans, not single tokens) |
 |---|---|
-| `exact_phrase_clue` | quoted phrases, as exact phrases |
-| `quoted_anchor_terms` | the 2–3 strongest entities/quotes, quoted |
-| `entity_clue` | the proper-noun entities |
-| `relation_clue` | two entities + the title/relation words connecting them |
-| `rare_terms_clue` | the rarest / most unusual content terms |
-| `date_range_clue` | entities + a year or year-range |
-| `source_type_query` | entities + a source hint (paper/patent/filing/…) when obvious |
-| `negative_noise_removed` | the question minus stop/meta-instruction words |
-| `full_question_compressed` | the whole question, compressed — **fallback only** |
+| `exact_phrase_clue` | quoted phrases, else the most distinctive multiword span, quoted |
+| `entity_clue` | multiword entities / top phrase spans (never a single generic word) + an answer-shape hint |
+| `relation_clue` | core spans from **different clauses** (predicate + object) + a title word |
+| `rare_terms_clue` | 4–8 rare terms from across clauses + the top span |
+| `date_range_clue` | a date/range **attached to a nearby noun phrase** (never a bare date) |
+| `location_constraint_clue` | a location entity + the object-type span (e.g. `New Mexico` + `Mexican restaurant`) |
+| `source_type_query` / `quoted_anchor_terms` | entity/span + source hint; or top entities quoted |
+| `negative_noise_removed` / `full_question_compressed` | question minus noise — **fallback only** |
 
-Clue extraction pulls quoted phrases, proper-noun entities (sentence-initial
-question words like *What* are filtered out), years/date ranges, rare terms,
-title/occupation and institution phrases, and source-type hints. Every query is
-**length-capped** (≤ `MAX_QUERY_TOKENS` tokens / `MAX_QUERY_CHARS` chars) so the
-whole prompt is never sent unless the `full_question_compressed` arm is explicitly
-selected. The fallback arms are always **last**, so the long arm is never the
-cold-start default.
+Clue-span extraction keeps quoted phrases, multiword entities, noun-phrase spans
+around distinctive predicates (`road accident`, `private university`,
+`food festival`), date+noun phrases (`19th century monument`), institution/source
+names, and rare terms (`ironworks`, `manga`). It **avoids** single generic
+capitalized words (`African`/`Mexican`/`Name`/`Early`/`One`), pure-date queries,
+boilerplate, and <3-meaningful-token queries unless quoted/named-entity. Each
+candidate is scored (`score_query`: meaningful/rare token counts,
+generic-token penalty, span-length, specificity → `expected_search_quality`);
+candidates below `QUALITY_THRESHOLD` / with no noun-like head / too short are
+**dropped** (with a reason). Kept arms are chosen by an arm-priority order so
+concise distinctive forms survive the cap; the fallback arms are always **last**,
+so the long arm is never the cold-start default.
 
 ### Query forms as bandit arms (tool × query_arm)
 
@@ -190,3 +200,45 @@ of the question. Contaminated results earn a reward penalty
 learns to avoid them. `report.json.contamination` reports
 `benchmark_contaminated_result_count`, `contamination_rate`, and per-provider /
 per-domain breakdowns.
+
+## Level 2b: iterative clue resolution (staged candidate-entity search)
+
+**Motivation (v1/v2 runs).** Clue-span decomposition (above) reduced contamination
+and produced sane queries, but accuracy stayed 0 with seam `exact_answer_missing`:
+the agent issued *parallel* clue queries and hoped the answer was in a snippet.
+BrowseComp usually needs **iterative resolution** — identify an intermediate
+entity from clue 1's results, then search that entity together with clue 2, etc.
+
+`agent/clue_resolution.py` (deterministic v0; gold-free, no network) implements
+staged search, enabled by `--enable-iterative-clue-resolution`:
+
+- **Stage 1** issues the best decomposed clue query.
+- **Candidate extraction**: from result titles/snippets/URLs, pull proper-noun
+  phrases (multiword preferred over single tokens), score them by **frequency**
+  across results, **source authority**, and **proximity** to clue terms, and
+  **filter generic hubs** (Facebook/Wikipedia/YouTube/Reddit/… and noise domain
+  labels like `example`/`news`).
+- **Stage 2+**: compose a follow-up query = `"{top candidate entity}"` + the next
+  unused clue span (arm `candidate_entity_followup`), or + an answer-shape hint
+  (arm `answer_shape_followup`). Continue until the budget is exhausted or the
+  evidence carries a likely answer. **Every follow-up counts against the budget.**
+
+Each call records its `stage`, `parent_query_id`, the extracted `candidate_entities`,
+the `selected_candidate`, the selection `reason`, and whether `evidence_improved`.
+`debug_questions.jsonl` carries the full **stage chain**, and
+`scripts/debug_run_failures.py` prints it (Stage 1 query → results → entities →
+Stage 2 query → …). Metrics: `mean_candidate_entity_count`,
+`mean_followup_query_count`, `evidence_improved_after_followup_rate`,
+`mean_stage_depth_used`, `answer_found_after_stage_mean`.
+
+### Strategy as a policy arm
+
+The follow-up query forms are real query-bandit arms (`candidate_entity_followup`,
+`answer_shape_followup`), distinct from the **direct clue** arms (`entity_clue`,
+`exact_phrase_clue`, …). Their reward is attributed per `(tool, query_arm)` and per
+signature cluster, so policy memory learns **whether iterative resolution helps a
+given cluster** — exactly as it learns tool and query-form choice.
+
+**Sequencing:** evaluate Firecrawl scrape/fetch only **after** candidate-entity
+targeting works — fetching a page the staged search would not have found just adds
+cost. Iterative clue resolution comes before scrape.

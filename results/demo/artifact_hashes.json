@@ -1,19 +1,19 @@
 {
   "run_dir": "results/demo",
   "sha256": {
-    "report.json": "874f4981d9036b90a53bccd12b116177b107e03d6d5e78c39eb3b74498694b08",
+    "report.json": "fb3d92192f226768a7b95c1c3cca5f08631a0df8d03768bb0177c5c6a910db14",
     "summary.md": "343de3562915dff524a283b24f2d7182eceb929e259d8bad478cc680ce905648",
-    "per_question.csv": "a9d4bb9759c6f448dbf6c2c14fe8e6e146efc3a29a550cc63461f1349b6c111a",
+    "per_question.csv": "b5a5c0897ce53a0640215191835a472aae95a7eb27edde6b14b3f9acc03d7d13",
     "budget_curve.csv": "1530c984bb2f70e8737c960043bac8cc5053cb3754c4c408e7dfbc7740d097fe",
     "tool_rewards.csv": "c73ed19b532a279ba5a0792a10ece205b2d624c641a112a2893279e835b9840e",
     "query_rewards.csv": "f171e9a34ab57378523b769e58aabc791507869e0bec310f57bd4c9350960413",
     "stop_verify_rewards.csv": "de7bf88b1d4ad70a73120499e3b4903f8e52c55dcf7c30bc442fdde9d7626d4f",
     "memory_snapshot.json": "955a26b8e284b9b9c136eb0711313b5227c4a66e1b02f6233a0d670ad267a79e",
     "policy_updates.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-    "run_manifest.json": "e22e712225fdffda99409ece80a9b84b8f6b6f0b7f7e1af8986ba400ba2ce2b8",
+    "run_manifest.json": "ab9a2d76ddbd32884fe840ba38ce1d236c439fd68d5fdfc54ff92df90e4b0c02",
     "replay_check.md": "a67759c17be90dff137bbba7680bdf2f60101479dccf334b6459fa60b3198b2f",
-    "config_snapshot.yaml": "c9a7df80cf8589933cbe1d24146d2633ed64e8fe9f3efdbf2762809890a9b50d",
-    "debug_questions.jsonl": "c6e1d450173baf87211f83f710203a1e1ba0ee7b235de37b786b190143745c5d",
+    "config_snapshot.yaml": "ccba357761c7b0679285c046aaaff12c437e54b4277de86bd2af7b2591927a70",
+    "debug_questions.jsonl": "12698f5e45773068bfa91a37998aeea752a242067e7593dc914f8b9045095758",
     "graph_projection.json": "c774a11e08ecf70d5507be5724f1832815d3f39784e81d4d5d4b08a808247c4c"
   },
   "missing": []

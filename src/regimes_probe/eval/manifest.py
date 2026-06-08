@@ -115,6 +115,9 @@ def build_manifest(
         "query_decomposition_enabled": ls.get(
             "query_decomposition_enabled",
             bool(cfg.get("policy", {}).get("enable_query_decomposition", False))),
+        "iterative_clue_resolution_enabled": ls.get(
+            "iterative_clue_resolution_enabled",
+            bool(cfg.get("policy", {}).get("enable_iterative_clue_resolution", False))),
         "live_settings": ls,
         "prompts": prompts.registry_dict(),
         # Tool inventory, split by routing role:

@@ -88,6 +88,8 @@ class DebugRecord:
     failed_tool_calls: int
     failure_seam: str
     contaminated_results: int = 0
+    stage_depth_used: int = 1
+    followup_query_count: int = 0
     evidence_titles: list[str] = field(default_factory=list)
     evidence_urls: list[str] = field(default_factory=list)
     evidence_snippet_previews: list[str] = field(default_factory=list)
@@ -125,11 +127,27 @@ def build_debug_record(*, item, trace, grade, reward, condition: str, budget: in
         n_results += n_ok
         c_cont = sum(1 for o in c.observations if getattr(o, "benchmark_contaminated", False))
         contaminated_results += c_cont
+        cand_prev = [{"arm": q.get("arm"), "query_preview": _prev(q.get("query", ""), preview),
+                      "expected_search_quality": q.get("expected_search_quality")}
+                     for q in getattr(c, "query_candidates", [])[:6]]
+        ent_prev = [{"text": _prev(e.get("text", ""), 80), "score": e.get("score")}
+                    for e in getattr(c, "candidate_entities", [])[:5]]
         calls_info.append({
             "call_index": c.call_index, "tool": c.tool, "query_arm": c.query_arm,
             "query_preview": _prev(c.query, preview),
             "query_text_hash": getattr(c, "query_text_hash", ""),
             "clue_ids": list(getattr(c, "clue_ids", [])),
+            "query_quality": round(float(getattr(c, "query_quality", 0.0)), 3),
+            "n_query_candidates": getattr(c, "n_query_candidates", 0),
+            "n_query_candidates_dropped": getattr(c, "n_query_candidates_dropped", 0),
+            "query_candidates": cand_prev,
+            # iterative clue resolution
+            "stage": getattr(c, "stage", 1),
+            "parent_query_id": getattr(c, "parent_query_id", None),
+            "candidate_entities": ent_prev,
+            "selected_candidate": getattr(c, "selected_candidate", None),
+            "selection_reason": _prev(getattr(c, "selection_reason", "") or "", preview),
+            "evidence_improved": bool(getattr(c, "evidence_improved", False)),
             "n_results": n_ok, "contaminated_results": c_cont,
             "failed": bool(getattr(c, "failed", False)),
             "error_type": getattr(c, "error_type", None),
@@ -183,6 +201,8 @@ def build_debug_record(*, item, trace, grade, reward, condition: str, budget: in
         failed_tool_calls=sum(1 for c in trace.calls if getattr(c, "failed", False)),
         failure_seam=seam,
         contaminated_results=contaminated_results,
+        stage_depth_used=max((getattr(c, "stage", 1) for c in trace.calls), default=1),
+        followup_query_count=sum(1 for c in trace.calls if getattr(c, "stage", 1) >= 2),
         evidence_titles=[e["title_preview"] for e in evidence],
         evidence_urls=[e["url"] for e in evidence],
         evidence_snippet_previews=[e["snippet_preview"] for e in evidence])

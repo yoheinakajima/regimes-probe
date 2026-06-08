@@ -75,6 +75,7 @@ memory:
   nearest_k: 8
   optimize_allows_exploration: true
 policy:
+  enable_iterative_clue_resolution: false
   enable_query_decomposition: false
   query_mode: learned
   stop_mode: learned

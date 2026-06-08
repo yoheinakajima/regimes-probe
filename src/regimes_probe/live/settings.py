@@ -59,6 +59,7 @@ class LiveSettings:
     browserish_tools_enabled: bool = False
     stateful_or_paid_tools_allowed: bool = False
     query_decomposition_enabled: bool = False
+    iterative_clue_resolution_enabled: bool = False
     missing_search_keys: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
@@ -104,6 +105,7 @@ class LiveSettings:
             "browserish_tools_enabled": self.browserish_tools_enabled,
             "stateful_or_paid_tools_allowed": self.stateful_or_paid_tools_allowed,
             "query_decomposition_enabled": self.query_decomposition_enabled,
+            "iterative_clue_resolution_enabled": self.iterative_clue_resolution_enabled,
             "provider_classes": self.provider_classes(),
             "tools_meta": self.tools_meta(),
             "missing_search_keys": self.missing_search_keys,
@@ -146,6 +148,7 @@ def resolve_live_settings(
     enable_browserish_tools: bool = False,
     allow_stateful_or_paid_tools: bool = False,
     enable_query_decomposition: bool = False,
+    enable_iterative_clue_resolution: bool = False,
     env: Optional[dict[str, str]] = None,
 ) -> LiveSettings:
     if mode not in MODES:
@@ -228,4 +231,5 @@ def resolve_live_settings(
         browserish_tools_enabled=any(tool_meta(t).family == "browserish" for t in tools),
         stateful_or_paid_tools_allowed=allow_stateful_or_paid_tools,
         query_decomposition_enabled=enable_query_decomposition,
+        iterative_clue_resolution_enabled=enable_iterative_clue_resolution,
         missing_search_keys=sorted(set(missing)), notes=notes, warnings=warnings)

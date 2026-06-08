@@ -67,6 +67,16 @@ def _outcome(trace, grade, reward, *, condition: str, budget: int) -> AttemptOut
         contaminated_results=sum(getattr(c, "contaminated_results", 0) for c in trace.calls),
         total_results=sum(1 for c in trace.calls for o in c.observations
                           if not getattr(o, "failed", False)),
+        candidate_entity_count=len({e["text"].lower()
+                                    for c in trace.calls
+                                    for e in getattr(c, "candidate_entities", [])}),
+        followup_query_count=sum(1 for c in trace.calls if getattr(c, "stage", 1) >= 2),
+        evidence_improved_after_followup=any(
+            getattr(c, "stage", 1) >= 2 and getattr(c, "evidence_improved", False)
+            for c in trace.calls),
+        answer_found_after_stage=next(
+            (getattr(c, "stage", 1) for c in trace.calls if c.supported), 0),
+        stage_depth_used=max((getattr(c, "stage", 1) for c in trace.calls), default=0),
     )
 
 

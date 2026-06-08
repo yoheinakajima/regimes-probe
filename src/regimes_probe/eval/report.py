@@ -209,6 +209,7 @@ def write_full_report(
         "failure_regime_summary": regime_summary,
         "contamination": contamination,
         "query_decomposition_enabled": bool(meta.get("query_decomposition_enabled", False)),
+        "iterative_clue_resolution_enabled": bool(meta.get("iterative_clue_resolution_enabled", False)),
         "leakage_check_details": leakage_details or {},
         "same_conditions": same_conditions or {},
         "condition_specs": condition_specs or {},

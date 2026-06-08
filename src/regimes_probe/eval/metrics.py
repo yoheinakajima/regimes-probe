@@ -40,6 +40,12 @@ class AttemptOutcome:
     failed_tools: list = field(default_factory=list)
     contaminated_results: int = 0
     total_results: int = 0
+    # iterative clue resolution
+    candidate_entity_count: int = 0
+    followup_query_count: int = 0
+    evidence_improved_after_followup: bool = False
+    answer_found_after_stage: int = 0
+    stage_depth_used: int = 1
 
     def to_row(self) -> dict[str, Any]:
         return {
@@ -65,6 +71,8 @@ class AttemptOutcome:
             "support_found": int(self.support_found),
             "failed_tool_calls": self.failed_tool_calls,
             "contaminated_results": self.contaminated_results,
+            "followup_query_count": self.followup_query_count,
+            "stage_depth_used": self.stage_depth_used,
             "regime": "",  # filled by the regime detectors if run
         }
 
@@ -107,6 +115,15 @@ def compute_metrics(outcomes: list[AttemptOutcome]) -> dict[str, Any]:
         "evidence_score_mean": _safe_div(sum(o.evidence_score for o in outcomes), n),
         "benchmark_contaminated_result_count": contaminated,
         "contamination_rate": _safe_div(contaminated, total_results),
+        # iterative clue resolution
+        "mean_candidate_entity_count": _safe_div(sum(o.candidate_entity_count for o in outcomes), n),
+        "mean_followup_query_count": _safe_div(sum(o.followup_query_count for o in outcomes), n),
+        "evidence_improved_after_followup_rate": _safe_div(
+            sum(1 for o in outcomes if o.evidence_improved_after_followup), n),
+        "mean_stage_depth_used": _safe_div(sum(o.stage_depth_used for o in outcomes), n),
+        "answer_found_after_stage_mean": _safe_div(
+            sum(o.answer_found_after_stage for o in outcomes if o.answer_found_after_stage),
+            sum(1 for o in outcomes if o.answer_found_after_stage)),
         "correct_per_tool_call": _safe_div(correct, calls),
         "correct_per_dollar": _safe_div(correct, cost) if cost else 0.0,
         "correct_per_second": _safe_div(correct, latency) if latency else 0.0,

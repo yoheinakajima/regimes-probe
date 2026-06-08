@@ -61,6 +61,9 @@ policy:
   # let the bandit choose the query form (tool x query_arm). Off by default;
   # enable with --enable-query-decomposition. See docs/QUERY_POLICY.md.
   enable_query_decomposition: false
+  # Iterative clue resolution: staged search that chases intermediate entities
+  # found in earlier results. Off by default; --enable-iterative-clue-resolution.
+  enable_iterative_clue_resolution: false
 
 router:
   cost_weight: 0.5

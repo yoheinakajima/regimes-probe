@@ -153,3 +153,28 @@ change. A fork is marked `offline_fork=true`/`parent_run_id` and is **never**
 headline-eligible. The fork's natural scope is the memory-variant condition
 (`policy_memory`); read the fixed `no_memory_search` baseline from the parent
 report. See `docs/OFFLINE_FORK_ABLATIONS.md`.
+
+## Query-formulation ladder for BrowseComp (why iterative resolution)
+
+The BrowseComp dry runs isolated the bottleneck step by step:
+
+1. **Level 1 routing only** → accuracy 0; the exact answer was missing from
+   snippets (`exact_answer_missing`) because the whole long prompt was searched as
+   one query and surfaced spam / benchmark-mirroring pages.
+2. **Query decomposition v1 (clue spans + quality scoring)** → contamination fell
+   to ~1% and queries became sane, but accuracy stayed 0: the agent still issued
+   *parallel* clue queries and hoped the answer appeared in a snippet.
+3. **Iterative clue resolution** (`--enable-iterative-clue-resolution`) → BrowseComp
+   typically needs to **resolve an intermediate entity** from one clue's results,
+   then search that entity with the next clue. Stage 1 issues the best clue query;
+   later stages combine the top extracted candidate entity with the next clue span
+   or an answer-shape hint, under the same budget. Stage chains, candidate entities,
+   and per-stage evidence improvement are recorded (`debug_questions.jsonl`,
+   `scripts/debug_run_failures.py`) and measured (`mean_stage_depth_used`,
+   `evidence_improved_after_followup_rate`, …).
+
+**Scrape/fetch comes last.** Full-page scrape (Firecrawl) should be evaluated only
+*after* candidate-entity targeting works — scraping a page the staged search would
+not have found just adds cost without addressing `exact_answer_missing`. All three
+levels are off by default and are recorded in the manifest/report so a run states
+exactly which were active.

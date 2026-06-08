@@ -60,13 +60,29 @@ def main() -> int:
         print(f"  flags: support_found={r['support_found']} found_hit={r['found_hit']} "
               f"authority_ok={r['authority_ok']} contradiction={r['contradiction']} "
               f"failed_tool_calls={r['failed_tool_calls']} "
-              f"contaminated_results={r.get('contaminated_results', 0)}")
+              f"contaminated_results={r.get('contaminated_results', 0)} "
+              f"stage_depth={r.get('stage_depth_used', 1)} "
+              f"followups={r.get('followup_query_count', 0)}")
+        # Stage chain (iterative clue resolution): query -> results -> candidate entities.
         for c in r.get("calls", []):
-            print(f"  query [{c.get('tool')}/{c.get('query_arm')}]: "
-                  f"{c.get('query_preview', '')!r}  "
-                  f"(n_results={c.get('n_results', 0)}, "
-                  f"contaminated={c.get('contaminated_results', 0)}"
-                  + (f", clues={c.get('clue_ids')}" if c.get('clue_ids') else "") + ")")
+            cands = c.get("candidate_entities", [])
+            print(f"  Stage {c.get('stage', 1)} [{c.get('tool')}/{c.get('query_arm')}]: "
+                  f"{c.get('query_preview', '')!r} -> {c.get('n_results', 0)} results"
+                  + (f", contaminated={c.get('contaminated_results')}"
+                     if c.get('contaminated_results') else "")
+                  + (f", q={c.get('query_quality')}" if c.get('query_quality') else "")
+                  + (f", clues={c.get('clue_ids')}" if c.get('clue_ids') else ""))
+            if c.get("selected_candidate"):
+                print(f"        selected entity: {c['selected_candidate']} "
+                      f"({c.get('selection_reason', '')})")
+            if cands:
+                print(f"        candidate entities: "
+                      f"{[(e.get('text'), e.get('score')) for e in cands]}")
+            qcands = c.get("query_candidates", [])
+            if qcands:
+                print(f"        query candidates ({c.get('n_query_candidates', len(qcands))}, "
+                      f"{c.get('n_query_candidates_dropped', 0)} dropped): "
+                      f"{[(q.get('arm'), q.get('expected_search_quality')) for q in qcands]}")
         for e in r.get("failed_tool_errors", []):
             print(f"  ⚠ tool error [{e['tool']}]: {e.get('error_type')} "
                   f"{e.get('status_code')} — {e.get('message_preview')}")

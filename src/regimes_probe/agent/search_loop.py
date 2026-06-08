@@ -37,6 +37,16 @@ from regimes_probe.policy.verification_policy import (
 from regimes_probe.tools.base import SearchProvider, SearchResponse
 
 
+def _dedupe_keep(seq: list[str]) -> list[str]:
+    out, seen = [], set()
+    for s in seq:
+        k = s.lower().strip()
+        if k and k not in seen:
+            seen.add(k)
+            out.append(s.strip())
+    return out
+
+
 class ToolInvoker(Protocol):
     """How the loop calls a tool. Implementations may record events."""
 
@@ -89,6 +99,18 @@ class CallRecord:
     status_code: Optional[int] = None
     query_text_hash: str = ""
     clue_ids: list[str] = field(default_factory=list)
+    # query decomposition debug (candidate queries before selection)
+    query_quality: float = 0.0
+    n_query_candidates: int = 0
+    n_query_candidates_dropped: int = 0
+    query_candidates: list[dict[str, Any]] = field(default_factory=list)
+    # iterative clue resolution (staged search)
+    stage: int = 1
+    parent_query_id: Optional[int] = None
+    candidate_entities: list[dict[str, Any]] = field(default_factory=list)
+    selected_candidate: Optional[str] = None
+    selection_reason: Optional[str] = None
+    evidence_improved: bool = False
 
     @property
     def contaminated_results(self) -> int:
@@ -103,6 +125,16 @@ class CallRecord:
             "query": self.query,
             "query_text_hash": self.query_text_hash,
             "clue_ids": list(self.clue_ids),
+            "query_quality": round(float(self.query_quality), 3),
+            "n_query_candidates": self.n_query_candidates,
+            "n_query_candidates_dropped": self.n_query_candidates_dropped,
+            "query_candidates": self.query_candidates,
+            "stage": self.stage,
+            "parent_query_id": self.parent_query_id,
+            "candidate_entities": self.candidate_entities,
+            "selected_candidate": self.selected_candidate,
+            "selection_reason": self.selection_reason,
+            "evidence_improved": self.evidence_improved,
             "cost": self.cost,
             "latency": self.latency,
             "stop_arm": self.stop_arm,
@@ -158,6 +190,7 @@ class SearchLoopConfig:
     as_of: str = "2026-06-01"
     verification: VerificationConfig = field(default_factory=VerificationConfig)
     enable_query_decomposition: bool = False
+    enable_iterative_clue_resolution: bool = False
 
 
 class SearchLoop:
@@ -213,6 +246,24 @@ class SearchLoop:
         known_domain = item.meta.get("known_domain")
         freshness_sensitive = bool(signature.features.get("freshness_sensitive"))
 
+        # Iterative clue resolution (staged search): clue spans + answer-shape to
+        # chase intermediate entities found in earlier results.
+        iterative = config.enable_iterative_clue_resolution
+        clue_spans: list[str] = []
+        answer_shape: list[str] = []
+        clue_terms: list[str] = []
+        if iterative:
+            from regimes_probe.policy.query_decomposition import (
+                answer_shape_terms, extract_clues)
+            _cl = extract_clues(item.question)
+            clue_spans = _dedupe_keep(_cl.phrase_spans + _cl.entities)
+            answer_shape = answer_shape_terms(item.question)
+            clue_terms = [t for s in clue_spans for t in s.split()]
+        ranked_entities: list = []
+        used_clue_spans: set[str] = set()
+        stage = 1
+        prev_vscore = 0.0
+
         calls: list[CallRecord] = []
         observations: list[EvidenceObservation] = []
         candidate = CandidateAnswer(None, 0, 0.0, [])
@@ -222,12 +273,29 @@ class SearchLoop:
 
         while len(calls) < config.budget:
             query_text_hash, clue_ids = "", []
+            stage_info: dict[str, Any] = {}
             if pending_fetch_url is not None and fetch_available:
                 tool = fetch_tool
                 query = pending_fetch_url
                 query_arm = "fetch"
                 opts: dict[str, Any] = {}
                 pending_fetch_url = None
+            elif iterative and ranked_entities and calls:
+                # Stage >= 2: combine the top candidate entity with the next clue.
+                from regimes_probe.agent.clue_resolution import compose_followup_query
+                fq = compose_followup_query(
+                    ranked_entities[0], clue_spans=clue_spans,
+                    used_clue_spans=used_clue_spans, answer_shape=answer_shape)
+                tool = tool_seq[step] if step < len(tool_seq) else tool_seq[-1]
+                query, query_arm, opts = fq.query, fq.query_arm, {}
+                if fq.clue_used:
+                    used_clue_spans.add(fq.clue_used.lower())
+                stage += 1
+                stage_info = {
+                    "stage": stage, "parent_query_id": calls[-1].call_index,
+                    "candidate_entities": [e.to_dict() for e in ranked_entities[:5]],
+                    "selected_candidate": fq.selected_candidate,
+                    "selection_reason": fq.reason}
             else:
                 tool = tool_seq[step] if step < len(tool_seq) else tool_seq[-1]
                 qplan = self.query_policy.formulate(
@@ -242,6 +310,13 @@ class SearchLoop:
                 )
                 query, query_arm, opts = qplan.query, qplan.arm, qplan.opts
                 query_text_hash, clue_ids = qplan.query_text_hash, qplan.clue_ids
+                ex = qplan.explanation
+                if ex.get("decompose") is True:
+                    stage_info = {
+                        "query_quality": ex.get("selected_query_quality", 0.0),
+                        "n_query_candidates": len(ex.get("candidate_queries", [])),
+                        "n_query_candidates_dropped": ex.get("dropped_count", 0),
+                        "query_candidates": ex.get("candidate_queries", [])}
                 rec.on_query_plan(step, qplan.to_dict())
 
             response = invoker.call(tool, query, limit=5, **opts)
@@ -285,6 +360,14 @@ class SearchLoop:
             )
             rec.on_stop(step, decision.to_dict())
 
+            # Did this call improve evidence vs before it? (Used by the iterative
+            # metrics and recorded per call.)
+            evidence_improved = bool(vstate.score > prev_vscore + 1e-9)
+            prev_vscore = max(prev_vscore, vstate.score)
+            if iterative:
+                from regimes_probe.agent.clue_resolution import extract_candidate_entities
+                ranked_entities = extract_candidate_entities(observations, clue_terms)
+
             calls.append(
                 CallRecord(
                     call_index=ci,
@@ -301,6 +384,16 @@ class SearchLoop:
                     status_code=(response.error_meta or {}).get("status_code") if call_failed else None,
                     query_text_hash=query_text_hash,
                     clue_ids=clue_ids,
+                    query_quality=stage_info.get("query_quality", 0.0),
+                    n_query_candidates=stage_info.get("n_query_candidates", 0),
+                    n_query_candidates_dropped=stage_info.get("n_query_candidates_dropped", 0),
+                    query_candidates=stage_info.get("query_candidates", []),
+                    stage=stage_info.get("stage", 1),
+                    parent_query_id=stage_info.get("parent_query_id"),
+                    candidate_entities=stage_info.get("candidate_entities", []),
+                    selected_candidate=stage_info.get("selected_candidate"),
+                    selection_reason=stage_info.get("selection_reason"),
+                    evidence_improved=evidence_improved,
                 )
             )
 

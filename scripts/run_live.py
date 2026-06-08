@@ -108,6 +108,9 @@ def main() -> int:
     ap.add_argument("--enable-query-decomposition", action="store_true",
                     help="Level 2: decompose long questions into several targeted clue "
                          "queries (query forms become bandit arms). Off by default.")
+    ap.add_argument("--enable-iterative-clue-resolution", action="store_true",
+                    help="Staged search: extract candidate entities from results and "
+                         "search them with the next clue. Off by default.")
     ap.add_argument("--judge-model", default=None,
                     help="(reserved) LLM judge; grading currently uses exact/normalized match")
     ap.add_argument("--split-seed", default=None)
@@ -132,9 +135,11 @@ def main() -> int:
         print(f"unknown condition(s): {bad}; valid: {list(ALL_CONDITIONS)}")
         return 2
 
-    # Effective query-decomposition flag: CLI flag OR config default.
+    # Effective Level-2 flags: CLI flag OR config default.
     decompose_enabled = (args.enable_query_decomposition
                          or bool(cfg.get("policy", {}).get("enable_query_decomposition", False)))
+    iterative_enabled = (args.enable_iterative_clue_resolution
+                         or bool(cfg.get("policy", {}).get("enable_iterative_clue_resolution", False)))
 
     # Resolve models + tools from mode/CLI/config/env (cheap-first; OpenAI hosted
     # web_search is opt-in, never a silent default).
@@ -151,9 +156,11 @@ def main() -> int:
         enable_browserish_tools=args.enable_browserish_tools,
         allow_stateful_or_paid_tools=args.allow_stateful_or_paid_tools,
         enable_query_decomposition=decompose_enabled,
+        enable_iterative_clue_resolution=iterative_enabled,
     )
-    # Stamp the effective flag into cfg.policy so the agent + manifest both see it.
+    # Stamp the effective flags into cfg.policy so the agent + manifest both see them.
     cfg.setdefault("policy", {})["enable_query_decomposition"] = decompose_enabled
+    cfg.setdefault("policy", {})["enable_iterative_clue_resolution"] = iterative_enabled
     tools = settings.tools
     search_tools = settings.search_tools
     answer_model = settings.answer_model
@@ -203,7 +210,8 @@ def main() -> int:
     print(f"follow-up tools (URL-only, not bandit arms)={settings.followup_tools}")
     print(f"all enabled tools={settings.tools}")
     print(f"provider_classes={settings.provider_classes()}")
-    print(f"query_decomposition_enabled={settings.query_decomposition_enabled}")
+    print(f"query_decomposition_enabled={settings.query_decomposition_enabled}  "
+          f"iterative_clue_resolution_enabled={settings.iterative_clue_resolution_enabled}")
     print(f"flags: agentic_discovery={settings.agentic_tool_discovery_enabled} "
           f"scrape={settings.scrape_tools_enabled} browserish={settings.browserish_tools_enabled} "
           f"stateful_or_paid_allowed={settings.stateful_or_paid_tools_allowed}")
@@ -251,6 +259,7 @@ def main() -> int:
                             query_mode=cfg["policy"]["query_mode"],
                             stop_mode=cfg["policy"]["stop_mode"],
                             enable_query_decomposition=decompose_enabled,
+                            enable_iterative_clue_resolution=iterative_enabled,
                             as_of=cfg.get("run", {}).get("as_of", "2026-06-01"))
     search_agent = EpistemicAgent(agent_cfg,
                                   answerer=build_live_answerer("search", model=answer_model,

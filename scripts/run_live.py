@@ -39,20 +39,26 @@ def _load_dataset(name, path, cfg):
     """Return (items, label, version, path, is_real). No network unless a real
     local file is provided; real datasets without local data fall back to the
     real-shaped placeholder for dry-run plumbing (is_real=False)."""
+    from regimes_probe.datasets.base import DatasetUnavailable
     ds = cfg.get("dataset", {})
     if name in ("livebrowsecomp", "LiveBrowseComp"):
         from regimes_probe.datasets.livebrowsecomp import LiveBrowseCompAdapter
-        local = path or ds.get("livebrowsecomp_local_jsonl") or ""
-        if local and Path(local).exists():
-            a = LiveBrowseCompAdapter(local_jsonl=local)
-            return a.load(), "LiveBrowseComp", a.version(), local, True
+        real_path = path or ds.get("livebrowsecomp_local_jsonl") or ""
+        if real_path:  # a real dataset path was supplied -> load real or FAIL CLOSED
+            if not Path(real_path).exists():
+                raise DatasetUnavailable(f"LiveBrowseComp path not found: {real_path}")
+            a = LiveBrowseCompAdapter(local_jsonl=real_path)
+            return a.load(), "LiveBrowseComp", a.version(), real_path, True   # may raise (fail closed)
     if name in ("browsecomp", "BrowseComp"):
         from regimes_probe.datasets.browsecomp import BrowseCompAdapter
-        csv = path or ds.get("browsecomp_csv") or ""
-        if csv and Path(csv).exists():
-            a = BrowseCompAdapter(csv)
-            return a.load(), "BrowseComp", a.version(), csv, True
-    # real-shaped placeholder fallback (NOT a benchmark)
+        real_path = path or ds.get("browsecomp_csv") or ""
+        if real_path:  # supplied -> load real or FAIL CLOSED (no placeholder fallback)
+            if not Path(real_path).exists():
+                raise DatasetUnavailable(f"BrowseComp path not found: {real_path}")
+            a = BrowseCompAdapter(real_path)
+            return a.load(), "BrowseComp", a.version(), real_path, True
+    # No real dataset path supplied: real-shaped placeholder (NOT a benchmark) for
+    # dry-run plumbing only. (When a path IS supplied we never reach here.)
     from regimes_probe.datasets.livebrowsecomp import LiveBrowseCompAdapter
     rp = ROOT / "fixtures" / "real_shaped" / "livebrowsecomp_sample.jsonl"
     a = LiveBrowseCompAdapter(local_jsonl=rp)
@@ -112,7 +118,28 @@ def main() -> int:
     split_seed = args.split_seed or cfg.get("split", {}).get("salt", "regimes-probe-v0")
     answer_model = cfg.get("live", {}).get("answer_model", "gpt-5.5")
 
-    items, label, version, ds_path, is_real = _load_dataset(args.dataset, args.dataset_path, cfg)
+    from regimes_probe.datasets.base import DatasetUnavailable
+    try:
+        items, label, version, ds_path, is_real = _load_dataset(args.dataset, args.dataset_path, cfg)
+    except DatasetUnavailable as exc:
+        print(f"=== run_live: REFUSING (dataset unavailable / fail-closed) ===\n{exc}")
+        print("\nLiveBrowseComp's HF 'problem'/'answer' fields are obfuscated; this run "
+              "will NOT spend API calls on encrypted text. Provide a plaintext export "
+              "or a validated decode path. See docs/NEXT_LIVE_RUN.md and docs/BENCHMARK_TARGETS.md.")
+        return 2
+
+    # Dry-run validation guard: refuse if the loaded REAL questions look obfuscated
+    # (belt-and-suspenders beyond the adapter's own fail-closed loading).
+    if is_real:
+        from regimes_probe.datasets.livebrowsecomp import looks_obfuscated
+        bad = [it.id for it in items[:50] if looks_obfuscated(it.question)]
+        if bad:
+            print("=== run_live: REFUSING — loaded questions look encrypted/obfuscated ===")
+            print(f"e.g. item ids {bad[:5]}. LiveBrowseComp rows require a supported decode "
+                  "path or a plaintext export; the adapter must not pass encrypted text as a "
+                  "question. No providers were called. See docs/BENCHMARK_TARGETS.md.")
+            return 2
+
     run_id = args.run_id or "live-" + hashlib.sha256(
         f"{label}|{version}|{split_seed}|{args.optimize}|{args.confirm}|{budgets}|{conditions}".encode()
     ).hexdigest()[:8]

@@ -15,6 +15,28 @@ search policy should pay off (freshness-sensitive, staleness-prone signatures).
 - Adapter: `LiveBrowseCompAdapter`
 - Config: `benchmark_primary=LiveBrowseComp`
 
+> **⛔ BLOCKER — obfuscated rows, fail-closed (resolve before any live run).**
+> The HF release `Forival/LiveBrowseComp` ships `problem` / `answer` fields that
+> are **encoded/obfuscated** (BrowseComp-style, to deter training leakage) — they
+> are NOT plaintext. The dataset has been *downloaded* but **cannot be executed**
+> until the official decode/plaintext path is resolved.
+>
+> `LiveBrowseCompAdapter` now **fails closed**: it treats only a plaintext
+> `question`/`query` field as a question; it will **never** pass `problem` through
+> as `Item.question`. A row is usable only if (a) a plaintext `question` is
+> present, or (b) a configured `canary=` decodes `problem`/`answer` into plausible
+> plaintext (validated). Otherwise it raises `DatasetUnavailable`, so a live run
+> never spends API calls on encrypted blobs.
+>
+> The official decode mechanism could not be verified from this environment
+> (network restricted). To run LiveBrowseComp, supply **one** of:
+> 1. a **plaintext export** as local JSONL (`question`/`answer` fields), or
+> 2. the **official decode utility / canary** from the dataset authors, then pass
+>    `canary=` (the adapter validates the decode looks like plaintext).
+>
+> Until then, `scripts/run_live.py --dataset livebrowsecomp --dataset-path …`
+> refuses to proceed (no placeholder fallback when a real path is supplied).
+
 ## Secondary — BrowseComp
 
 Public, short-answer browsing benchmark. Short answers make grading easy and reduce grader

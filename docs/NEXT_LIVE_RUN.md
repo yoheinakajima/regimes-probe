@@ -42,16 +42,30 @@ python -c "from regimes_probe.datasets.browsecomp import BrowseCompAdapter as A;
            a=A('/path/to/browse_comp_test_set.csv'); print(len(a.load()), a.version())"
 ```
 
-**LiveBrowseComp (primary, recent facts):**
+**LiveBrowseComp (primary, recent facts) — ⛔ BLOCKED on obfuscation.**
+The HF release `Forival/LiveBrowseComp` ships `problem`/`answer` **encoded**, not
+plaintext. The adapter **fails closed** and will NOT pass encrypted text through
+as a question, so a live run cannot spend on encrypted blobs. **This benchmark
+cannot be executed until the official decode/plaintext path is resolved.** You
+will hit a clear `DatasetUnavailable` / `REFUSING` message until you provide one
+of:
+
 ```bash
-# Either via Hugging Face (needs the 'datasets' package + network):
+# (1) a PLAINTEXT export as local JSONL (fields: question, answer, released_at):
+python scripts/run_live.py --dataset livebrowsecomp \
+    --dataset-path data/livebrowsecomp_plaintext.jsonl --optimize 10 --confirm 20 --budgets 1,3
+#     (dry-run first; add --execute to actually call providers)
+
+# (2) the OFFICIAL canary/decode from the dataset authors, then configure it:
 python -c "from regimes_probe.datasets.livebrowsecomp import LiveBrowseCompAdapter as A; \
-           print(len(A(split='test').load()))"
-# ...or cache to a local JSONL and point local_jsonl=... at it.
+           print(len(A(local_jsonl='data/lbc.jsonl', canary='<OFFICIAL_CANARY>').load()))"
+#     the adapter validates that the decode yields plausible plaintext, else fails closed.
 ```
 
-Confirm the field names and any canary/obfuscation match the real release
-(`_row_to_item` in `datasets/livebrowsecomp.py`). Adjust if the schema differs.
+A raw HF dump (`problem`/`answer`, no `question`, no canary) is **refused** — by
+design. Confirm the field names and the official decode scheme against the
+dataset card/paper before configuring `canary=` (the obfuscation could not be
+verified from this environment; network was restricted).
 
 ## 4. Config to edit
 

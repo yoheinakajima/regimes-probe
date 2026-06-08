@@ -32,6 +32,16 @@ real result is `docs/REAL_BENCHMARK_READINESS.md` + `docs/NEXT_LIVE_RUN.md`.
    Requires keys + data and must clear `docs/FIRST_REAL_RESULT_CRITERIA.md` with
    `headline_eligible = true`. **The only thing that could be a benchmark claim.**
 
+**⛔ Active blocker — LiveBrowseComp obfuscation.** The HF dataset
+`Forival/LiveBrowseComp` has been *downloaded* but its `problem`/`answer` fields
+are **encoded, not plaintext**. The adapter now **fails closed** (refuses to pass
+encrypted text as a question; `scripts/run_live.py` refuses with no placeholder
+fallback when a real path is supplied), so **LiveBrowseComp cannot be executed
+until the official decode/plaintext path is resolved** — provide a plaintext
+export or the official canary/decode utility (validated). The decode scheme could
+not be verified from this environment (network restricted). See
+`docs/BENCHMARK_TARGETS.md` and `docs/NEXT_LIVE_RUN.md`.
+
 ## ✅ Verified claims (with artifacts)
 
 | claim | evidence |
@@ -56,6 +66,7 @@ real result is `docs/REAL_BENCHMARK_READINESS.md` + `docs/NEXT_LIVE_RUN.md`.
 | Live calls are **cache/replay-guarded** (no re-spend) and **un-armed in dry-run** (refuse to call). | `RecordingCache`, `CachedProvider`/`NotArmed`; `tests/test_run_live_safety.py`. |
 | The execute pipeline passes **same-conditions + headline-eligibility** plumbing (verified with mock providers, no network). | `tests/test_run_live_safety.py::test_run_live_pipeline_with_mocks_passes_plumbing`. |
 | Secrets never enter cache/manifest/artifacts (env-var names only; key-like fields redacted). | `live/cache.sanitize`; `tests/test_run_live_safety.py`. |
+| LiveBrowseComp **fails closed** on obfuscated rows — encrypted `problem` is never passed through as a question; `run_live` refuses (no placeholder fallback when a real path is given). | `datasets/livebrowsecomp.py`; `scripts/run_live.py`; `tests/test_livebrowsecomp_failclosed.py` (9 tests). |
 | The graph is a deterministic projection of the event log (replay passes). | `results/demo/replay_check.md` (`projection_matches: true`); `tests/test_fake_tool_replay.py`. |
 | Fake tool calls are replayable; replay detects divergence. | `tests/test_fake_tool_replay.py::test_recording_then_replay_reproduces_responses`, `::test_replay_divergence_is_detected`. |
 | The project also runs with the standard library + PyYAML only (no `activegraph`). | `EventLog` fallback in `activegraph_pack/behaviors.py`; verified by blocking the import. |

@@ -336,10 +336,23 @@ def run_live_pipeline(cfg, items, *, providers, search_agent, cb_agent, cache,
         "no_live_updates_during_confirm": True,
         "same_conditions": sc_ok,
     }
-    min_confirm = cfg.get("headline", {}).get("min_confirm_size", 20)
+    # Provider-failure stats: overall rate + any condition that failed entirely.
+    total_calls = sum(o.tool_calls for r in runs for o in r.outcomes)
+    total_failed = sum(o.failed_tool_calls for r in runs for o in r.outcomes)
+    pf_rate = (total_failed / total_calls) if total_calls else 0.0
+    failed_conditions = []
+    for cond in conditions_present:
+        cc = sum(o.tool_calls for r in runs if r.condition == cond for o in r.outcomes)
+        cf = sum(o.failed_tool_calls for r in runs if r.condition == cond for o in r.outcomes)
+        if cc > 0 and cf == cc:
+            failed_conditions.append(cond)
+    hcfg = cfg.get("headline", {})
+    min_confirm = hcfg.get("min_confirm_size", 20)
     elig = compute_eligibility(checks, dataset_is_real=is_real,
                                conditions_present=conditions_present,
-                               confirm_size=len(con), min_confirm=min_confirm)
+                               confirm_size=len(con), min_confirm=min_confirm,
+                               provider_failure_rate=pf_rate, failed_conditions=failed_conditions,
+                               max_provider_failure_rate=hcfg.get("max_provider_failure_rate", 0.2))
 
     ls = live_settings or {}
     meta = {

@@ -36,6 +36,8 @@ class AttemptOutcome:
     authority_ok: bool = True
     contradiction: bool = False
     support_found: bool = True
+    failed_tool_calls: int = 0
+    failed_tools: list = field(default_factory=list)
 
     def to_row(self) -> dict[str, Any]:
         return {
@@ -59,6 +61,7 @@ class AttemptOutcome:
             "authority_ok": int(self.authority_ok),
             "contradiction": int(self.contradiction),
             "support_found": int(self.support_found),
+            "failed_tool_calls": self.failed_tool_calls,
             "regime": "",  # filled by the regime detectors if run
         }
 
@@ -83,9 +86,17 @@ def compute_metrics(outcomes: list[AttemptOutcome]) -> dict[str, Any]:
     # recall = of all would-be-wrong, how many abstained.
     would_be_wrong = sum(1 for o in outcomes if not o.correct)
     correct_abstentions = sum(1 for o in abstained if not o.found_hit)
+    failed_calls = sum(o.failed_tool_calls for o in outcomes)
+    failed_by_tool: dict[str, int] = {}
+    for o in outcomes:
+        for t in o.failed_tools:
+            failed_by_tool[t] = failed_by_tool.get(t, 0) + 1
     return {
         "n": n,
         "accuracy": _safe_div(correct, n),
+        "failed_tool_calls": failed_calls,
+        "provider_failure_rate": _safe_div(failed_calls, calls),
+        "failed_tool_calls_by_tool": failed_by_tool,
         "correct_per_tool_call": _safe_div(correct, calls),
         "correct_per_dollar": _safe_div(correct, cost) if cost else 0.0,
         "correct_per_second": _safe_div(correct, latency) if latency else 0.0,

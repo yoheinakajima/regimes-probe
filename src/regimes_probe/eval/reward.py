@@ -44,6 +44,7 @@ class RewardWeights:
     stale_penalty: float = 0.4
     contradiction_penalty: float = 0.3
     extra_call_penalty: float = 0.2
+    tool_failure_penalty: float = 0.5  # extra penalty on a tool/query arm that errored
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -57,6 +58,7 @@ class RewardWeights:
             "stale_penalty": self.stale_penalty,
             "contradiction_penalty": self.contradiction_penalty,
             "extra_call_penalty": self.extra_call_penalty,
+            "tool_failure_penalty": self.tool_failure_penalty,
         }
 
     @classmethod
@@ -157,11 +159,15 @@ def compute_rewards(
     def add(fam: str, arm: str, val: float) -> None:
         acc[fam].setdefault(arm, []).append(val)
 
+    n_failed = sum(1 for c in trace.calls if getattr(c, "failed", False))
     for i, c in enumerate(trace.calls):
         tool_bonus = w.first_tool_hit if hits[i] else 0.0
         miss_pen = 0.0 if c.supported else _MISS_PENALTY
-        add("tool", c.tool, R + tool_bonus - miss_pen - w.cost_penalty * c.cost)
-        add("query", c.query_arm, R + tool_bonus - miss_pen)
+        # A failed tool call (provider/API error) earns no evidence gain and an
+        # explicit penalty, so the bandit learns the tool failed in this context.
+        fail_pen = w.tool_failure_penalty if getattr(c, "failed", False) else 0.0
+        add("tool", c.tool, R + tool_bonus - miss_pen - w.cost_penalty * c.cost - fail_pen)
+        add("query", c.query_arm, R + tool_bonus - miss_pen - fail_pen)
 
         stop_bonus = 0.0
         if c.stop_arm == "stop_now":
@@ -190,6 +196,7 @@ def compute_rewards(
         "stopped": stopped,
         "contradiction": vs.contradiction,
         "found_hit": hit_index is not None,
+        "had_tool_failure": n_failed > 0,
     }
     return RewardResult(
         attempt_reward=R,

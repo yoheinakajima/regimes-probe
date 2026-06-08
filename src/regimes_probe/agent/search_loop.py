@@ -67,8 +67,10 @@ class DirectInvoker:
         self.providers = providers
 
     def call(self, tool: str, query: str, *, limit: int = 5, **opts: Any) -> SearchResponse:
-        provider = self.providers[tool]
-        return provider.search(query, limit=limit, **opts)
+        # safe_search turns provider/API errors into a recorded failed response
+        # (config/preflight errors still raise) so a tool error never crashes the run.
+        from regimes_probe.tools.base import safe_search
+        return safe_search(self.providers[tool], query, limit=limit, **opts)
 
 
 @dataclass
@@ -82,6 +84,9 @@ class CallRecord:
     observations: list[EvidenceObservation]
     stop_arm: str
     supported: bool
+    failed: bool = False
+    error_type: Optional[str] = None
+    status_code: Optional[int] = None
 
     def public_dict(self) -> dict[str, Any]:
         return {
@@ -93,6 +98,9 @@ class CallRecord:
             "latency": self.latency,
             "stop_arm": self.stop_arm,
             "supported": self.supported,
+            "failed": self.failed,
+            "error_type": self.error_type,
+            "status_code": self.status_code,
             "observations": [o.to_public_dict() for o in self.observations],
         }
 
@@ -220,6 +228,11 @@ class SearchLoop:
                 )
                 for r in response.results
             ]
+            call_failed = bool(response.failed)
+            if call_failed:
+                # provider/API error -> recorded failed observation, agent continues.
+                obs.append(EvidenceObservation.failure(
+                    call_index=ci, tool=tool, query_arm=query_arm, response=response))
             observations.extend(obs)
             supported = any(o.supports for o in obs)
             rec.on_evidence(step, obs)
@@ -258,6 +271,9 @@ class SearchLoop:
                     observations=obs,
                     stop_arm=decision.arm,
                     supported=supported,
+                    failed=call_failed,
+                    error_type=(response.error_meta or {}).get("error_type") if call_failed else None,
+                    status_code=(response.error_meta or {}).get("status_code") if call_failed else None,
                 )
             )
 

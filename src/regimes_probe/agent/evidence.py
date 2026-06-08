@@ -43,10 +43,15 @@ class EvidenceObservation:
     asserts: Optional[str]
     content_hash: str
     fetchable: bool = False   # relevant doc whose assertion is hidden until fetched
+    # failed tool-call observation (provider/API error, not a crash)
+    failed: bool = False
+    error_type: Optional[str] = None
+    status_code: Optional[int] = None
+    error_message: Optional[str] = None
 
     def to_public_dict(self) -> dict[str, Any]:
         """Answer-free projection for logging (drops the asserted answer)."""
-        return {
+        d = {
             "call_index": self.call_index,
             "tool": self.tool,
             "query_arm": self.query_arm,
@@ -57,12 +62,32 @@ class EvidenceObservation:
             "supports": self.supports,
             "content_hash": self.content_hash,
         }
+        if self.failed:
+            d.update({"failed": True, "error_type": self.error_type,
+                      "status_code": self.status_code, "error_message": self.error_message})
+        return d
 
     def to_verify_dict(self) -> dict[str, Any]:
         """Includes ``asserts`` for verification (transient, not persisted)."""
         d = self.to_public_dict()
         d["asserts"] = self.asserts
         return d
+
+    @classmethod
+    def failure(cls, *, call_index: int, tool: str, query_arm: str,
+                response) -> "EvidenceObservation":
+        """A failed-tool-call observation built from a failed SearchResponse.
+
+        Contributes no support/freshness (so it earns no evidence gain) and
+        carries the sanitized error metadata for auditing/reward.
+        """
+        meta = response.error_meta or {}
+        return cls(
+            call_index=call_index, tool=tool, query_arm=query_arm, url="",
+            snippet="", source_authority=0.0, published_at=None, fresh=False,
+            supports=False, asserts=None, content_hash="", fetchable=False,
+            failed=True, error_type=meta.get("error_type"),
+            status_code=meta.get("status_code"), error_message=meta.get("message"))
 
 
 def score_observation(

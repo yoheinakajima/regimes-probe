@@ -31,6 +31,10 @@ main_metric: "correct_per_tool_call"
 # random_memory/policy_memory on a real dataset with a CONFIRM set this large.
 headline:
   min_confirm_size: 20
+  # A few recorded provider failures are fine (still structurally valid), but a
+  # run is NOT headline-eligible if the provider failure rate exceeds this, or if
+  # any required condition fails entirely.
+  max_provider_failure_rate: 0.2
 
 memory:
   optimize_allows_exploration: true

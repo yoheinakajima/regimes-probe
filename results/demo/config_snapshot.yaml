@@ -49,6 +49,7 @@ dataset:
   secondary: BrowseComp
   synthetic_path: fixtures/synthetic_browse.json
 headline:
+  max_provider_failure_rate: 0.2
   min_confirm_size: 20
 live:
   answer_model: gpt-5.4-mini

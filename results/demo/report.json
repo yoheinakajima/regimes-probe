@@ -50,6 +50,8 @@
     "policy_memory",
     "random_memory"
   ],
+  "tool_failures": {},
+  "provider_failure_rate": 0.0,
   "headline_eligible": false,
   "eligibility": {
     "structurally_valid": true,
@@ -68,6 +70,8 @@
     ],
     "confirm_size": 28,
     "min_confirm": 20,
+    "provider_failure_rate": 0.0,
+    "failed_conditions": [],
     "checks": {
       "optimize_confirm_disjoint": true,
       "replay_passed": true,
@@ -76,7 +80,8 @@
       "runs_completed": true,
       "confirm_memory_frozen": true,
       "no_live_updates_during_confirm": true,
-      "same_conditions": true
+      "same_conditions": true,
+      "provider_failures_within_threshold": true
     },
     "structural_reasons": [],
     "headline_eligibility_reasons": [
@@ -144,6 +149,9 @@
       "metrics": {
         "n": 28,
         "accuracy": 0.03571428571428571,
+        "failed_tool_calls": 0,
+        "provider_failure_rate": 0.0,
+        "failed_tool_calls_by_tool": {},
         "correct_per_tool_call": 0.0,
         "correct_per_dollar": 0.0,
         "correct_per_second": 0.0,
@@ -168,6 +176,9 @@
       "metrics": {
         "n": 28,
         "accuracy": 0.0,
+        "failed_tool_calls": 0,
+        "provider_failure_rate": 0.0,
+        "failed_tool_calls_by_tool": {},
         "correct_per_tool_call": 0.0,
         "correct_per_dollar": 0.0,
         "correct_per_second": 0.0,
@@ -192,6 +203,9 @@
       "metrics": {
         "n": 28,
         "accuracy": 0.75,
+        "failed_tool_calls": 0,
+        "provider_failure_rate": 0.0,
+        "failed_tool_calls_by_tool": {},
         "correct_per_tool_call": 0.75,
         "correct_per_dollar": 374.9999999999998,
         "correct_per_second": 0.0,
@@ -216,6 +230,9 @@
       "metrics": {
         "n": 28,
         "accuracy": 0.2857142857142857,
+        "failed_tool_calls": 0,
+        "provider_failure_rate": 0.0,
+        "failed_tool_calls_by_tool": {},
         "correct_per_tool_call": 0.2857142857142857,
         "correct_per_dollar": 142.85714285714278,
         "correct_per_second": 0.0,
@@ -240,6 +257,9 @@
       "metrics": {
         "n": 28,
         "accuracy": 0.2857142857142857,
+        "failed_tool_calls": 0,
+        "provider_failure_rate": 0.0,
+        "failed_tool_calls_by_tool": {},
         "correct_per_tool_call": 0.09523809523809523,
         "correct_per_dollar": 57.142857142857125,
         "correct_per_second": 0.0,
@@ -264,6 +284,9 @@
       "metrics": {
         "n": 28,
         "accuracy": 0.75,
+        "failed_tool_calls": 0,
+        "provider_failure_rate": 0.0,
+        "failed_tool_calls_by_tool": {},
         "correct_per_tool_call": 0.65625,
         "correct_per_dollar": 328.12499999999983,
         "correct_per_second": 0.0,
@@ -288,6 +311,9 @@
       "metrics": {
         "n": 28,
         "accuracy": 0.5,
+        "failed_tool_calls": 0,
+        "provider_failure_rate": 0.0,
+        "failed_tool_calls_by_tool": {},
         "correct_per_tool_call": 0.27450980392156865,
         "correct_per_dollar": 137.25490196078425,
         "correct_per_second": 0.0,
@@ -312,6 +338,9 @@
       "metrics": {
         "n": 28,
         "accuracy": 0.42857142857142855,
+        "failed_tool_calls": 0,
+        "provider_failure_rate": 0.0,
+        "failed_tool_calls_by_tool": {},
         "correct_per_tool_call": 0.08571428571428572,
         "correct_per_dollar": 47.619047619047585,
         "correct_per_second": 0.0,
@@ -336,6 +365,9 @@
       "metrics": {
         "n": 28,
         "accuracy": 0.75,
+        "failed_tool_calls": 0,
+        "provider_failure_rate": 0.0,
+        "failed_tool_calls_by_tool": {},
         "correct_per_tool_call": 0.6176470588235294,
         "correct_per_dollar": 308.8235294117646,
         "correct_per_second": 0.0,
@@ -360,6 +392,9 @@
       "metrics": {
         "n": 28,
         "accuracy": 0.5,
+        "failed_tool_calls": 0,
+        "provider_failure_rate": 0.0,
+        "failed_tool_calls_by_tool": {},
         "correct_per_tool_call": 0.2222222222222222,
         "correct_per_dollar": 116.66666666666659,
         "correct_per_second": 0.0,
@@ -384,6 +419,9 @@
       "metrics": {
         "n": 28,
         "accuracy": 0.21428571428571427,
+        "failed_tool_calls": 0,
+        "provider_failure_rate": 0.0,
+        "failed_tool_calls_by_tool": {},
         "correct_per_tool_call": 0.02142857142857143,
         "correct_per_dollar": 11.278195488721797,
         "correct_per_second": 0.0,
@@ -408,6 +446,9 @@
       "metrics": {
         "n": 28,
         "accuracy": 0.75,
+        "failed_tool_calls": 0,
+        "provider_failure_rate": 0.0,
+        "failed_tool_calls_by_tool": {},
         "correct_per_tool_call": 0.6176470588235294,
         "correct_per_dollar": 308.8235294117646,
         "correct_per_second": 0.0,
@@ -432,6 +473,9 @@
       "metrics": {
         "n": 28,
         "accuracy": 0.4642857142857143,
+        "failed_tool_calls": 0,
+        "provider_failure_rate": 0.0,
+        "failed_tool_calls_by_tool": {},
         "correct_per_tool_call": 0.1566265060240964,
         "correct_per_dollar": 81.24999999999996,
         "correct_per_second": 0.0,

@@ -65,6 +65,8 @@ class Eligibility:
     headline_eligibility_reasons: list[str]
     confirm_size: int = 0
     min_confirm: int = 20
+    provider_failure_rate: float = 0.0
+    failed_conditions: list[str] = field(default_factory=list)
 
     # --- back-compat aliases (older code/reports read these) ---
     @property
@@ -92,6 +94,8 @@ class Eligibility:
             "conditions_present": self.conditions_present,
             "confirm_size": self.confirm_size,
             "min_confirm": self.min_confirm,
+            "provider_failure_rate": round(self.provider_failure_rate, 4),
+            "failed_conditions": self.failed_conditions,
             "checks": self.checks,
             "structural_reasons": self.structural_reasons,
             "headline_eligibility_reasons": self.headline_eligibility_reasons,
@@ -105,6 +109,9 @@ def compute_eligibility(
     conditions_present: Optional[list[str]] = None,
     confirm_size: int = 0,
     min_confirm: int = 20,
+    provider_failure_rate: float = 0.0,
+    failed_conditions: Optional[list[str]] = None,
+    max_provider_failure_rate: float = 0.2,
 ) -> Eligibility:
     """Compute structural validity AND headline (memory-claim) eligibility.
 
@@ -142,11 +149,24 @@ def compute_eligibility(
             f"CONFIRM size {confirm_size} is below the minimum {min_confirm} for a "
             "headline memory claim")
 
+    # Provider failures: a few recorded failures are fine (still structurally
+    # valid), but a high failure rate, or an entirely-failed required condition,
+    # makes the run not headline-eligible.
+    failed_conds = [c for c in (failed_conditions or []) if c in REQUIRED_CONDITIONS]
+    failures_ok = (provider_failure_rate <= max_provider_failure_rate) and not failed_conds
+    if provider_failure_rate > max_provider_failure_rate:
+        reasons.append(
+            f"provider failure rate {provider_failure_rate:.2f} exceeds the maximum "
+            f"{max_provider_failure_rate:.2f} for a headline memory claim")
+    if failed_conds:
+        reasons.append(f"required condition(s) failed entirely (all tool calls failed): {failed_conds}")
+
     headline = bool(
         structurally_valid and dataset_is_real and has_comparison and not missing
-        and confirm_ok and mem_checks_ok)
+        and confirm_ok and mem_checks_ok and failures_ok)
 
-    all_checks = {**structural, **mem_checks}
+    all_checks = {**structural, **mem_checks,
+                  "provider_failures_within_threshold": failures_ok}
     return Eligibility(
         structurally_valid=structurally_valid,
         headline_eligible_memory_claim=headline,
@@ -157,4 +177,6 @@ def compute_eligibility(
         headline_eligibility_reasons=reasons,
         confirm_size=confirm_size,
         min_confirm=min_confirm,
+        provider_failure_rate=provider_failure_rate,
+        failed_conditions=failed_conds,
     )

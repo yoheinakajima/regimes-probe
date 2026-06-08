@@ -49,21 +49,25 @@ Frozen policy memory vs no_memory_search baseline, correct_per_tool_call — bud
 
 ## Efficiency & epistemic-error rates
 
-| condition | budget | over_search | false_stop | stale_err | evidence_gain/call |
-|---|---|---|---|---|---|
-| closed_book | 0 | 0.000 | 0.000 | 0.000 | 0.000 |
-| no_memory_search | 1 | 0.000 | 0.000 | 0.000 | 0.112 |
-| policy_memory | 1 | 0.000 | 0.000 | 0.000 | 0.913 |
-| random_memory | 1 | 0.000 | 0.000 | 0.250 | 0.530 |
-| no_memory_search | 3 | 0.000 | 0.000 | 0.250 | 0.201 |
-| policy_memory | 3 | 0.000 | 0.179 | 0.000 | 0.798 |
-| random_memory | 3 | 0.036 | 0.321 | 0.250 | 0.436 |
-| no_memory_search | 5 | 0.214 | 0.000 | 0.250 | 0.122 |
-| policy_memory | 5 | 0.000 | 0.250 | 0.000 | 0.793 |
-| random_memory | 5 | 0.036 | 0.321 | 0.250 | 0.375 |
-| no_memory_search | 10 | 0.214 | 0.000 | 0.250 | 0.061 |
-| policy_memory | 10 | 0.000 | 0.250 | 0.000 | 0.793 |
-| random_memory | 10 | 0.000 | 0.393 | 0.250 | 0.285 |
+| condition | budget | over_search | false_stop | stale_err | evidence_gain/call | provider_fail_rate |
+|---|---|---|---|---|---|---|
+| closed_book | 0 | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 |
+| no_memory_search | 1 | 0.000 | 0.000 | 0.000 | 0.112 | 0.000 |
+| policy_memory | 1 | 0.000 | 0.000 | 0.000 | 0.913 | 0.000 |
+| random_memory | 1 | 0.000 | 0.000 | 0.250 | 0.530 | 0.000 |
+| no_memory_search | 3 | 0.000 | 0.000 | 0.250 | 0.201 | 0.000 |
+| policy_memory | 3 | 0.000 | 0.179 | 0.000 | 0.798 | 0.000 |
+| random_memory | 3 | 0.036 | 0.321 | 0.250 | 0.436 | 0.000 |
+| no_memory_search | 5 | 0.214 | 0.000 | 0.250 | 0.122 | 0.000 |
+| policy_memory | 5 | 0.000 | 0.250 | 0.000 | 0.793 | 0.000 |
+| random_memory | 5 | 0.036 | 0.321 | 0.250 | 0.375 | 0.000 |
+| no_memory_search | 10 | 0.214 | 0.000 | 0.250 | 0.061 | 0.000 |
+| policy_memory | 10 | 0.000 | 0.250 | 0.000 | 0.793 | 0.000 |
+| random_memory | 10 | 0.000 | 0.393 | 0.250 | 0.285 | 0.000 |
+
+## Provider failures
+
+- none recorded (no provider errors during tool calls).
 
 ## Statistical tests
 

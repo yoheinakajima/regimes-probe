@@ -30,16 +30,20 @@ class TavilySearch(SearchProvider):
     def search(self, query: str, *, limit: int = 5, **opts: Any) -> SearchResponse:
         if not self.available():
             raise ProviderUnavailable("tavily_search requires TAVILY_API_KEY")
+        # Current Tavily API: Bearer-token AUTH HEADER (not api_key in the body).
+        # The old body-key form returns HTTP 400 on the current API.
         body = {
-            "api_key": os.environ["TAVILY_API_KEY"],
             "query": query,
             "max_results": limit,
             "search_depth": opts.get("search_depth", "basic"),
         }
+        if opts.get("allowed_domains"):
+            body["include_domains"] = list(opts["allowed_domains"])
         req = urllib.request.Request(
             _ENDPOINT,
             data=json.dumps(body).encode(),
-            headers={"Content-Type": "application/json"},
+            headers={"Content-Type": "application/json",
+                     "Authorization": f"Bearer {os.environ['TAVILY_API_KEY']}"},
         )
         t0 = time.monotonic()
         with urllib.request.urlopen(req, timeout=30) as resp:  # noqa: S310

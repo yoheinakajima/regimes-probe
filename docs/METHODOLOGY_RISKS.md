@@ -77,6 +77,19 @@ numbers independent of the policy.
 **Defense:** record every tool response in the event log; verify the replay
 check passes; report repeated-run variance; note cache risks in the report.
 
+### 7b. Provider/API failures during tool calls
+Real providers return errors (HTTP 400/429/5xx, timeouts). These must not crash a
+run, but they also must not be swept under the rug.
+
+**Defense:** a tool-call error becomes a *recorded* failed observation (sanitized,
+no secrets), earns no evidence gain, and penalizes that tool/query arm so the
+bandit can learn the tool is unreliable in that context. Per-tool failure counts
+go to report.json / summary.md / tool_rewards.csv, and a high overall failure rate
+(> headline.max_provider_failure_rate, default 0.2) or an entirely-failed required
+condition makes the run not headline-eligible — even though it stays structurally
+valid. If a provider is failing often, the comparison is degraded; fix the adapter
+or drop that arm before claiming anything.
+
 ### 8. OPTIMIZE leaking into the headline
 In-sample improvement is nearly free and meaningless on its own.
 

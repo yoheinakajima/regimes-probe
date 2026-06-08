@@ -61,6 +61,8 @@ def _outcome(trace, grade, reward, *, condition: str, budget: int) -> AttemptOut
         authority_ok=trace.vstate.authority_ok,
         contradiction=trace.vstate.contradiction,
         support_found=trace.vstate.support_found,
+        failed_tool_calls=sum(1 for c in trace.calls if getattr(c, "failed", False)),
+        failed_tools=[c.tool for c in trace.calls if getattr(c, "failed", False)],
     )
 
 

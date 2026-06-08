@@ -3,7 +3,7 @@
   "live": false,
   "git": {
     "branch": "claude/regimes-probe-setup-ILfr0",
-    "commit": "c5548f3ef8fd2d27e056bb0f99628b1635a3ae9f",
+    "commit": "efc9ec19b59c88d497cbe2cc4ffef8ca959ddc51",
     "dirty": true
   },
   "dataset": {
@@ -178,6 +178,8 @@
     ],
     "confirm_size": 28,
     "min_confirm": 20,
+    "provider_failure_rate": 0.0,
+    "failed_conditions": [],
     "checks": {
       "optimize_confirm_disjoint": true,
       "replay_passed": true,
@@ -186,7 +188,8 @@
       "runs_completed": true,
       "confirm_memory_frozen": true,
       "no_live_updates_during_confirm": true,
-      "same_conditions": true
+      "same_conditions": true,
+      "provider_failures_within_threshold": true
     },
     "structural_reasons": [],
     "headline_eligibility_reasons": [

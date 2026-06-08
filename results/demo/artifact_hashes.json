@@ -1,18 +1,18 @@
 {
   "run_dir": "results/demo",
   "sha256": {
-    "report.json": "242044557e9ee6274eb8d07f1e50e77ef60862e8468e22fea75c14720f3f6565",
-    "summary.md": "22f26bb62f6fdeb2ff42068a7f1983b6b35d59c38a9b08e71c3ebccd908055be",
-    "per_question.csv": "d717702de638f518369f761bf4f2ca373535ba0596d5cc45256fe27cd1cd9bfb",
+    "report.json": "a6011e75162c41146debd403714f7cd31fc9be0ab7e8acf190d39185339a506b",
+    "summary.md": "f25586dc0333c61a1ac2819bc2309e554f0716b7359406b9b795dbdc4d0b3eb1",
+    "per_question.csv": "42f5827c6597dd0ca7863e8ff43ec320ed1b84a9e07419d753af987ca7001708",
     "budget_curve.csv": "c5c86e74c4ad1cfaaf447115c46e784217888119e72b105450fbb492419d53cc",
-    "tool_rewards.csv": "95b7f030139c9a5750a9f0a7aaf4b5d7f0c3ef4683866a8455ff4bece11e1667",
-    "query_rewards.csv": "86f65bb7efb5b6b74ca6162b5c194c9e49a208f85989a4a8b9f3d84f05006266",
-    "stop_verify_rewards.csv": "5665beb862c9ec037be38710d24102402976948114197cc4c17b50998c0a3dde",
+    "tool_rewards.csv": "a5fa06bda81a30aec16471f6b52c7a8cddae92c63b6d7ddd2cc575036116fa28",
+    "query_rewards.csv": "9ec4a75b3164d9aca350e54d7686479013e3b0fe26ef1b2dc916e371941e76f3",
+    "stop_verify_rewards.csv": "e1f1028d641697d57751884f3a25d4f6c0c86466bdcddbcfecba0e55adf02949",
     "memory_snapshot.json": "d3a1a86f145919c07ba09fcb4713f8a799889230cdc495a8fc769dc8c574c9c8",
     "policy_updates.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-    "run_manifest.json": "8303b86d6319a15f085f4e82df5aacb3af3a6745832c4631b75b16a1b3cfa428",
+    "run_manifest.json": "b785c5a619293e55f56fa948ea36b96ff3d4649a396c7ba05d0c5d4a05691ed5",
     "replay_check.md": "21f6cc53f9aec05900bc410709f1b9f8770da289ad70b56b37623b2510a150bb",
-    "config_snapshot.yaml": "5b85097fa6352e4809a49b585cdf5ac42f67de5bbab0e04b1e2d263939e3dd0b"
+    "config_snapshot.yaml": "6bc414c6d30d5b886ee21bbcf989c3fcfb2c0ad1c53f2ac18d5f753c8d87db9c"
   },
   "missing": []
 }

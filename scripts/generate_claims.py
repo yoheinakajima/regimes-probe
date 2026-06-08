@@ -25,6 +25,7 @@ _CHECK_CLAIM = {
     "runs_completed": "the requested runs completed",
     "budget_enforced": "tool-call budgets were enforced",
     "no_live_updates_during_confirm": "no live memory updates during CONFIRM",
+    "provider_failures_within_threshold": "provider failure rate within the headline threshold",
 }
 # Checks that only make sense once a memory comparison (policy_memory) was run.
 _MEMORY_ONLY_CHECKS = {"same_conditions", "confirm_memory_frozen", "no_live_updates_during_confirm"}

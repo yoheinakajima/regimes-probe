@@ -14,6 +14,7 @@ Memory-performance claims are REFUSED below.
 - CONFIRM used a frozen policy-memory snapshot.
 - no live memory updates during CONFIRM.
 - no_memory_search and policy_memory differ only in memory access.
+- provider failure rate within the headline threshold.
 
 ## Partially verified
 - A closed-book baseline ran (0 tool calls); intrinsic-knowledge accuracy estimate = 0.036 on this dataset.

@@ -63,8 +63,19 @@ def _per_question_rows(runs: list[ConditionRun]) -> list[dict[str, Any]]:
     return rows
 
 
-def _reward_rows(snapshot: dict[str, Any], family: str) -> list[dict[str, Any]]:
+def _failures_by_tool(runs: list["ConditionRun"]) -> dict[str, int]:
+    out: dict[str, int] = {}
+    for run in runs:
+        for o in run.outcomes:
+            for t in getattr(o, "failed_tools", []):
+                out[t] = out.get(t, 0) + 1
+    return out
+
+
+def _reward_rows(snapshot: dict[str, Any], family: str,
+                 failures_by_tool: Optional[dict[str, int]] = None) -> list[dict[str, Any]]:
     rows = []
+    failures_by_tool = failures_by_tool or {}
     bandit = (snapshot or {}).get("bandits", {}).get(family, {})
     for cluster, arms in bandit.get("ctx", {}).items():
         for arm, st in arms.items():
@@ -74,6 +85,7 @@ def _reward_rows(snapshot: dict[str, Any], family: str) -> list[dict[str, Any]]:
                 "mean_reward": round(st.get("mean", 0.0), 4),
                 "count": st.get("n", 0),
                 "w": round(st.get("w", 0.0), 3),
+                "failed_calls": failures_by_tool.get(arm, 0),
             })
     rows.sort(key=lambda r: (r["signature_cluster"], -r["mean_reward"]))
     return rows
@@ -100,6 +112,8 @@ def write_full_report(
     promotions = promotions or []
     snapshot = snapshot or {}
 
+    failures_by_tool = _failures_by_tool(runs)
+
     # --- CSVs ---
     _write_csv(run_dir / "budget_curve.csv",
                ["budget", "condition", "accuracy", "correct_per_tool_call",
@@ -109,14 +123,14 @@ def write_full_report(
     if pq_rows:
         _write_csv(run_dir / "per_question.csv", list(pq_rows[0].keys()), pq_rows)
     _write_csv(run_dir / "tool_rewards.csv",
-               ["signature_cluster", "arm", "mean_reward", "count", "w"],
-               _reward_rows(snapshot, "tool"))
+               ["signature_cluster", "arm", "mean_reward", "count", "w", "failed_calls"],
+               _reward_rows(snapshot, "tool", failures_by_tool))
     _write_csv(run_dir / "query_rewards.csv",
-               ["signature_cluster", "arm", "mean_reward", "count", "w"],
+               ["signature_cluster", "arm", "mean_reward", "count", "w", "failed_calls"],
                _reward_rows(snapshot, "query"))
     sv_rows = _reward_rows(snapshot, "stop") + _reward_rows(snapshot, "verify")
     _write_csv(run_dir / "stop_verify_rewards.csv",
-               ["signature_cluster", "arm", "mean_reward", "count", "w"], sv_rows)
+               ["signature_cluster", "arm", "mean_reward", "count", "w", "failed_calls"], sv_rows)
 
     # --- JSON artifacts ---
     (run_dir / "memory_snapshot.json").write_text(json.dumps(snapshot, indent=2), encoding="utf-8")
@@ -135,6 +149,8 @@ def write_full_report(
         "headline_eligibility_reasons": elig.get("headline_eligibility_reasons",
                                                  elig.get("reasons", [])),
         "conditions_present": conditions_present,
+        "tool_failures": failures_by_tool,
+        "provider_failure_rate": elig.get("provider_failure_rate", 0.0),
         # back-compat alias (== headline_eligible_memory_claim):
         "headline_eligible": elig.get("headline_eligible_memory_claim",
                                       elig.get("headline_eligible", False)),
@@ -157,7 +173,7 @@ def write_full_report(
     # --- summary.md ---
     (run_dir / "summary.md").write_text(
         _summary_md(run_id, runs, meta, promotions, significance or {}, replay or {},
-                    eligibility or {}, same_conditions or {}),
+                    eligibility or {}, same_conditions or {}, failures_by_tool),
         encoding="utf-8",
     )
     return run_dir
@@ -179,7 +195,7 @@ def _replay_md(replay: dict[str, Any]) -> str:
 
 
 def _summary_md(run_id, runs, meta, promotions, significance, replay,
-                eligibility=None, same_conditions=None) -> str:
+                eligibility=None, same_conditions=None, failures_by_tool=None) -> str:
     eligibility = eligibility or {}
     same_conditions = same_conditions or {}
     lines: list[str] = []
@@ -238,13 +254,34 @@ def _summary_md(run_id, runs, meta, promotions, significance, replay,
     A("")
 
     A("## Efficiency & epistemic-error rates\n")
-    A("| condition | budget | over_search | false_stop | stale_err | evidence_gain/call |")
-    A("|---|---|---|---|---|---|")
+    A("| condition | budget | over_search | false_stop | stale_err | evidence_gain/call | provider_fail_rate |")
+    A("|---|---|---|---|---|---|---|")
     for r in runs:
         m = r.metrics
         A(f"| {r.condition} | {r.budget} | {m.get('over_search_rate',0):.3f} | "
           f"{m.get('false_stop_rate',0):.3f} | {m.get('stale_source_error_rate',0):.3f} | "
-          f"{m.get('evidence_gain_per_call',0):.3f} |")
+          f"{m.get('evidence_gain_per_call',0):.3f} | {m.get('provider_failure_rate',0):.3f} |")
+    A("")
+
+    # Provider failures: recorded per-tool failure counts + a warning on high rates.
+    failures_by_tool = failures_by_tool or {}
+    pf_rate = (eligibility or {}).get("provider_failure_rate", 0.0)
+    A("## Provider failures\n")
+    if failures_by_tool:
+        total_calls = sum(r.metrics.get("total_tool_calls", 0) for r in runs)
+        A(f"- overall provider failure rate: **{pf_rate:.3f}** "
+          f"({sum(failures_by_tool.values())} failed of {total_calls} tool calls)")
+        A("- failed calls by tool:")
+        for tool, n in sorted(failures_by_tool.items(), key=lambda kv: -kv[1]):
+            calls = sum(r.metrics.get("total_tool_calls", 0) for r in runs)
+            rate = (n / calls) if calls else 0.0
+            warn = "  ⚠️ HIGH" if rate > 0.2 else ""
+            A(f"  - `{tool}`: {n} failed{warn}")
+        if pf_rate > 0.2:
+            A(f"- ⚠️ **WARNING: provider failure rate {pf_rate:.2f} exceeds 0.20** — this "
+              "run is not headline-eligible (see Eligibility) until failures are addressed.")
+    else:
+        A("- none recorded (no provider errors during tool calls).")
     A("")
 
     if significance:

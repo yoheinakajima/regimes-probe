@@ -20,7 +20,8 @@ from regimes_probe.activegraph_pack.tools import payload_to_response
 from regimes_probe.agent.answerer import CandidateAnswer
 from regimes_probe.agent.evidence import EvidenceObservation
 from regimes_probe.live.cache import RecordingCache, ReplayMiss
-from regimes_probe.tools.base import ProviderUnavailable, SearchProvider, SearchResponse
+from regimes_probe.tools.base import (
+    ProviderUnavailable, SearchProvider, SearchResponse, safe_search)
 
 # Env var each adapter needs (None = no key required). Derived from the central
 # tool metadata registry so there is a single source of truth.
@@ -60,10 +61,12 @@ class CachedProvider(SearchProvider):
         if not self.armed:
             raise NotArmed(f"{self.name}: refusing to call provider in dry-run "
                            "(pass --execute to arm live calls)")
-        resp = self.inner.search(query, limit=limit, **opts)   # the only network
+        # API/network errors become a recorded FAILED response (not a crash);
+        # config/preflight errors still raise. safe_search is the boundary.
+        resp = safe_search(self.inner, query, limit=limit, **opts)   # the only network
         self.cache.calls += 1
-        if self.cache.mode != "off":
-            self.cache.store(h, provider=self.name, name=self.name,
+        if self.cache.mode != "off":               # cache failures too, so reruns/replay
+            self.cache.store(h, provider=self.name, name=self.name,   # don't re-trigger them
                              request_meta=meta, response_payload=resp.to_dict())
         return resp
 

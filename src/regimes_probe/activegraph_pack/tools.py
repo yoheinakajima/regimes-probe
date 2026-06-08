@@ -38,6 +38,7 @@ def payload_to_response(payload: dict[str, Any]) -> SearchResponse:
         cost=Decimal(str(payload.get("cost", "0"))),
         latency_s=float(payload.get("latency_s", 0.0)),
         error=payload.get("error"),
+        error_meta=payload.get("error_meta"),
     )
 
 
@@ -57,19 +58,22 @@ class RecordingInvoker:
             {"tool": tool, "query": query, "opts": opts, "limit": limit,
              "attempt_id": self.attempt_id},
         )
-        provider = self.providers[tool]
-        resp = provider.search(query, limit=limit, **opts)   # the only I/O
+        from regimes_probe.tools.base import safe_search
+        # safe_search converts provider/API errors into a recorded FAILED response
+        # (config/preflight errors still raise); a tool error never crashes the run.
+        resp = safe_search(self.providers[tool], query, limit=limit, **opts)   # the only I/O
         payload = response_to_payload(resp)
         self.log.emit(
             Events.TOOL_RESPONDED,
             {"tool": tool, "query": query, "n_results": len(resp.results),
-             "cost": str(resp.cost), "response": payload, "attempt_id": self.attempt_id},
+             "cost": str(resp.cost), "failed": resp.failed, "error": resp.error,
+             "response": payload, "attempt_id": self.attempt_id},
             caused_by=req.id,
         )
         self.log.add_object(
             Objects.TOOL_CALL,
             {"tool": tool, "query": query, "n_results": len(resp.results),
-             "cost": str(resp.cost), "attempt_id": self.attempt_id},
+             "cost": str(resp.cost), "failed": resp.failed, "attempt_id": self.attempt_id},
             caused_by=req.id,
         )
         self.recorded.append({"tool": tool, "query": query, "response": payload})

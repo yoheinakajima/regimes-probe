@@ -130,6 +130,44 @@ def test_run_live_pipeline_with_mocks_passes_plumbing(tmp_path):
     assert cache.calls == 0                              # mock providers, no live calls
 
 
+# --------------------------------------------------- consolidation in live pipeline
+def test_live_pipeline_consolidates_fragments(tmp_path):
+    cfg = _cfg()
+    items, providers = _rs_items_and_providers()
+    agent = EpistemicAgent(AgentConfig(available_tools=SEARCH_TOOLS + ["page_fetch"]))
+    cb = build_closed_book_agent(AgentConfig(available_tools=SEARCH_TOOLS + ["page_fetch"]),
+                                 build_closed_book_knowledge(items))
+    cache = RecordingCache(mode="off")
+    out = run_live_pipeline(
+        cfg, items, providers=providers, search_agent=agent, cb_agent=cb, cache=cache,
+        conditions=["closed_book", "no_memory_search", "random_memory", "policy_memory"],
+        budgets=[1, 3], optimize=4, confirm=4, split_seed="t", run_id="frags",
+        results_root=str(tmp_path), dataset_label="real_shaped_placeholder",
+        dataset_version="v", dataset_path=None, is_real=False, search_tools=SEARCH_TOOLS,
+        weights=RewardWeights.full(), params=BanditParams())
+    snap = json.loads((Path(out["run_dir"]) / "memory_snapshot.json").read_text())
+
+    # raw traces + signature clusters present...
+    assert len(snap["traces"]) > 0
+    assert len(snap["bandits"]["tool"]["ctx"]) > 0
+    # ...and consolidation produced policy fragments (was 0 before the patch)
+    assert len(snap["fragments"]) > 0
+
+    # fragments carry reward stats keyed by arm, not answers
+    for frag in snap["fragments"].values():
+        assert "tool_rewards" in frag and "best_tool" in frag and "support_count" in frag
+
+    # no-answer-leakage holds over traces, priors, AND consolidated fragments
+    from regimes_probe.policy.policy_fragment import assert_no_answer_leakage
+    assert_no_answer_leakage(snap, "snapshot")                 # raises if any leak
+    frag_blob = json.dumps(snap["fragments"])
+    for it in items:
+        for gold in it.gold_answers():
+            assert gold not in frag_blob
+
+    assert cache.calls == 0                                     # mock providers, no spend
+
+
 # --------------------------------------------------- the script defaults to no-spend
 def test_script_dry_run_makes_no_calls(tmp_path):
     out = subprocess.run(

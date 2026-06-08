@@ -25,6 +25,7 @@ from regimes_probe.eval.metrics import compute_metrics
 from regimes_probe.eval.report import ConditionRun, write_full_report
 from regimes_probe.eval.significance import bootstrap_correct_per_tool_call, mcnemar
 from regimes_probe.eval.split import build_split, partition
+from regimes_probe.policy.consolidation import consolidate
 from regimes_probe.policy.contextual_bandit import BanditParams
 from regimes_probe.policy.memory import PolicyMemory
 from regimes_probe.policy.policy_fragment import assert_no_answer_leakage
@@ -209,6 +210,11 @@ def run_live_pipeline(cfg, items, *, providers, search_agent, cb_agent, cache,
                              budget=mem_cfg.get("experience_budget", 5),
                              passes=mem_cfg.get("experience_passes", 4),
                              weights=weights, dataset_version=ver)
+            # Consolidate raw traces into answer-free policy fragments BEFORE
+            # freezing, so the CONFIRM snapshot carries fragments (mirrors
+            # scripts/run_experience.py). assert_no_answer_leakage runs inside
+            # snapshot() over bandits, traces, and fragments.
+            consolidate(mem)
             snapshot = mem.snapshot(meta={"dataset_version": ver, "n_optimize": len(opt)})
 
     for b in budgets:

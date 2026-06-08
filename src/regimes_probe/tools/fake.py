@@ -165,7 +165,17 @@ class FakePageFetch(SearchProvider):
         )
 
     def search(self, query: str, *, limit: int = 5, **opts: Any) -> SearchResponse:
-        # For a fetch tool, ``query`` is the URL to retrieve.
+        # For a fetch tool, ``query`` is the URL to retrieve. Mirror the live
+        # adapter: a non-URL (e.g. routed first-hop with a search query) fails
+        # gracefully with a ``requires_url`` error rather than silently returning
+        # nothing — so misuse is visible as a failed call, as in production.
+        from regimes_probe.tools.page_fetch import _looks_like_url
+        if not _looks_like_url(query):
+            meta = {"tool": self.name, "provider": self.name, "error_type": "requires_url",
+                    "status_code": None, "success": False,
+                    "message": "page_fetch requires a URL, not a search query"}
+            return SearchResponse(provider=self.name, query=query, results=(),
+                                  cost=Decimal("0"), error=meta["message"], error_meta=meta)
         doc = self._by_url.get(query)
         results: list[SearchResult] = []
         if doc is not None:

@@ -113,13 +113,19 @@ report's `headline_eligible` is **false** (dataset is synthetic), by design:
 | budget | closed_book | no_memory_search | random_memory (control) | policy_memory |
 | --- | --- | --- | --- | --- |
 | 1 | 0.036 acc | 0.000 | 0.286 | **0.750** |
-| 3 | 0.036 acc | 0.095 | 0.275 | **0.656** |
+| 3 | 0.036 acc | 0.071 | 0.275 | **0.286** |
 
 (`correct_per_tool_call`, except `closed_book` which makes 0 tool calls so only
-its accuracy is shown.) Paired McNemar at budget 3 shows 13 answers flipping
-wrong→correct with no reverse flips; `random_memory` lands well below
-`policy_memory`; the replay check confirms the graph is a deterministic
-projection of the log. **These are numbers on an engineered synthetic fixture
+its accuracy is shown.) Policy memory beats the `no_memory_search` baseline on
+`correct_per_tool_call` at every budget and far exceeds the `random_memory`
+control at budget 1; on **accuracy** it improves at every budget (budget 3:
+0.214 → 0.857). Paired McNemar at budget 3 shows 18 answers flipping
+wrong→correct with no reverse flips (p ≈ 0.0001); the replay check confirms the
+graph is a deterministic projection of the log. On this fixture the learned stop
+policy does not always stop early (the first tool's verification score stays
+below the stop threshold), so at large budgets `policy_memory` trades calls for
+accuracy and its `correct_per_tool_call` can trail `random_memory` — recorded
+honestly, not tuned. **These are numbers on an engineered synthetic fixture
 (Study 0/1)** — the policy is intentionally *not* perfect (residual failures feed
 the regime diagnostics). They say nothing about BrowseComp or LiveBrowseComp.
 Read `docs/STATUS.md` (claim ledger) and `docs/METHODOLOGY_RISKS.md` first.

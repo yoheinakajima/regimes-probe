@@ -6,11 +6,13 @@ research. OpenAI hosted ``web_search`` is opt-in; stateful/paid and browser-like
 tools are off unless explicitly allowed.
 
 Provider modes:
-  * ``cheap``        — default. Answerer ``gpt-5.4-mini``; search = ``page_fetch``
-    + cheap external search adapters with keys (Serper/Brave/Tavily/Exa) +
-    ``firecrawl_search`` if its key is present. NO OpenAI web_search, NO scrape,
-    NO discovery, NO stateful/browser tools. If no search provider key exists, we
-    explain which env vars to set rather than falling back to hosted search.
+  * ``cheap``        — default. Answerer ``gpt-5.4-mini``; first-hop search =
+    cheap external search adapters with keys (Serper/Brave/Tavily/Exa) +
+    ``firecrawl_search`` if its key is present. ``page_fetch`` is included as a
+    FOLLOW-UP tool only (operates on a URL from evidence), never a first-hop
+    search arm. NO OpenAI web_search, NO scrape, NO discovery, NO stateful/browser
+    tools. If no search provider key exists, we explain which env vars to set
+    rather than falling back to hosted search.
   * ``diverse``      — the main experiment. Everything in cheap, plus
     ``monid_discover``/``monid_inspect`` (if MONID key) and OpenAI web_search as
     one arm among many (unless disabled). Each provider is a separate bandit arm.
@@ -63,6 +65,19 @@ class LiveSettings:
     @property
     def search_tools(self) -> list[str]:
         return [t for t in self.tools if t != "page_fetch"]
+
+    @property
+    def first_hop_tools(self) -> list[str]:
+        """Tools eligible as first-hop (search) bandit arms. Excludes follow-up
+        tools like page_fetch/scrape, which operate on URLs from evidence."""
+        from regimes_probe.tools.metadata import is_first_hop
+        return [t for t in self.tools if is_first_hop(t)]
+
+    @property
+    def followup_tools(self) -> list[str]:
+        """URL-operating follow-up tools (page_fetch / scrape), not first-hop arms."""
+        from regimes_probe.tools.metadata import is_followup
+        return [t for t in self.tools if is_followup(t)]
 
     def tools_meta(self) -> dict[str, Any]:
         return tools_meta_dict(self.tools)
@@ -180,8 +195,11 @@ def resolve_live_settings(
         tools = [t for t in tools if t != "openai_web_search"]
         notes.append("openai_web_search disabled via --disable-openai-web-search")
     tools = list(dict.fromkeys(tools))
-    if "page_fetch" not in tools:                   # free; always available
-        tools.append("page_fetch")
+    if "page_fetch" not in tools:                   # free; FOLLOW-UP tool only —
+        tools.append("page_fetch")                  # never a first-hop search arm
+    # (page_fetch is family=fetch: the router never routes it first-hop; it is
+    #  used only as a follow-up on a URL returned by a search provider. See
+    #  agent/search_loop.py and tools/metadata.py:FOLLOWUP_FAMILIES.)
 
     openai_enabled = "openai_web_search" in tools
     if openai_enabled and (answer_model == "gpt-5.5" or web_search_model == "gpt-5.5"):

@@ -19,6 +19,13 @@ FAMILIES = ("search", "scrape", "fetch", "specialized_research",
             "agentic_discovery", "browserish")
 COST_CLASSES = ("low", "medium", "high", "unknown")
 
+#: Families that may be selected as a FIRST-HOP arm (they take a query and can be
+#: the agent's first action). The router only routes over these.
+FIRST_HOP_FAMILIES = ("search", "specialized_research", "agentic_discovery")
+#: Families that operate on a URL produced by earlier evidence — FOLLOW-UP only
+#: (e.g. page_fetch / firecrawl_scrape). Never a first-hop search arm.
+FOLLOWUP_FAMILIES = ("fetch", "scrape", "browserish")
+
 
 @dataclass(frozen=True)
 class ToolMeta:
@@ -111,3 +118,23 @@ def tools_meta_dict(names: list[str]) -> dict[str, Any]:
 
 def env_key(name: str) -> Optional[str]:
     return tool_meta(name).requires_api_key
+
+
+def is_first_hop(name: str) -> bool:
+    """True if ``name`` may be a first-hop arm (a query tool, not a URL fetcher)."""
+    return tool_meta(name).family in FIRST_HOP_FAMILIES
+
+
+def is_followup(name: str) -> bool:
+    """True if ``name`` is a follow-up tool that operates on a URL from evidence."""
+    return tool_meta(name).family in FOLLOWUP_FAMILIES
+
+
+def first_hop_tools(names: list[str]) -> list[str]:
+    """The subset of ``names`` eligible as first-hop (search) arms, order preserved."""
+    return [n for n in names if is_first_hop(n)]
+
+
+def followup_tools(names: list[str]) -> list[str]:
+    """The subset of ``names`` that are URL-operating follow-up tools."""
+    return [n for n in names if is_followup(n)]

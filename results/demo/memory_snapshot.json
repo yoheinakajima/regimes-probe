@@ -14,248 +14,218 @@
       },
       "ctx": {
         "freshness_sensitive+answer_shape_constrained+query_fragile+staleness_prone": {
-          "page_fetch": {
-            "n": 5,
-            "w": 4.80396016,
-            "mean": 0.09113145018255088,
-            "var": 1.482349473719628
-          },
           "brave_search": {
-            "n": 5,
-            "w": 4.80396016,
-            "mean": 0.3891314501825509,
-            "var": 1.482349473719628
+            "n": 16,
+            "w": 13.810113970375207,
+            "mean": -0.03164116906144079,
+            "var": 0.60969236548027
           },
           "generic_web_search": {
-            "n": 5,
-            "w": 4.80396016,
-            "mean": 0.3891314501825509,
-            "var": 1.482349473719628
+            "n": 16,
+            "w": 13.810113970375207,
+            "mean": -0.03164116906144079,
+            "var": 0.60969236548027
           },
           "news_search": {
             "n": 16,
             "w": 13.810113970375207,
-            "mean": 2.103385744938239,
-            "var": 7.402339773290677
+            "mean": 0.33361938932410246,
+            "var": 1.477325162231515
           },
           "official_domain_search": {
-            "n": 5,
-            "w": 4.80396016,
-            "mean": 0.3891314501825509,
-            "var": 1.482349473719628
+            "n": 16,
+            "w": 13.810113970375207,
+            "mean": -0.03164116906144079,
+            "var": 0.60969236548027
           }
         },
         "freshness_sensitive": {
           "news_search": {
             "n": 20,
             "w": 16.619601412245274,
-            "mean": 2.43496254322627,
-            "var": 1.9042135944781822
+            "mean": 0.295206400700503,
+            "var": 1.2187398856030045
           },
           "brave_search": {
-            "n": 5,
-            "w": 4.80396016,
-            "mean": 0.988,
-            "var": 0.0
+            "n": 20,
+            "w": 16.619601412245274,
+            "mean": -0.10025734548448303,
+            "var": 0.22783515920727523
           },
           "generic_web_search": {
-            "n": 5,
-            "w": 4.80396016,
-            "mean": 0.988,
-            "var": 0.0
+            "n": 20,
+            "w": 16.619601412245274,
+            "mean": -0.10025734548448303,
+            "var": 0.22783515920727523
           },
           "official_domain_search": {
-            "n": 5,
-            "w": 4.80396016,
-            "mean": 0.988,
-            "var": 0.0
-          },
-          "page_fetch": {
-            "n": 5,
-            "w": 4.80396016,
-            "mean": 0.69,
-            "var": 0.0
+            "n": 20,
+            "w": 16.619601412245274,
+            "mean": -0.10025734548448303,
+            "var": 0.22783515920727523
           }
         },
         "source_authority_sensitive": {
           "news_search": {
-            "n": 7,
-            "w": 6.593723337664,
-            "mean": 0.9603082101563746,
-            "var": 0.016654181043879474
+            "n": 39,
+            "w": 27.26018347189024,
+            "mean": 0.9877024019255308,
+            "var": 0.0004980376739080341
           },
           "brave_search": {
-            "n": 7,
-            "w": 6.593723337664,
-            "mean": 0.9603082101563746,
-            "var": 0.016654181043879474
+            "n": 39,
+            "w": 27.26018347189024,
+            "mean": 0.9877024019255308,
+            "var": 0.0004980376739080341
           },
           "generic_web_search": {
-            "n": 7,
-            "w": 6.593723337664,
-            "mean": 0.6603082101563745,
-            "var": 0.01665418104387947
+            "n": 39,
+            "w": 27.26018347189024,
+            "mean": 0.6877024019255308,
+            "var": 0.0004980376739080366
           },
           "official_domain_search": {
             "n": 40,
             "w": 27.714979802452437,
-            "mean": 2.54155467431286,
-            "var": 1.923590441146711
-          },
-          "page_fetch": {
-            "n": 7,
-            "w": 6.593723337664,
-            "mean": 0.6623082101563745,
-            "var": 0.01665418104387947
+            "mean": 1.5113773853434018,
+            "var": 0.24699700378211506
           }
         },
         "answer_shape_constrained": {
           "official_domain_search": {
-            "n": 7,
-            "w": 6.593723337664,
-            "mean": 0.696174370626668,
-            "var": 0.25755953109977997
+            "n": 39,
+            "w": 27.26018347189024,
+            "mean": 0.736257029693077,
+            "var": 3.0031239622766517
           },
           "news_search": {
-            "n": 4,
-            "w": 3.881592,
-            "mean": 0.6501440893324182,
-            "var": 0.11053829917209627
+            "n": 38,
+            "w": 26.79610558356147,
+            "mean": 0.5234428231250183,
+            "var": 1.4763459330884228
           },
           "brave_search": {
-            "n": 4,
-            "w": 3.881592,
-            "mean": 0.6501440893324182,
-            "var": 0.11053829917209627
+            "n": 38,
+            "w": 26.79610558356147,
+            "mean": 0.5234428231250183,
+            "var": 1.4763459330884228
           },
           "generic_web_search": {
-            "n": 36,
-            "w": 25.83934358971415,
-            "mean": 2.6235666839208998,
-            "var": 0.5034755000309135
-          },
-          "page_fetch": {
-            "n": 3,
-            "w": 2.9404,
-            "mean": 0.7226622228268262,
-            "var": 0.002683435869195802
+            "n": 39,
+            "w": 27.26018347189024,
+            "mean": 1.2701630097523369,
+            "var": 3.3216235503645293
           }
         },
         "generic": {
           "official_domain_search": {
             "n": 12,
             "w": 10.764163813259998,
-            "mean": 0.44124395992929005,
-            "var": 5.145909225306645e-05
+            "mean": 1.0132873794478305,
+            "var": 0.060039935295688095
           },
           "generic_web_search": {
-            "n": 9,
-            "w": 8.312611893492505,
-            "mean": 0.1398532245726376,
-            "var": 8.448698927925443e-06
+            "n": 12,
+            "w": 10.764163813259998,
+            "mean": 0.7132873794478303,
+            "var": 0.060039935295688115
+          },
+          "page_fetch": {
+            "n": 12,
+            "w": 10.764163813259998,
+            "mean": 1.5152873794478305,
+            "var": 0.06003993529568807
           },
           "news_search": {
-            "n": 8,
-            "w": 7.461848870910719,
-            "mean": 0.13946536752392885,
-            "var": 3.0995356120981886e-06
+            "n": 7,
+            "w": 6.593723337664,
+            "mean": 0.7899999999999998,
+            "var": 0.0
           }
         },
         "evidence_sparse": {
           "official_domain_search": {
             "n": 4,
             "w": 3.881592,
-            "mean": 0.1354546505660564,
-            "var": 9.212689150033928e-06
+            "mean": 0.131,
+            "var": 0.0
           },
           "generic_web_search": {
             "n": 4,
             "w": 3.881592,
-            "mean": 0.1354546505660564,
-            "var": 9.212689150033928e-06
+            "mean": 0.131,
+            "var": 0.0
+          },
+          "news_search": {
+            "n": 4,
+            "w": 3.881592,
+            "mean": 0.131,
+            "var": 0.0
           },
           "brave_search": {
             "n": 4,
             "w": 3.881592,
-            "mean": 0.4354546505660564,
-            "var": 9.212689150033996e-06
-          },
-          "news_search": {
-            "n": 3,
-            "w": 2.9404,
-            "mean": 0.13431982043259422,
-            "var": 1.7419259742931623e-06
-          },
-          "page_fetch": {
-            "n": 1,
-            "w": 1.0,
-            "mean": 0.135,
+            "mean": 0.431,
             "var": 0.0
           }
         },
         "freshness_sensitive+answer_shape_constrained": {
+          "official_domain_search": {
+            "n": 8,
+            "w": 7.461848870910719,
+            "mean": 0.39609743570533723,
+            "var": 0.017434887818052306
+          },
           "generic_web_search": {
             "n": 8,
             "w": 7.461848870910719,
-            "mean": 1.8556627179421992,
-            "var": 0.36821815233596283
-          },
-          "official_domain_search": {
-            "n": 2,
-            "w": 1.98,
-            "mean": 0.4329999999999999,
-            "var": 0.0
+            "mean": 1.196097435705337,
+            "var": 0.01743488781805231
           },
           "news_search": {
-            "n": 2,
-            "w": 1.98,
-            "mean": 1.2329999999999999,
-            "var": 0.0
+            "n": 8,
+            "w": 7.461848870910719,
+            "mean": 1.196097435705337,
+            "var": 0.01743488781805231
           },
           "brave_search": {
-            "n": 2,
-            "w": 1.98,
-            "mean": 0.4329999999999999,
-            "var": 0.0
-          },
-          "page_fetch": {
-            "n": 2,
-            "w": 1.98,
-            "mean": 0.4349999999999999,
-            "var": 0.0
+            "n": 8,
+            "w": 7.461848870910719,
+            "mean": 0.39609743570533723,
+            "var": 0.017434887818052306
           }
         }
       },
       "global": {
-        "page_fetch": {
-          "n": 23,
-          "w": 18.582635892393952,
-          "mean": 0.5180568476396226,
-          "var": 0.8458102574432874
-        },
         "brave_search": {
-          "n": 27,
-          "w": 21.021623676017366,
-          "mean": 0.6860604898231012,
-          "var": 1.2094905514448953
+          "n": 125,
+          "w": 45.99843877692874,
+          "mean": 0.5153930594023548,
+          "var": 6.329428683387834
         },
         "generic_web_search": {
-          "n": 74,
-          "w": 38.78757359247756,
-          "mean": 1.759770276866993,
-          "var": 34.91394087992987
+          "n": 138,
+          "w": 46.92270982746314,
+          "mean": 0.7464669340448346,
+          "var": 11.570058737273012
         },
         "news_search": {
-          "n": 60,
-          "w": 35.12234286539395,
-          "mean": 1.658405768517957,
-          "var": 34.19627726344872
+          "n": 132,
+          "w": 46.52614252940185,
+          "mean": 0.6833626564300008,
+          "var": 4.792378594758291
         },
         "official_domain_search": {
-          "n": 75,
-          "w": 39.011822120628004,
-          "mean": 1.6899852783698597,
-          "var": 36.23526423422332
+          "n": 139,
+          "w": 46.98425563091387,
+          "mean": 0.7656579758190178,
+          "var": 14.202349358830253
+        },
+        "page_fetch": {
+          "n": 12,
+          "w": 10.764163813259998,
+          "mean": 1.5152873794478305,
+          "var": 0.06003993529568807
         }
       }
     },
@@ -276,68 +246,98 @@
           "direct_question": {
             "n": 1,
             "w": 1.0,
-            "mean": -0.7180000000000001,
+            "mean": -0.6600000000000001,
             "var": 0.0
           },
           "exact_answer_shape": {
             "n": 1,
             "w": 1.0,
-            "mean": -0.7180000000000001,
+            "mean": -0.7200000000000001,
             "var": 0.0
           },
           "freshness_terms": {
-            "n": 14,
-            "w": 12.317902926254902,
-            "mean": 2.383537733428558,
-            "var": 2.0921855354608367
+            "n": 13,
+            "w": 11.548880536994798,
+            "mean": 0.203905167610426,
+            "var": 0.6206848231475521
+          },
+          "source_constrained": {
+            "n": 1,
+            "w": 1.0,
+            "mean": -0.6600000000000001,
+            "var": 0.0
           }
         },
         "freshness_sensitive": {
           "freshness_terms": {
-            "n": 20,
-            "w": 16.619601412245274,
-            "mean": 2.340758863728,
-            "var": 3.637217997660254
+            "n": 17,
+            "w": 14.533911690967702,
+            "mean": 0.07952336877290038,
+            "var": 0.0038948472990068587
+          },
+          "keyword_compressed": {
+            "n": 1,
+            "w": 1.0,
+            "mean": -0.6600000000000001,
+            "var": 0.0
+          },
+          "quoted_entities": {
+            "n": 1,
+            "w": 1.0,
+            "mean": -0.6600000000000001,
+            "var": 0.0
+          },
+          "site_or_domain_constrained": {
+            "n": 1,
+            "w": 1.0,
+            "mean": -0.6600000000000001,
+            "var": 0.0
           }
         },
         "source_authority_sensitive": {
           "freshness_terms": {
             "n": 40,
             "w": 27.714979802452437,
-            "mean": 2.4820391341408774,
-            "var": 3.8885853936825243
+            "mean": 1.0082375519936864,
+            "var": 0.5108966059413805
           }
         },
         "answer_shape_constrained": {
           "freshness_terms": {
             "n": 40,
             "w": 27.714979802452437,
-            "mean": 2.444670950573162,
-            "var": 5.3986494554758035
+            "mean": 0.7516857262456916,
+            "var": 2.743559566227448
           }
         },
         "generic": {
           "freshness_terms": {
             "n": 12,
             "w": 10.764163813259998,
-            "mean": 0.2894760755585901,
-            "var": 0.029474402089838585
+            "mean": 0.8366592533246408,
+            "var": 0.033545422475174766
+          },
+          "fetch": {
+            "n": 12,
+            "w": 10.764163813259998,
+            "mean": 1.5172873794478305,
+            "var": 0.06003993529568807
           }
         },
         "evidence_sparse": {
           "freshness_terms": {
             "n": 4,
             "w": 3.881592,
-            "mean": 0.2166521509731059,
-            "var": 0.0005537436859051614
+            "mean": 0.255,
+            "var": 0.0
           }
         },
         "freshness_sensitive+answer_shape_constrained": {
           "freshness_terms": {
             "n": 8,
             "w": 7.461848870910719,
-            "mean": 1.7468348366304738,
-            "var": 0.9305183401723229
+            "mean": 0.7200974357053371,
+            "var": 0.01743488781805232
           }
         }
       },
@@ -345,20 +345,50 @@
         "direct_question": {
           "n": 1,
           "w": 1.0,
-          "mean": -0.7180000000000001,
+          "mean": -0.6600000000000001,
           "var": 0.0
         },
         "exact_answer_shape": {
           "n": 1,
           "w": 1.0,
-          "mean": -0.7180000000000001,
+          "mean": -0.7200000000000001,
           "var": 0.0
         },
         "freshness_terms": {
-          "n": 138,
-          "w": 46.92270982746314,
-          "mean": 2.208986326493175,
-          "var": 33.112960836007915
+          "n": 134,
+          "w": 46.663707285237535,
+          "mean": 0.6699564007083636,
+          "var": 5.90195549224145
+        },
+        "keyword_compressed": {
+          "n": 1,
+          "w": 1.0,
+          "mean": -0.6600000000000001,
+          "var": 0.0
+        },
+        "quoted_entities": {
+          "n": 1,
+          "w": 1.0,
+          "mean": -0.6600000000000001,
+          "var": 0.0
+        },
+        "site_or_domain_constrained": {
+          "n": 1,
+          "w": 1.0,
+          "mean": -0.6600000000000001,
+          "var": 0.0
+        },
+        "fetch": {
+          "n": 12,
+          "w": 10.764163813259998,
+          "mean": 1.5172873794478305,
+          "var": 0.06003993529568807
+        },
+        "source_constrained": {
+          "n": 1,
+          "w": 1.0,
+          "mean": -0.6600000000000001,
+          "var": 0.0
         }
       }
     },
@@ -379,14 +409,22 @@
           "contradiction_check": {
             "n": 1,
             "w": 1.0,
-            "mean": -0.5980000000000001,
+            "mean": -0.6000000000000001,
             "var": 0.0
           },
           "corroborate": {
             "n": 1,
             "w": 1.0,
-            "mean": -0.5980000000000001,
+            "mean": -0.6000000000000001,
             "var": 0.0
+          }
+        },
+        "generic": {
+          "fetch_page": {
+            "n": 12,
+            "w": 10.764163813259998,
+            "mean": 0.90437279686329,
+            "var": 0.08195704031355669
           }
         }
       },
@@ -394,14 +432,20 @@
         "contradiction_check": {
           "n": 1,
           "w": 1.0,
-          "mean": -0.5980000000000001,
+          "mean": -0.6000000000000001,
           "var": 0.0
         },
         "corroborate": {
           "n": 1,
           "w": 1.0,
-          "mean": -0.5980000000000001,
+          "mean": -0.6000000000000001,
           "var": 0.0
+        },
+        "fetch_page": {
+          "n": 12,
+          "w": 10.764163813259998,
+          "mean": 0.90437279686329,
+          "var": 0.08195704031355669
         }
       }
     },
@@ -422,110 +466,116 @@
           "contradiction_check": {
             "n": 1,
             "w": 1.0,
-            "mean": -0.5980000000000001,
+            "mean": -0.6000000000000001,
             "var": 0.0
           },
           "stop_now": {
             "n": 16,
             "w": 13.810113970375207,
-            "mean": 1.9269707462130277,
-            "var": 6.523746687554516
+            "mean": -0.027641169061440783,
+            "var": 0.60969236548027
           },
           "corroborate": {
             "n": 1,
             "w": 1.0,
-            "mean": -0.5980000000000001,
+            "mean": -0.6000000000000001,
             "var": 0.0
           },
           "search_more": {
-            "n": 3,
-            "w": 2.9404,
-            "mean": 0.9536106652156167,
-            "var": 0.17952718390178363
+            "n": 14,
+            "w": 12.317902926254902,
+            "mean": 0.03538848929231376,
+            "var": 0.5372538389443777
           }
         },
         "freshness_sensitive": {
           "search_more": {
-            "n": 5,
-            "w": 4.80396016,
-            "mean": 0.792,
-            "var": 0.0
+            "n": 20,
+            "w": 16.619601412245274,
+            "mean": -0.09625734548448302,
+            "var": 0.22783515920727518
           },
           "stop_now": {
             "n": 20,
             "w": 16.619601412245274,
-            "mean": 2.1749166652926157,
-            "var": 2.9713811230885705
+            "mean": -0.09625734548448302,
+            "var": 0.22783515920727518
           }
         },
         "source_authority_sensitive": {
           "search_more": {
-            "n": 7,
-            "w": 6.593723337664,
-            "mean": 0.791314559657336,
-            "var": 0.016627344544001426
+            "n": 39,
+            "w": 27.26018347189024,
+            "mean": 0.7942560048138275,
+            "var": 0.0031127354619252473
           },
           "stop_now": {
             "n": 40,
             "w": 27.714979802452437,
-            "mean": 2.3089110934444075,
-            "var": 2.973643943442323
+            "mean": 1.0212819646352203,
+            "var": 0.38439267842764474
           }
         },
         "answer_shape_constrained": {
+          "search_more": {
+            "n": 38,
+            "w": 26.79610558356147,
+            "mean": 0.6002764747619344,
+            "var": 1.9007507807114326
+          },
           "stop_now": {
             "n": 40,
             "w": 27.714979802452437,
-            "mean": 2.2560317500014615,
-            "var": 4.96414972343874
-          },
-          "search_more": {
-            "n": 5,
-            "w": 4.80396016,
-            "mean": 0.7034361514605068,
-            "var": 0.07359405842036447
+            "mean": 0.7692062828926575,
+            "var": 3.5551393809655547
           }
         },
         "generic": {
+          "search_more": {
+            "n": 12,
+            "w": 10.764163813259998,
+            "mean": 1.0172873794478305,
+            "var": 0.060039935295688095
+          },
+          "fetch_page": {
+            "n": 12,
+            "w": 10.764163813259998,
+            "mean": 0.90437279686329,
+            "var": 0.08195704031355669
+          },
           "stop_now": {
             "n": 12,
             "w": 10.764163813259998,
-            "mean": 0.14524395992929007,
-            "var": 5.145909225306657e-05
-          },
-          "search_more": {
-            "n": 10,
-            "w": 9.146359655622655,
-            "mean": 0.44414007279086576,
-            "var": 1.3212182596575875e-05
+            "mean": 1.0172873794478305,
+            "var": 0.060039935295688095
           }
         },
         "evidence_sparse": {
           "search_more": {
             "n": 4,
             "w": 3.881592,
-            "mean": 0.4394546505660564,
-            "var": 9.212689150033996e-06
+            "mean": 0.435,
+            "var": 0.0
           },
           "stop_now": {
             "n": 4,
             "w": 3.881592,
-            "mean": 0.2167425262624202,
-            "var": 0.04851654211700926
+            "mean": 0.435,
+            "var": 0.0
           }
         },
         "freshness_sensitive+answer_shape_constrained": {
           "search_more": {
-            "n": 2,
-            "w": 1.98,
-            "mean": 0.5369999999999999,
-            "var": 0.0
+            "n": 8,
+            "w": 7.461848870910719,
+            "mean": 0.5059145297544476,
+            "var": 0.012107560984758563
           },
           "stop_now": {
             "n": 8,
             "w": 7.461848870910719,
-            "mean": 1.5891452921223708,
-            "var": 0.6896468650223074
+            "mean": 0.7000974357053371,
+            "var": 0.01743488781805232
           }
         }
       },
@@ -533,26 +583,32 @@
         "contradiction_check": {
           "n": 1,
           "w": 1.0,
-          "mean": -0.5980000000000001,
+          "mean": -0.6000000000000001,
           "var": 0.0
         },
         "stop_now": {
           "n": 140,
           "w": 47.04457051829559,
-          "mean": 2.0282487904351716,
-          "var": 30.069907384188376
+          "mean": 0.6776121587786909,
+          "var": 8.415981590659754
         },
         "corroborate": {
           "n": 1,
           "w": 1.0,
-          "mean": -0.5980000000000001,
+          "mean": -0.6000000000000001,
           "var": 0.0
         },
         "search_more": {
-          "n": 36,
-          "w": 25.83934358971415,
-          "mean": 0.6068891569548307,
-          "var": 0.7235615344199183
+          "n": 135,
+          "w": 46.730433139532785,
+          "mean": 0.5605974529035205,
+          "var": 5.9384357386981055
+        },
+        "fetch_page": {
+          "n": 12,
+          "w": 10.764163813259998,
+          "mean": 0.90437279686329,
+          "var": 0.08195704031355669
         }
       }
     }
@@ -822,21 +878,20 @@
       ],
       "arm_rewards": {
         "tool": {
-          "page_fetch": -0.9000000000000001,
-          "brave_search": -0.6020000000000001,
-          "generic_web_search": -0.6020000000000001,
-          "news_search": -0.9020000000000001,
-          "official_domain_search": -0.6020000000000001
+          "brave_search": -0.6040000000000001,
+          "generic_web_search": -0.6040000000000001,
+          "news_search": -0.9040000000000001,
+          "official_domain_search": -0.6040000000000001
         },
         "query": {
-          "direct_question": -0.7180000000000001
+          "direct_question": -0.6600000000000001
         },
         "stop": {
-          "contradiction_check": -0.5980000000000001,
-          "stop_now": -0.5980000000000001
+          "contradiction_check": -0.6000000000000001,
+          "stop_now": -0.6000000000000001
         },
         "verify": {
-          "contradiction_check": -0.5980000000000001
+          "contradiction_check": -0.6000000000000001
         }
       },
       "correct": false,
@@ -1106,21 +1161,20 @@
       ],
       "arm_rewards": {
         "tool": {
-          "brave_search": -0.6020000000000001,
-          "generic_web_search": -0.6020000000000001,
-          "official_domain_search": -0.6020000000000001,
-          "page_fetch": -0.9000000000000001,
-          "news_search": -0.9020000000000001
+          "brave_search": -0.6040000000000001,
+          "generic_web_search": -0.6040000000000001,
+          "official_domain_search": -0.6040000000000001,
+          "news_search": -0.9040000000000001
         },
         "query": {
-          "exact_answer_shape": -0.7180000000000001
+          "exact_answer_shape": -0.7200000000000001
         },
         "stop": {
-          "corroborate": -0.5980000000000001,
-          "stop_now": -0.5980000000000001
+          "corroborate": -0.6000000000000001,
+          "stop_now": -0.6000000000000001
         },
         "verify": {
-          "corroborate": -0.5980000000000001
+          "corroborate": -0.6000000000000001
         }
       },
       "correct": false,
@@ -1390,18 +1444,17 @@
       ],
       "arm_rewards": {
         "tool": {
-          "brave_search": 1.2879999999999998,
-          "generic_web_search": 1.2879999999999998,
-          "official_domain_search": 1.2879999999999998,
-          "page_fetch": 0.9899999999999998,
-          "news_search": 1.7879999999999998
+          "brave_search": 1.0859999999999999,
+          "generic_web_search": 1.0859999999999999,
+          "official_domain_search": 1.0859999999999999,
+          "news_search": 1.5859999999999999
         },
         "query": {
-          "freshness_terms": 1.3319999999999999
+          "freshness_terms": 1.2899999999999998
         },
         "stop": {
-          "search_more": 1.2919999999999998,
-          "stop_now": 1.5919999999999999
+          "search_more": 1.0399999999999998,
+          "stop_now": 1.0899999999999999
         },
         "verify": {}
       },
@@ -1672,18 +1725,17 @@
       ],
       "arm_rewards": {
         "tool": {
-          "brave_search": 1.0879999999999999,
-          "generic_web_search": 1.0879999999999999,
-          "official_domain_search": 1.0879999999999999,
-          "news_search": 1.5879999999999999,
-          "page_fetch": 0.7899999999999998
+          "brave_search": 1.0859999999999999,
+          "generic_web_search": 1.0859999999999999,
+          "official_domain_search": 1.0859999999999999,
+          "news_search": 1.5859999999999999
         },
         "query": {
-          "freshness_terms": 1.132
+          "freshness_terms": 1.2899999999999998
         },
         "stop": {
-          "search_more": 1.0419999999999998,
-          "stop_now": 1.0919999999999999
+          "search_more": 1.0399999999999998,
+          "stop_now": 1.0899999999999999
         },
         "verify": {}
       },
@@ -1954,22 +2006,21 @@
       ],
       "arm_rewards": {
         "tool": {
-          "news_search": 1.488,
-          "brave_search": 0.988,
-          "generic_web_search": 0.988,
-          "official_domain_search": 0.988,
-          "page_fetch": 0.69
+          "news_search": 0.486,
+          "brave_search": -0.014000000000000009,
+          "generic_web_search": -0.014000000000000009,
+          "official_domain_search": -0.014000000000000009
         },
         "query": {
-          "freshness_terms": 1.032
+          "freshness_terms": 0.09
         },
         "stop": {
-          "search_more": 0.792,
-          "stop_now": 0.992
+          "search_more": -0.010000000000000009,
+          "stop_now": -0.010000000000000009
         },
         "verify": {}
       },
-      "correct": true,
+      "correct": false,
       "tool_calls": 5
     },
     {
@@ -2236,22 +2287,21 @@
       ],
       "arm_rewards": {
         "tool": {
-          "news_search": 1.488,
-          "brave_search": 0.988,
-          "generic_web_search": 0.988,
-          "official_domain_search": 0.988,
-          "page_fetch": 0.69
+          "news_search": 0.486,
+          "brave_search": -0.014000000000000009,
+          "generic_web_search": -0.014000000000000009,
+          "official_domain_search": -0.014000000000000009
         },
         "query": {
-          "freshness_terms": 1.032
+          "freshness_terms": 0.09
         },
         "stop": {
-          "search_more": 0.792,
-          "stop_now": 0.992
+          "search_more": -0.010000000000000009,
+          "stop_now": -0.010000000000000009
         },
         "verify": {}
       },
-      "correct": true,
+      "correct": false,
       "tool_calls": 5
     },
     {
@@ -2518,22 +2568,21 @@
       ],
       "arm_rewards": {
         "tool": {
-          "news_search": 1.488,
-          "brave_search": 0.988,
-          "generic_web_search": 0.988,
-          "official_domain_search": 0.988,
-          "page_fetch": 0.69
+          "news_search": -0.9040000000000001,
+          "brave_search": -0.6040000000000001,
+          "generic_web_search": -0.6040000000000001,
+          "official_domain_search": -0.6040000000000001
         },
         "query": {
-          "freshness_terms": 1.032
+          "keyword_compressed": -0.6600000000000001
         },
         "stop": {
-          "search_more": 0.792,
-          "stop_now": 0.992
+          "search_more": -0.6000000000000001,
+          "stop_now": -0.6000000000000001
         },
         "verify": {}
       },
-      "correct": true,
+      "correct": false,
       "tool_calls": 5
     },
     {
@@ -2800,22 +2849,21 @@
       ],
       "arm_rewards": {
         "tool": {
-          "news_search": 1.488,
-          "brave_search": 0.988,
-          "generic_web_search": 0.988,
-          "official_domain_search": 0.988,
-          "page_fetch": 0.69
+          "news_search": -0.9040000000000001,
+          "brave_search": -0.6040000000000001,
+          "generic_web_search": -0.6040000000000001,
+          "official_domain_search": -0.6040000000000001
         },
         "query": {
-          "freshness_terms": 1.032
+          "quoted_entities": -0.6600000000000001
         },
         "stop": {
-          "search_more": 0.792,
-          "stop_now": 0.992
+          "search_more": -0.6000000000000001,
+          "stop_now": -0.6000000000000001
         },
         "verify": {}
       },
-      "correct": true,
+      "correct": false,
       "tool_calls": 5
     },
     {
@@ -3082,22 +3130,21 @@
       ],
       "arm_rewards": {
         "tool": {
-          "news_search": 1.488,
-          "brave_search": 0.988,
-          "generic_web_search": 0.988,
-          "official_domain_search": 0.988,
-          "page_fetch": 0.69
+          "news_search": -0.9040000000000001,
+          "brave_search": -0.6040000000000001,
+          "generic_web_search": -0.6040000000000001,
+          "official_domain_search": -0.6040000000000001
         },
         "query": {
-          "freshness_terms": 1.032
+          "site_or_domain_constrained": -0.6600000000000001
         },
         "stop": {
-          "search_more": 0.792,
-          "stop_now": 0.992
+          "search_more": -0.6000000000000001,
+          "stop_now": -0.6000000000000001
         },
         "verify": {}
       },
-      "correct": true,
+      "correct": false,
       "tool_calls": 5
     },
     {
@@ -3364,18 +3411,17 @@
       ],
       "arm_rewards": {
         "tool": {
-          "news_search": 1.0879999999999999,
-          "brave_search": 1.0879999999999999,
-          "generic_web_search": 0.7879999999999998,
-          "official_domain_search": 1.5879999999999999,
-          "page_fetch": 0.7899999999999998
+          "news_search": 1.0859999999999999,
+          "brave_search": 1.0859999999999999,
+          "generic_web_search": 0.7859999999999998,
+          "official_domain_search": 1.5859999999999999
         },
         "query": {
-          "freshness_terms": 1.0719999999999998
+          "freshness_terms": 1.2299999999999998
         },
         "stop": {
-          "search_more": 1.0419999999999998,
-          "stop_now": 1.0919999999999999
+          "search_more": 1.0399999999999998,
+          "stop_now": 1.0899999999999999
         },
         "verify": {}
       },
@@ -3646,18 +3692,17 @@
       ],
       "arm_rewards": {
         "tool": {
-          "news_search": 0.6879999999999997,
-          "official_domain_search": 1.1879999999999997,
-          "brave_search": 0.6879999999999997,
-          "generic_web_search": 0.38799999999999973,
-          "page_fetch": 0.38999999999999974
+          "official_domain_search": 1.4859999999999998,
+          "news_search": 0.9859999999999998,
+          "brave_search": 0.9859999999999998,
+          "generic_web_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 0.6719999999999997
+          "freshness_terms": 0.9699999999999998
         },
         "stop": {
-          "search_more": 0.5419999999999997,
-          "stop_now": 0.6919999999999997
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
@@ -3928,18 +3973,17 @@
       ],
       "arm_rewards": {
         "tool": {
-          "official_domain_search": 1.488,
-          "news_search": 0.988,
-          "brave_search": 0.988,
-          "generic_web_search": 0.688,
-          "page_fetch": 0.69
+          "official_domain_search": 1.4859999999999998,
+          "news_search": 0.9859999999999998,
+          "brave_search": 0.9859999999999998,
+          "generic_web_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 0.972
+          "freshness_terms": 0.9699999999999998
         },
         "stop": {
-          "search_more": 0.792,
-          "stop_now": 0.992
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
@@ -4210,18 +4254,17 @@
       ],
       "arm_rewards": {
         "tool": {
-          "official_domain_search": 1.488,
-          "news_search": 0.988,
-          "brave_search": 0.988,
-          "generic_web_search": 0.688,
-          "page_fetch": 0.69
+          "official_domain_search": 1.4859999999999998,
+          "news_search": 0.9859999999999998,
+          "brave_search": 0.9859999999999998,
+          "generic_web_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 0.972
+          "freshness_terms": 0.9699999999999998
         },
         "stop": {
-          "search_more": 0.792,
-          "stop_now": 0.992
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
@@ -4492,18 +4535,17 @@
       ],
       "arm_rewards": {
         "tool": {
-          "official_domain_search": 1.488,
-          "news_search": 0.988,
-          "brave_search": 0.988,
-          "generic_web_search": 0.688,
-          "page_fetch": 0.69
+          "official_domain_search": 1.4859999999999998,
+          "news_search": 0.9859999999999998,
+          "brave_search": 0.9859999999999998,
+          "generic_web_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 0.972
+          "freshness_terms": 0.9699999999999998
         },
         "stop": {
-          "search_more": 0.792,
-          "stop_now": 0.992
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
@@ -4774,18 +4816,17 @@
       ],
       "arm_rewards": {
         "tool": {
-          "official_domain_search": 1.488,
-          "news_search": 0.988,
-          "brave_search": 0.988,
-          "generic_web_search": 0.688,
-          "page_fetch": 0.69
+          "official_domain_search": 1.4859999999999998,
+          "news_search": 0.9859999999999998,
+          "brave_search": 0.9859999999999998,
+          "generic_web_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 0.972
+          "freshness_terms": 0.9699999999999998
         },
         "stop": {
-          "search_more": 0.792,
-          "stop_now": 0.992
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
@@ -5056,18 +5097,17 @@
       ],
       "arm_rewards": {
         "tool": {
-          "official_domain_search": 1.488,
-          "news_search": 0.988,
-          "brave_search": 0.988,
-          "generic_web_search": 0.688,
-          "page_fetch": 0.69
+          "official_domain_search": 1.4859999999999998,
+          "brave_search": 0.9859999999999998,
+          "news_search": 0.9859999999999998,
+          "generic_web_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 0.972
+          "freshness_terms": 0.9699999999999998
         },
         "stop": {
-          "search_more": 0.792,
-          "stop_now": 0.992
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
@@ -5338,18 +5378,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "official_domain_search": 2.692
+          "official_domain_search": 1.4859999999999998,
+          "news_search": 0.9859999999999998,
+          "brave_search": 0.9859999999999998,
+          "generic_web_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9699999999999998
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p0-syn-031",
@@ -5615,18 +5659,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "official_domain_search": 2.692
+          "official_domain_search": 1.4859999999999998,
+          "news_search": 0.9859999999999998,
+          "brave_search": 0.9859999999999998,
+          "generic_web_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9699999999999998
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p0-syn-032",
@@ -6169,18 +6217,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "official_domain_search": 0.447
+          "official_domain_search": 1.0859999999999999,
+          "news_search": 1.0859999999999999,
+          "brave_search": 1.0859999999999999,
+          "generic_web_search": 1.5859999999999999
         },
         "query": {
-          "freshness_terms": 0.451
+          "freshness_terms": 1.2899999999999998
         },
         "stop": {
-          "stop_now": 0.15100000000000002
+          "search_more": 1.0399999999999998,
+          "stop_now": 1.0899999999999999
         },
         "verify": {}
       },
-      "correct": false,
-      "tool_calls": 1
+      "correct": true,
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p0-syn-036",
@@ -6446,18 +6498,17 @@
       ],
       "arm_rewards": {
         "tool": {
-          "official_domain_search": 1.0879999999999999,
-          "news_search": 1.0879999999999999,
-          "brave_search": 1.0879999999999999,
-          "generic_web_search": 1.5879999999999999,
-          "page_fetch": 0.7899999999999998
+          "official_domain_search": 1.0859999999999999,
+          "news_search": 1.0859999999999999,
+          "brave_search": 1.0859999999999999,
+          "generic_web_search": 1.5859999999999999
         },
         "query": {
-          "freshness_terms": 1.132
+          "freshness_terms": 1.2899999999999998
         },
         "stop": {
-          "search_more": 1.0419999999999998,
-          "stop_now": 1.0919999999999999
+          "search_more": 1.0399999999999998,
+          "stop_now": 1.0899999999999999
         },
         "verify": {}
       },
@@ -7005,20 +7056,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "news_search": 0.14300000000000002,
-          "official_domain_search": 0.443
+          "official_domain_search": 0.6859999999999997,
+          "generic_web_search": 1.1859999999999997,
+          "news_search": 0.38599999999999973,
+          "brave_search": 0.38599999999999973
         },
         "query": {
-          "freshness_terms": 0.29700000000000004
+          "freshness_terms": 0.6099999999999998
         },
         "stop": {
-          "search_more": 0.447,
-          "stop_now": 0.14700000000000002
+          "search_more": 0.5399999999999997,
+          "stop_now": 0.6899999999999997
         },
         "verify": {}
       },
-      "correct": false,
-      "tool_calls": 2
+      "correct": true,
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p0-syn-042",
@@ -7284,20 +7337,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "brave_search": 0.14300000000000002,
-          "official_domain_search": 0.443
+          "official_domain_search": 0.6859999999999997,
+          "generic_web_search": 1.1859999999999997,
+          "news_search": 0.38599999999999973,
+          "brave_search": 0.38599999999999973
         },
         "query": {
-          "freshness_terms": 0.29700000000000004
+          "freshness_terms": 0.6099999999999998
         },
         "stop": {
-          "search_more": 0.447,
-          "stop_now": 0.14700000000000002
+          "search_more": 0.5399999999999997,
+          "stop_now": 0.6899999999999997
         },
         "verify": {}
       },
-      "correct": false,
-      "tool_calls": 2
+      "correct": true,
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p0-syn-043",
@@ -7563,18 +7618,17 @@
       ],
       "arm_rewards": {
         "tool": {
-          "generic_web_search": 1.488,
-          "news_search": 0.688,
-          "official_domain_search": 0.988,
-          "brave_search": 0.688,
-          "page_fetch": 0.69
+          "generic_web_search": 1.4859999999999998,
+          "official_domain_search": 0.9859999999999998,
+          "news_search": 0.6859999999999997,
+          "brave_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 0.9119999999999999
+          "freshness_terms": 0.9099999999999997
         },
         "stop": {
-          "search_more": 0.792,
-          "stop_now": 0.992
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
@@ -7845,18 +7899,17 @@
       ],
       "arm_rewards": {
         "tool": {
-          "generic_web_search": 1.488,
-          "official_domain_search": 0.988,
-          "news_search": 0.688,
-          "brave_search": 0.688,
-          "page_fetch": 0.69
+          "generic_web_search": 1.4859999999999998,
+          "official_domain_search": 0.9859999999999998,
+          "brave_search": 0.6859999999999997,
+          "news_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 0.9119999999999999
+          "freshness_terms": 0.9099999999999997
         },
         "stop": {
-          "search_more": 0.792,
-          "stop_now": 0.992
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
@@ -8127,18 +8180,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "generic_web_search": 2.692
+          "generic_web_search": 1.4859999999999998,
+          "official_domain_search": 0.9859999999999998,
+          "news_search": 0.6859999999999997,
+          "brave_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9099999999999997
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p0-syn-046",
@@ -8404,18 +8461,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "generic_web_search": 2.692
+          "generic_web_search": 1.4859999999999998,
+          "official_domain_search": 0.9859999999999998,
+          "news_search": 0.6859999999999997,
+          "brave_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9099999999999997
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p0-syn-048",
@@ -8958,18 +9019,25 @@
       ],
       "arm_rewards": {
         "tool": {
-          "official_domain_search": 0.447
+          "official_domain_search": 0.8919999999999998,
+          "generic_web_search": 0.5919999999999999,
+          "page_fetch": 1.394
         },
         "query": {
-          "freshness_terms": 0.451
+          "freshness_terms": 0.7459999999999998,
+          "fetch": 1.396
         },
         "stop": {
-          "stop_now": 0.15100000000000002
+          "search_more": 0.8959999999999998,
+          "fetch_page": 0.7626666666666664,
+          "stop_now": 0.8959999999999998
         },
-        "verify": {}
+        "verify": {
+          "fetch_page": 0.7626666666666664
+        }
       },
-      "correct": false,
-      "tool_calls": 1
+      "correct": true,
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p0-syn-053",
@@ -9235,20 +9303,25 @@
       ],
       "arm_rewards": {
         "tool": {
-          "generic_web_search": 0.14300000000000002,
-          "official_domain_search": 0.443
+          "official_domain_search": 0.8919999999999998,
+          "generic_web_search": 0.5919999999999999,
+          "page_fetch": 1.394
         },
         "query": {
-          "freshness_terms": 0.29700000000000004
+          "freshness_terms": 0.7459999999999998,
+          "fetch": 1.396
         },
         "stop": {
-          "search_more": 0.447,
-          "stop_now": 0.14700000000000002
+          "search_more": 0.8959999999999998,
+          "fetch_page": 0.7626666666666664,
+          "stop_now": 0.8959999999999998
         },
-        "verify": {}
+        "verify": {
+          "fetch_page": 0.7626666666666664
+        }
       },
-      "correct": false,
-      "tool_calls": 2
+      "correct": true,
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p0-syn-055",
@@ -9514,20 +9587,25 @@
       ],
       "arm_rewards": {
         "tool": {
-          "news_search": 0.14300000000000002,
-          "official_domain_search": 0.443
+          "official_domain_search": 0.8919999999999998,
+          "generic_web_search": 0.5919999999999999,
+          "page_fetch": 1.394
         },
         "query": {
-          "freshness_terms": 0.29700000000000004
+          "freshness_terms": 0.7459999999999998,
+          "fetch": 1.396
         },
         "stop": {
-          "search_more": 0.447,
-          "stop_now": 0.14700000000000002
+          "search_more": 0.8959999999999998,
+          "fetch_page": 0.7626666666666664,
+          "stop_now": 0.8959999999999998
         },
-        "verify": {}
+        "verify": {
+          "fetch_page": 0.7626666666666664
+        }
       },
-      "correct": false,
-      "tool_calls": 2
+      "correct": true,
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p0-syn-057",
@@ -9793,21 +9871,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "official_domain_search": 0.139,
-          "generic_web_search": 0.139,
-          "brave_search": 0.439
+          "official_domain_search": 0.131,
+          "generic_web_search": 0.131,
+          "news_search": 0.131,
+          "brave_search": 0.431
         },
         "query": {
-          "freshness_terms": 0.24300000000000002
+          "freshness_terms": 0.255
         },
         "stop": {
-          "search_more": 0.443,
-          "stop_now": 0.14300000000000002
+          "search_more": 0.435,
+          "stop_now": 0.435
         },
         "verify": {}
       },
       "correct": false,
-      "tool_calls": 3
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p0-syn-060",
@@ -10073,18 +10152,17 @@
       ],
       "arm_rewards": {
         "tool": {
-          "generic_web_search": 1.2329999999999999,
-          "official_domain_search": 0.4329999999999999,
-          "news_search": 1.2329999999999999,
-          "brave_search": 0.4329999999999999,
-          "page_fetch": 0.4349999999999999
+          "official_domain_search": 0.13099999999999962,
+          "generic_web_search": 0.9309999999999996,
+          "news_search": 0.9309999999999996,
+          "brave_search": 0.13099999999999962
         },
         "query": {
-          "freshness_terms": 0.7569999999999999
+          "freshness_terms": 0.4549999999999996
         },
         "stop": {
-          "search_more": 0.5369999999999999,
-          "stop_now": 0.7369999999999999
+          "search_more": 0.2849999999999996,
+          "stop_now": 0.4349999999999996
         },
         "verify": {}
       },
@@ -10355,18 +10433,17 @@
       ],
       "arm_rewards": {
         "tool": {
-          "news_search": 1.2329999999999999,
-          "generic_web_search": 1.2329999999999999,
-          "official_domain_search": 0.4329999999999999,
-          "brave_search": 0.4329999999999999,
-          "page_fetch": 0.4349999999999999
+          "generic_web_search": 1.2309999999999997,
+          "official_domain_search": 0.43099999999999966,
+          "news_search": 1.2309999999999997,
+          "brave_search": 0.43099999999999966
         },
         "query": {
-          "freshness_terms": 0.7569999999999999
+          "freshness_terms": 0.7549999999999997
         },
         "stop": {
-          "search_more": 0.5369999999999999,
-          "stop_now": 0.7369999999999999
+          "search_more": 0.5349999999999997,
+          "stop_now": 0.7349999999999997
         },
         "verify": {}
       },
@@ -10637,22 +10714,21 @@
       ],
       "arm_rewards": {
         "tool": {
-          "generic_web_search": 0.6879999999999997,
-          "news_search": 1.1879999999999997,
-          "official_domain_search": 0.6879999999999997,
-          "brave_search": 0.6879999999999997,
-          "page_fetch": 0.38999999999999974
+          "generic_web_search": -0.11399999999999993,
+          "official_domain_search": -0.11399999999999993,
+          "news_search": 0.38600000000000007,
+          "brave_search": -0.11399999999999993
         },
         "query": {
-          "freshness_terms": 0.7319999999999998
+          "freshness_terms": -0.00999999999999993
         },
         "stop": {
-          "search_more": 0.5419999999999997,
-          "stop_now": 0.6919999999999997
+          "search_more": -0.10999999999999993,
+          "stop_now": -0.10999999999999993
         },
         "verify": {}
       },
-      "correct": true,
+      "correct": false,
       "tool_calls": 5
     },
     {
@@ -10919,18 +10995,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "news_search": 2.692
+          "generic_web_search": -0.314,
+          "news_search": 0.186,
+          "official_domain_search": -0.314,
+          "brave_search": -0.314
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": -0.21
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": -0.31,
+          "stop_now": -0.31
         },
         "verify": {}
       },
-      "correct": true,
-      "tool_calls": 1
+      "correct": false,
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p1-syn-006",
@@ -11196,18 +11276,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "news_search": 2.692
+          "news_search": -0.9040000000000001,
+          "generic_web_search": -0.6040000000000001,
+          "official_domain_search": -0.6040000000000001,
+          "brave_search": -0.6040000000000001
         },
         "query": {
-          "freshness_terms": 2.696
+          "source_constrained": -0.6600000000000001
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": -0.6000000000000001,
+          "stop_now": -0.6000000000000001
         },
         "verify": {}
       },
-      "correct": true,
-      "tool_calls": 1
+      "correct": false,
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p1-syn-007",
@@ -11473,18 +11557,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "news_search": 2.692
+          "official_domain_search": -0.314,
+          "news_search": 0.186,
+          "generic_web_search": -0.314,
+          "brave_search": -0.314
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": -0.21
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": -0.31,
+          "stop_now": -0.31
         },
         "verify": {}
       },
-      "correct": true,
-      "tool_calls": 1
+      "correct": false,
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p1-syn-009",
@@ -11750,18 +11838,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "news_search": 2.692
+          "official_domain_search": -0.11399999999999993,
+          "generic_web_search": -0.11399999999999993,
+          "news_search": 0.38600000000000007,
+          "brave_search": -0.11399999999999993
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": -0.00999999999999993
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": -0.10999999999999993,
+          "stop_now": -0.10999999999999993
         },
         "verify": {}
       },
-      "correct": true,
-      "tool_calls": 1
+      "correct": false,
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p1-syn-010",
@@ -12027,18 +12119,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "news_search": 2.692
+          "official_domain_search": -0.11399999999999993,
+          "generic_web_search": -0.11399999999999993,
+          "news_search": 0.38600000000000007,
+          "brave_search": -0.11399999999999993
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": -0.00999999999999993
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": -0.10999999999999993,
+          "stop_now": -0.10999999999999993
         },
         "verify": {}
       },
-      "correct": true,
-      "tool_calls": 1
+      "correct": false,
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p1-syn-012",
@@ -12304,18 +12400,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "news_search": 2.692
+          "news_search": 0.486,
+          "official_domain_search": -0.014000000000000009,
+          "generic_web_search": -0.014000000000000009,
+          "brave_search": -0.014000000000000009
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.09
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": -0.010000000000000009,
+          "stop_now": -0.010000000000000009
         },
         "verify": {}
       },
-      "correct": true,
-      "tool_calls": 1
+      "correct": false,
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p1-syn-013",
@@ -12581,18 +12681,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "news_search": 2.692
+          "news_search": 0.486,
+          "official_domain_search": -0.014000000000000009,
+          "generic_web_search": -0.014000000000000009,
+          "brave_search": -0.014000000000000009
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.09
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": -0.010000000000000009,
+          "stop_now": -0.010000000000000009
         },
         "verify": {}
       },
-      "correct": true,
-      "tool_calls": 1
+      "correct": false,
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p1-syn-015",
@@ -12858,18 +12962,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "news_search": 2.692
+          "news_search": 0.486,
+          "official_domain_search": -0.014000000000000009,
+          "generic_web_search": -0.014000000000000009,
+          "brave_search": -0.014000000000000009
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.09
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": -0.010000000000000009,
+          "stop_now": -0.010000000000000009
         },
         "verify": {}
       },
-      "correct": true,
-      "tool_calls": 1
+      "correct": false,
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p1-syn-017",
@@ -13135,18 +13243,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "official_domain_search": 2.692
+          "official_domain_search": 1.4859999999999998,
+          "news_search": 0.9859999999999998,
+          "brave_search": 0.9859999999999998,
+          "generic_web_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9699999999999998
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p1-syn-018",
@@ -13412,18 +13524,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "official_domain_search": 2.692
+          "official_domain_search": 1.4859999999999998,
+          "news_search": 0.9859999999999998,
+          "brave_search": 0.9859999999999998,
+          "generic_web_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9699999999999998
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p1-syn-020",
@@ -13689,18 +13805,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "official_domain_search": 2.692
+          "official_domain_search": 1.4859999999999998,
+          "news_search": 0.9859999999999998,
+          "brave_search": 0.9859999999999998,
+          "generic_web_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9699999999999998
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p1-syn-024",
@@ -13966,18 +14086,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "official_domain_search": 2.692
+          "official_domain_search": 1.4859999999999998,
+          "news_search": 0.9859999999999998,
+          "brave_search": 0.9859999999999998,
+          "generic_web_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9699999999999998
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p1-syn-025",
@@ -14243,18 +14367,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "official_domain_search": 2.692
+          "official_domain_search": 1.4859999999999998,
+          "news_search": 0.9859999999999998,
+          "brave_search": 0.9859999999999998,
+          "generic_web_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9699999999999998
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p1-syn-027",
@@ -14520,18 +14648,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "official_domain_search": 2.692
+          "official_domain_search": 1.4859999999999998,
+          "news_search": 0.9859999999999998,
+          "brave_search": 0.9859999999999998,
+          "generic_web_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9699999999999998
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p1-syn-028",
@@ -14797,18 +14929,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "official_domain_search": 2.692
+          "official_domain_search": 1.4859999999999998,
+          "news_search": 0.9859999999999998,
+          "brave_search": 0.9859999999999998,
+          "generic_web_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9699999999999998
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p1-syn-029",
@@ -15074,18 +15210,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "official_domain_search": 2.692
+          "official_domain_search": 1.4859999999999998,
+          "news_search": 0.9859999999999998,
+          "brave_search": 0.9859999999999998,
+          "generic_web_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9699999999999998
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p1-syn-031",
@@ -15351,18 +15491,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "official_domain_search": 2.692
+          "official_domain_search": 1.4859999999999998,
+          "news_search": 0.9859999999999998,
+          "brave_search": 0.9859999999999998,
+          "generic_web_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9699999999999998
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p1-syn-032",
@@ -15628,18 +15772,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "official_domain_search": 2.692
+          "official_domain_search": 1.4859999999999998,
+          "news_search": 0.9859999999999998,
+          "brave_search": 0.9859999999999998,
+          "generic_web_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9699999999999998
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p1-syn-033",
@@ -15905,18 +16053,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "generic_web_search": 2.692
+          "generic_web_search": 0.486,
+          "official_domain_search": -0.014000000000000009,
+          "news_search": -0.014000000000000009,
+          "brave_search": -0.014000000000000009
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.09
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": -0.010000000000000009,
+          "stop_now": -0.010000000000000009
         },
         "verify": {}
       },
-      "correct": true,
-      "tool_calls": 1
+      "correct": false,
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p1-syn-036",
@@ -16182,18 +16334,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "generic_web_search": 2.692
+          "generic_web_search": 0.486,
+          "official_domain_search": -0.014000000000000009,
+          "news_search": -0.014000000000000009,
+          "brave_search": -0.014000000000000009
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.09
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": -0.010000000000000009,
+          "stop_now": -0.010000000000000009
         },
         "verify": {}
       },
-      "correct": true,
-      "tool_calls": 1
+      "correct": false,
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p1-syn-038",
@@ -16459,18 +16615,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "generic_web_search": 2.692
+          "generic_web_search": 0.486,
+          "official_domain_search": -0.014000000000000009,
+          "news_search": -0.014000000000000009,
+          "brave_search": -0.014000000000000009
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.09
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": -0.010000000000000009,
+          "stop_now": -0.010000000000000009
         },
         "verify": {}
       },
-      "correct": true,
-      "tool_calls": 1
+      "correct": false,
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p1-syn-041",
@@ -16736,18 +16896,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "generic_web_search": 2.692
+          "generic_web_search": 1.4859999999999998,
+          "official_domain_search": 0.9859999999999998,
+          "news_search": 0.6859999999999997,
+          "brave_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9099999999999997
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p1-syn-042",
@@ -17013,18 +17177,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "generic_web_search": 2.692
+          "generic_web_search": 1.4859999999999998,
+          "official_domain_search": 0.9859999999999998,
+          "news_search": 0.6859999999999997,
+          "brave_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9099999999999997
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p1-syn-043",
@@ -17290,18 +17458,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "generic_web_search": 2.692
+          "generic_web_search": 1.4859999999999998,
+          "official_domain_search": 0.9859999999999998,
+          "news_search": 0.6859999999999997,
+          "brave_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9099999999999997
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p1-syn-044",
@@ -17567,18 +17739,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "generic_web_search": 2.692
+          "generic_web_search": 1.4859999999999998,
+          "official_domain_search": 0.9859999999999998,
+          "news_search": 0.6859999999999997,
+          "brave_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9099999999999997
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p1-syn-045",
@@ -17844,18 +18020,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "generic_web_search": 2.692
+          "generic_web_search": 1.4859999999999998,
+          "official_domain_search": 0.9859999999999998,
+          "news_search": 0.6859999999999997,
+          "brave_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9099999999999997
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p1-syn-046",
@@ -18121,18 +18301,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "generic_web_search": 2.692
+          "generic_web_search": 1.4859999999999998,
+          "official_domain_search": 0.9859999999999998,
+          "news_search": 0.6859999999999997,
+          "brave_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9099999999999997
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p1-syn-048",
@@ -18398,18 +18582,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "generic_web_search": 2.692
+          "generic_web_search": 1.4859999999999998,
+          "official_domain_search": 0.9859999999999998,
+          "news_search": 0.6859999999999997,
+          "brave_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9099999999999997
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p1-syn-049",
@@ -18675,21 +18863,25 @@
       ],
       "arm_rewards": {
         "tool": {
-          "generic_web_search": 0.139,
-          "news_search": 0.139,
-          "official_domain_search": 0.439
+          "official_domain_search": 0.8919999999999998,
+          "generic_web_search": 0.5919999999999999,
+          "page_fetch": 1.394
         },
         "query": {
-          "freshness_terms": 0.24300000000000002
+          "freshness_terms": 0.7459999999999998,
+          "fetch": 1.396
         },
         "stop": {
-          "search_more": 0.443,
-          "stop_now": 0.14300000000000002
+          "search_more": 0.8959999999999998,
+          "fetch_page": 0.7626666666666664,
+          "stop_now": 0.8959999999999998
         },
-        "verify": {}
+        "verify": {
+          "fetch_page": 0.7626666666666664
+        }
       },
-      "correct": false,
-      "tool_calls": 3
+      "correct": true,
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p1-syn-053",
@@ -18955,21 +19147,25 @@
       ],
       "arm_rewards": {
         "tool": {
-          "generic_web_search": 0.139,
-          "news_search": 0.139,
-          "official_domain_search": 0.439
+          "official_domain_search": 0.8919999999999998,
+          "generic_web_search": 0.5919999999999999,
+          "page_fetch": 1.394
         },
         "query": {
-          "freshness_terms": 0.24300000000000002
+          "freshness_terms": 0.7459999999999998,
+          "fetch": 1.396
         },
         "stop": {
-          "search_more": 0.443,
-          "stop_now": 0.14300000000000002
+          "search_more": 0.8959999999999998,
+          "fetch_page": 0.7626666666666664,
+          "stop_now": 0.8959999999999998
         },
-        "verify": {}
+        "verify": {
+          "fetch_page": 0.7626666666666664
+        }
       },
-      "correct": false,
-      "tool_calls": 3
+      "correct": true,
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p1-syn-055",
@@ -19235,21 +19431,26 @@
       ],
       "arm_rewards": {
         "tool": {
-          "generic_web_search": 0.139,
-          "news_search": 0.139,
-          "official_domain_search": 0.439
+          "official_domain_search": 1.0899999999999999,
+          "news_search": 0.7899999999999998,
+          "generic_web_search": 0.7899999999999998,
+          "page_fetch": 1.5919999999999999
         },
         "query": {
-          "freshness_terms": 0.24300000000000002
+          "freshness_terms": 0.8939999999999998,
+          "fetch": 1.5939999999999999
         },
         "stop": {
-          "search_more": 0.443,
-          "stop_now": 0.14300000000000002
+          "search_more": 1.0939999999999999,
+          "fetch_page": 0.9939999999999999,
+          "stop_now": 1.0939999999999999
         },
-        "verify": {}
+        "verify": {
+          "fetch_page": 0.9939999999999999
+        }
       },
-      "correct": false,
-      "tool_calls": 3
+      "correct": true,
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p1-syn-057",
@@ -19515,22 +19716,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "news_search": 0.135,
-          "generic_web_search": 0.135,
-          "official_domain_search": 0.135,
-          "brave_search": 0.435
+          "official_domain_search": 0.131,
+          "generic_web_search": 0.131,
+          "news_search": 0.131,
+          "brave_search": 0.431
         },
         "query": {
-          "freshness_terms": 0.21400000000000002
+          "freshness_terms": 0.255
         },
         "stop": {
-          "search_more": 0.439,
-          "stop_now": 0.139
+          "search_more": 0.435,
+          "stop_now": 0.435
         },
         "verify": {}
       },
       "correct": false,
-      "tool_calls": 4
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p1-syn-060",
@@ -19796,18 +19997,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "generic_web_search": 2.0469999999999997
+          "generic_web_search": 1.2309999999999997,
+          "news_search": 1.2309999999999997,
+          "official_domain_search": 0.43099999999999966,
+          "brave_search": 0.43099999999999966
         },
         "query": {
-          "freshness_terms": 2.0509999999999997
+          "freshness_terms": 0.7549999999999997
         },
         "stop": {
-          "stop_now": 1.8509999999999998
+          "search_more": 0.5349999999999997,
+          "stop_now": 0.7349999999999997
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p1-syn-061",
@@ -20073,18 +20278,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "generic_web_search": 2.0469999999999997
+          "generic_web_search": 1.2309999999999997,
+          "news_search": 1.2309999999999997,
+          "official_domain_search": 0.43099999999999966,
+          "brave_search": 0.43099999999999966
         },
         "query": {
-          "freshness_terms": 2.0509999999999997
+          "freshness_terms": 0.7549999999999997
         },
         "stop": {
-          "stop_now": 1.8509999999999998
+          "search_more": 0.5349999999999997,
+          "stop_now": 0.7349999999999997
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p2-syn-003",
@@ -20350,18 +20559,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "news_search": 2.692
+          "news_search": 0.486,
+          "official_domain_search": -0.014000000000000009,
+          "generic_web_search": -0.014000000000000009,
+          "brave_search": -0.014000000000000009
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.09
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": -0.010000000000000009,
+          "stop_now": -0.010000000000000009
         },
         "verify": {}
       },
-      "correct": true,
-      "tool_calls": 1
+      "correct": false,
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p2-syn-004",
@@ -20627,18 +20840,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "news_search": 2.692
+          "news_search": 0.486,
+          "official_domain_search": -0.014000000000000009,
+          "generic_web_search": -0.014000000000000009,
+          "brave_search": -0.014000000000000009
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.09
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": -0.010000000000000009,
+          "stop_now": -0.010000000000000009
         },
         "verify": {}
       },
-      "correct": true,
-      "tool_calls": 1
+      "correct": false,
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p2-syn-006",
@@ -20904,18 +21121,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "news_search": 2.692
+          "news_search": 0.486,
+          "official_domain_search": -0.014000000000000009,
+          "generic_web_search": -0.014000000000000009,
+          "brave_search": -0.014000000000000009
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.09
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": -0.010000000000000009,
+          "stop_now": -0.010000000000000009
         },
         "verify": {}
       },
-      "correct": true,
-      "tool_calls": 1
+      "correct": false,
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p2-syn-007",
@@ -21181,18 +21402,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "news_search": 2.692
+          "news_search": 0.486,
+          "official_domain_search": -0.014000000000000009,
+          "generic_web_search": -0.014000000000000009,
+          "brave_search": -0.014000000000000009
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.09
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": -0.010000000000000009,
+          "stop_now": -0.010000000000000009
         },
         "verify": {}
       },
-      "correct": true,
-      "tool_calls": 1
+      "correct": false,
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p2-syn-009",
@@ -21458,18 +21683,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "news_search": 2.692
+          "news_search": 0.486,
+          "official_domain_search": -0.014000000000000009,
+          "generic_web_search": -0.014000000000000009,
+          "brave_search": -0.014000000000000009
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.09
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": -0.010000000000000009,
+          "stop_now": -0.010000000000000009
         },
         "verify": {}
       },
-      "correct": true,
-      "tool_calls": 1
+      "correct": false,
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p2-syn-010",
@@ -21735,18 +21964,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "news_search": 2.692
+          "news_search": 0.486,
+          "official_domain_search": -0.014000000000000009,
+          "generic_web_search": -0.014000000000000009,
+          "brave_search": -0.014000000000000009
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.09
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": -0.010000000000000009,
+          "stop_now": -0.010000000000000009
         },
         "verify": {}
       },
-      "correct": true,
-      "tool_calls": 1
+      "correct": false,
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p2-syn-012",
@@ -22012,18 +22245,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "news_search": 2.692
+          "news_search": 0.486,
+          "official_domain_search": -0.014000000000000009,
+          "generic_web_search": -0.014000000000000009,
+          "brave_search": -0.014000000000000009
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.09
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": -0.010000000000000009,
+          "stop_now": -0.010000000000000009
         },
         "verify": {}
       },
-      "correct": true,
-      "tool_calls": 1
+      "correct": false,
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p2-syn-013",
@@ -22289,18 +22526,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "news_search": 2.692
+          "news_search": 0.486,
+          "official_domain_search": -0.014000000000000009,
+          "generic_web_search": -0.014000000000000009,
+          "brave_search": -0.014000000000000009
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.09
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": -0.010000000000000009,
+          "stop_now": -0.010000000000000009
         },
         "verify": {}
       },
-      "correct": true,
-      "tool_calls": 1
+      "correct": false,
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p2-syn-015",
@@ -22566,18 +22807,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "news_search": 2.692
+          "news_search": 0.486,
+          "official_domain_search": -0.014000000000000009,
+          "generic_web_search": -0.014000000000000009,
+          "brave_search": -0.014000000000000009
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.09
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": -0.010000000000000009,
+          "stop_now": -0.010000000000000009
         },
         "verify": {}
       },
-      "correct": true,
-      "tool_calls": 1
+      "correct": false,
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p2-syn-017",
@@ -22843,18 +23088,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "official_domain_search": 2.692
+          "official_domain_search": 1.4859999999999998,
+          "news_search": 0.9859999999999998,
+          "brave_search": 0.9859999999999998,
+          "generic_web_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9699999999999998
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p2-syn-018",
@@ -23120,18 +23369,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "official_domain_search": 2.692
+          "official_domain_search": 1.4859999999999998,
+          "news_search": 0.9859999999999998,
+          "brave_search": 0.9859999999999998,
+          "generic_web_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9699999999999998
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p2-syn-020",
@@ -23397,18 +23650,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "official_domain_search": 2.692
+          "official_domain_search": 1.4859999999999998,
+          "news_search": 0.9859999999999998,
+          "brave_search": 0.9859999999999998,
+          "generic_web_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9699999999999998
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p2-syn-024",
@@ -23674,18 +23931,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "official_domain_search": 2.692
+          "official_domain_search": 1.4859999999999998,
+          "news_search": 0.9859999999999998,
+          "brave_search": 0.9859999999999998,
+          "generic_web_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9699999999999998
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p2-syn-025",
@@ -23951,18 +24212,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "official_domain_search": 2.692
+          "official_domain_search": 1.4859999999999998,
+          "news_search": 0.9859999999999998,
+          "brave_search": 0.9859999999999998,
+          "generic_web_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9699999999999998
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p2-syn-027",
@@ -24228,18 +24493,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "official_domain_search": 2.692
+          "official_domain_search": 1.4859999999999998,
+          "news_search": 0.9859999999999998,
+          "brave_search": 0.9859999999999998,
+          "generic_web_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9699999999999998
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p2-syn-028",
@@ -24505,18 +24774,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "official_domain_search": 2.692
+          "official_domain_search": 1.4859999999999998,
+          "news_search": 0.9859999999999998,
+          "brave_search": 0.9859999999999998,
+          "generic_web_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9699999999999998
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p2-syn-029",
@@ -24782,18 +25055,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "official_domain_search": 2.692
+          "official_domain_search": 1.4859999999999998,
+          "news_search": 0.9859999999999998,
+          "brave_search": 0.9859999999999998,
+          "generic_web_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9699999999999998
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p2-syn-031",
@@ -25059,18 +25336,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "official_domain_search": 2.692
+          "official_domain_search": 1.4859999999999998,
+          "news_search": 0.9859999999999998,
+          "brave_search": 0.9859999999999998,
+          "generic_web_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9699999999999998
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p2-syn-032",
@@ -25336,18 +25617,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "official_domain_search": 2.692
+          "official_domain_search": 1.4859999999999998,
+          "news_search": 0.9859999999999998,
+          "brave_search": 0.9859999999999998,
+          "generic_web_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9699999999999998
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p2-syn-033",
@@ -25613,18 +25898,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "generic_web_search": 2.692
+          "generic_web_search": 0.486,
+          "official_domain_search": -0.014000000000000009,
+          "news_search": -0.014000000000000009,
+          "brave_search": -0.014000000000000009
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.09
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": -0.010000000000000009,
+          "stop_now": -0.010000000000000009
         },
         "verify": {}
       },
-      "correct": true,
-      "tool_calls": 1
+      "correct": false,
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p2-syn-036",
@@ -25890,18 +26179,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "generic_web_search": 2.692
+          "generic_web_search": 0.486,
+          "official_domain_search": -0.014000000000000009,
+          "news_search": -0.014000000000000009,
+          "brave_search": -0.014000000000000009
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.09
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": -0.010000000000000009,
+          "stop_now": -0.010000000000000009
         },
         "verify": {}
       },
-      "correct": true,
-      "tool_calls": 1
+      "correct": false,
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p2-syn-038",
@@ -26167,18 +26460,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "generic_web_search": 2.692
+          "generic_web_search": 0.486,
+          "official_domain_search": -0.014000000000000009,
+          "news_search": -0.014000000000000009,
+          "brave_search": -0.014000000000000009
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.09
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": -0.010000000000000009,
+          "stop_now": -0.010000000000000009
         },
         "verify": {}
       },
-      "correct": true,
-      "tool_calls": 1
+      "correct": false,
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p2-syn-041",
@@ -26444,18 +26741,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "generic_web_search": 2.692
+          "generic_web_search": 1.4859999999999998,
+          "official_domain_search": 0.9859999999999998,
+          "news_search": 0.6859999999999997,
+          "brave_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9099999999999997
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p2-syn-042",
@@ -26721,18 +27022,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "generic_web_search": 2.692
+          "generic_web_search": 1.4859999999999998,
+          "official_domain_search": 0.9859999999999998,
+          "news_search": 0.6859999999999997,
+          "brave_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9099999999999997
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p2-syn-043",
@@ -26998,18 +27303,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "generic_web_search": 2.692
+          "generic_web_search": 1.4859999999999998,
+          "official_domain_search": 0.9859999999999998,
+          "news_search": 0.6859999999999997,
+          "brave_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9099999999999997
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p2-syn-044",
@@ -27275,18 +27584,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "generic_web_search": 2.692
+          "generic_web_search": 1.4859999999999998,
+          "official_domain_search": 0.9859999999999998,
+          "news_search": 0.6859999999999997,
+          "brave_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9099999999999997
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p2-syn-045",
@@ -27552,18 +27865,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "generic_web_search": 2.692
+          "generic_web_search": 1.4859999999999998,
+          "official_domain_search": 0.9859999999999998,
+          "news_search": 0.6859999999999997,
+          "brave_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9099999999999997
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p2-syn-046",
@@ -27829,18 +28146,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "generic_web_search": 2.692
+          "generic_web_search": 1.4859999999999998,
+          "official_domain_search": 0.9859999999999998,
+          "news_search": 0.6859999999999997,
+          "brave_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9099999999999997
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p2-syn-048",
@@ -28106,18 +28427,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "generic_web_search": 2.692
+          "generic_web_search": 1.4859999999999998,
+          "official_domain_search": 0.9859999999999998,
+          "news_search": 0.6859999999999997,
+          "brave_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9099999999999997
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p2-syn-049",
@@ -28383,20 +28708,26 @@
       ],
       "arm_rewards": {
         "tool": {
-          "generic_web_search": 0.14300000000000002,
-          "official_domain_search": 0.443
+          "official_domain_search": 1.0899999999999999,
+          "news_search": 0.7899999999999998,
+          "generic_web_search": 0.7899999999999998,
+          "page_fetch": 1.5919999999999999
         },
         "query": {
-          "freshness_terms": 0.29700000000000004
+          "freshness_terms": 0.8939999999999998,
+          "fetch": 1.5939999999999999
         },
         "stop": {
-          "search_more": 0.447,
-          "stop_now": 0.14700000000000002
+          "search_more": 1.0939999999999999,
+          "fetch_page": 0.9939999999999999,
+          "stop_now": 1.0939999999999999
         },
-        "verify": {}
+        "verify": {
+          "fetch_page": 0.9939999999999999
+        }
       },
-      "correct": false,
-      "tool_calls": 2
+      "correct": true,
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p2-syn-053",
@@ -28662,21 +28993,26 @@
       ],
       "arm_rewards": {
         "tool": {
-          "news_search": 0.139,
-          "generic_web_search": 0.139,
-          "official_domain_search": 0.439
+          "official_domain_search": 1.0899999999999999,
+          "news_search": 0.7899999999999998,
+          "generic_web_search": 0.7899999999999998,
+          "page_fetch": 1.5919999999999999
         },
         "query": {
-          "freshness_terms": 0.24300000000000002
+          "freshness_terms": 0.8939999999999998,
+          "fetch": 1.5939999999999999
         },
         "stop": {
-          "search_more": 0.443,
-          "stop_now": 0.14300000000000002
+          "search_more": 1.0939999999999999,
+          "fetch_page": 0.9939999999999999,
+          "stop_now": 1.0939999999999999
         },
-        "verify": {}
+        "verify": {
+          "fetch_page": 0.9939999999999999
+        }
       },
-      "correct": false,
-      "tool_calls": 3
+      "correct": true,
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p2-syn-055",
@@ -28942,18 +29278,26 @@
       ],
       "arm_rewards": {
         "tool": {
-          "official_domain_search": 0.447
+          "official_domain_search": 1.0899999999999999,
+          "news_search": 0.7899999999999998,
+          "generic_web_search": 0.7899999999999998,
+          "page_fetch": 1.5919999999999999
         },
         "query": {
-          "freshness_terms": 0.451
+          "freshness_terms": 0.8939999999999998,
+          "fetch": 1.5939999999999999
         },
         "stop": {
-          "stop_now": 0.15100000000000002
+          "search_more": 1.0939999999999999,
+          "fetch_page": 0.9939999999999999,
+          "stop_now": 1.0939999999999999
         },
-        "verify": {}
+        "verify": {
+          "fetch_page": 0.9939999999999999
+        }
       },
-      "correct": false,
-      "tool_calls": 1
+      "correct": true,
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p2-syn-057",
@@ -29219,22 +29563,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "news_search": 0.135,
-          "generic_web_search": 0.135,
-          "official_domain_search": 0.135,
-          "brave_search": 0.435
+          "official_domain_search": 0.131,
+          "generic_web_search": 0.131,
+          "news_search": 0.131,
+          "brave_search": 0.431
         },
         "query": {
-          "freshness_terms": 0.21400000000000002
+          "freshness_terms": 0.255
         },
         "stop": {
-          "search_more": 0.439,
-          "stop_now": 0.139
+          "search_more": 0.435,
+          "stop_now": 0.435
         },
         "verify": {}
       },
       "correct": false,
-      "tool_calls": 4
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p2-syn-060",
@@ -29500,18 +29844,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "generic_web_search": 2.0469999999999997
+          "generic_web_search": 1.2309999999999997,
+          "news_search": 1.2309999999999997,
+          "official_domain_search": 0.43099999999999966,
+          "brave_search": 0.43099999999999966
         },
         "query": {
-          "freshness_terms": 2.0509999999999997
+          "freshness_terms": 0.7549999999999997
         },
         "stop": {
-          "stop_now": 1.8509999999999998
+          "search_more": 0.5349999999999997,
+          "stop_now": 0.7349999999999997
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p2-syn-061",
@@ -29777,18 +30125,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "generic_web_search": 2.0469999999999997
+          "generic_web_search": 1.2309999999999997,
+          "news_search": 1.2309999999999997,
+          "official_domain_search": 0.43099999999999966,
+          "brave_search": 0.43099999999999966
         },
         "query": {
-          "freshness_terms": 2.0509999999999997
+          "freshness_terms": 0.7549999999999997
         },
         "stop": {
-          "stop_now": 1.8509999999999998
+          "search_more": 0.5349999999999997,
+          "stop_now": 0.7349999999999997
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p3-syn-003",
@@ -30054,18 +30406,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "news_search": 2.692
+          "news_search": 0.486,
+          "official_domain_search": -0.014000000000000009,
+          "generic_web_search": -0.014000000000000009,
+          "brave_search": -0.014000000000000009
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.09
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": -0.010000000000000009,
+          "stop_now": -0.010000000000000009
         },
         "verify": {}
       },
-      "correct": true,
-      "tool_calls": 1
+      "correct": false,
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p3-syn-004",
@@ -30331,18 +30687,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "news_search": 2.692
+          "news_search": 0.486,
+          "official_domain_search": -0.014000000000000009,
+          "generic_web_search": -0.014000000000000009,
+          "brave_search": -0.014000000000000009
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.09
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": -0.010000000000000009,
+          "stop_now": -0.010000000000000009
         },
         "verify": {}
       },
-      "correct": true,
-      "tool_calls": 1
+      "correct": false,
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p3-syn-006",
@@ -30608,18 +30968,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "news_search": 2.692
+          "news_search": 0.486,
+          "official_domain_search": -0.014000000000000009,
+          "generic_web_search": -0.014000000000000009,
+          "brave_search": -0.014000000000000009
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.09
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": -0.010000000000000009,
+          "stop_now": -0.010000000000000009
         },
         "verify": {}
       },
-      "correct": true,
-      "tool_calls": 1
+      "correct": false,
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p3-syn-007",
@@ -30885,18 +31249,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "news_search": 2.692
+          "news_search": 0.486,
+          "official_domain_search": -0.014000000000000009,
+          "generic_web_search": -0.014000000000000009,
+          "brave_search": -0.014000000000000009
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.09
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": -0.010000000000000009,
+          "stop_now": -0.010000000000000009
         },
         "verify": {}
       },
-      "correct": true,
-      "tool_calls": 1
+      "correct": false,
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p3-syn-009",
@@ -31162,18 +31530,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "news_search": 2.692
+          "news_search": 0.486,
+          "official_domain_search": -0.014000000000000009,
+          "generic_web_search": -0.014000000000000009,
+          "brave_search": -0.014000000000000009
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.09
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": -0.010000000000000009,
+          "stop_now": -0.010000000000000009
         },
         "verify": {}
       },
-      "correct": true,
-      "tool_calls": 1
+      "correct": false,
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p3-syn-010",
@@ -31439,18 +31811,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "news_search": 2.692
+          "news_search": 0.486,
+          "official_domain_search": -0.014000000000000009,
+          "generic_web_search": -0.014000000000000009,
+          "brave_search": -0.014000000000000009
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.09
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": -0.010000000000000009,
+          "stop_now": -0.010000000000000009
         },
         "verify": {}
       },
-      "correct": true,
-      "tool_calls": 1
+      "correct": false,
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p3-syn-012",
@@ -31716,18 +32092,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "news_search": 2.692
+          "news_search": 0.486,
+          "official_domain_search": -0.014000000000000009,
+          "generic_web_search": -0.014000000000000009,
+          "brave_search": -0.014000000000000009
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.09
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": -0.010000000000000009,
+          "stop_now": -0.010000000000000009
         },
         "verify": {}
       },
-      "correct": true,
-      "tool_calls": 1
+      "correct": false,
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p3-syn-013",
@@ -31993,18 +32373,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "news_search": 2.692
+          "news_search": 0.486,
+          "official_domain_search": -0.014000000000000009,
+          "generic_web_search": -0.014000000000000009,
+          "brave_search": -0.014000000000000009
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.09
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": -0.010000000000000009,
+          "stop_now": -0.010000000000000009
         },
         "verify": {}
       },
-      "correct": true,
-      "tool_calls": 1
+      "correct": false,
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p3-syn-015",
@@ -32270,18 +32654,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "news_search": 2.692
+          "news_search": 0.486,
+          "official_domain_search": -0.014000000000000009,
+          "generic_web_search": -0.014000000000000009,
+          "brave_search": -0.014000000000000009
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.09
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": -0.010000000000000009,
+          "stop_now": -0.010000000000000009
         },
         "verify": {}
       },
-      "correct": true,
-      "tool_calls": 1
+      "correct": false,
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p3-syn-017",
@@ -32547,18 +32935,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "official_domain_search": 2.692
+          "official_domain_search": 1.4859999999999998,
+          "news_search": 0.9859999999999998,
+          "brave_search": 0.9859999999999998,
+          "generic_web_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9699999999999998
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p3-syn-018",
@@ -32824,18 +33216,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "official_domain_search": 2.692
+          "official_domain_search": 1.4859999999999998,
+          "news_search": 0.9859999999999998,
+          "brave_search": 0.9859999999999998,
+          "generic_web_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9699999999999998
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p3-syn-020",
@@ -33101,18 +33497,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "official_domain_search": 2.692
+          "official_domain_search": 1.4859999999999998,
+          "news_search": 0.9859999999999998,
+          "brave_search": 0.9859999999999998,
+          "generic_web_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9699999999999998
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p3-syn-024",
@@ -33378,18 +33778,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "official_domain_search": 2.692
+          "official_domain_search": 1.4859999999999998,
+          "news_search": 0.9859999999999998,
+          "brave_search": 0.9859999999999998,
+          "generic_web_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9699999999999998
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p3-syn-025",
@@ -33655,18 +34059,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "official_domain_search": 2.692
+          "official_domain_search": 1.4859999999999998,
+          "news_search": 0.9859999999999998,
+          "brave_search": 0.9859999999999998,
+          "generic_web_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9699999999999998
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p3-syn-027",
@@ -33932,18 +34340,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "official_domain_search": 2.692
+          "official_domain_search": 1.4859999999999998,
+          "news_search": 0.9859999999999998,
+          "brave_search": 0.9859999999999998,
+          "generic_web_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9699999999999998
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p3-syn-028",
@@ -34209,18 +34621,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "official_domain_search": 2.692
+          "official_domain_search": 1.4859999999999998,
+          "news_search": 0.9859999999999998,
+          "brave_search": 0.9859999999999998,
+          "generic_web_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9699999999999998
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p3-syn-029",
@@ -34486,18 +34902,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "official_domain_search": 2.692
+          "official_domain_search": 1.4859999999999998,
+          "news_search": 0.9859999999999998,
+          "brave_search": 0.9859999999999998,
+          "generic_web_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9699999999999998
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p3-syn-031",
@@ -34763,18 +35183,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "official_domain_search": 2.692
+          "official_domain_search": 1.4859999999999998,
+          "news_search": 0.9859999999999998,
+          "brave_search": 0.9859999999999998,
+          "generic_web_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9699999999999998
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p3-syn-032",
@@ -35040,18 +35464,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "official_domain_search": 2.692
+          "official_domain_search": 1.4859999999999998,
+          "news_search": 0.9859999999999998,
+          "brave_search": 0.9859999999999998,
+          "generic_web_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9699999999999998
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p3-syn-033",
@@ -35317,18 +35745,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "generic_web_search": 2.692
+          "generic_web_search": 0.486,
+          "official_domain_search": -0.014000000000000009,
+          "news_search": -0.014000000000000009,
+          "brave_search": -0.014000000000000009
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.09
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": -0.010000000000000009,
+          "stop_now": -0.010000000000000009
         },
         "verify": {}
       },
-      "correct": true,
-      "tool_calls": 1
+      "correct": false,
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p3-syn-036",
@@ -35594,18 +36026,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "generic_web_search": 2.692
+          "generic_web_search": 0.486,
+          "official_domain_search": -0.014000000000000009,
+          "news_search": -0.014000000000000009,
+          "brave_search": -0.014000000000000009
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.09
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": -0.010000000000000009,
+          "stop_now": -0.010000000000000009
         },
         "verify": {}
       },
-      "correct": true,
-      "tool_calls": 1
+      "correct": false,
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p3-syn-038",
@@ -35871,18 +36307,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "generic_web_search": 2.692
+          "generic_web_search": 0.486,
+          "official_domain_search": -0.014000000000000009,
+          "news_search": -0.014000000000000009,
+          "brave_search": -0.014000000000000009
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.09
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": -0.010000000000000009,
+          "stop_now": -0.010000000000000009
         },
         "verify": {}
       },
-      "correct": true,
-      "tool_calls": 1
+      "correct": false,
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p3-syn-041",
@@ -36148,18 +36588,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "generic_web_search": 2.692
+          "generic_web_search": 1.4859999999999998,
+          "official_domain_search": 0.9859999999999998,
+          "news_search": 0.6859999999999997,
+          "brave_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9099999999999997
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p3-syn-042",
@@ -36425,18 +36869,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "generic_web_search": 2.692
+          "generic_web_search": 1.4859999999999998,
+          "official_domain_search": 0.9859999999999998,
+          "news_search": 0.6859999999999997,
+          "brave_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9099999999999997
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p3-syn-043",
@@ -36702,18 +37150,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "generic_web_search": 2.692
+          "generic_web_search": 1.4859999999999998,
+          "official_domain_search": 0.9859999999999998,
+          "news_search": 0.6859999999999997,
+          "brave_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9099999999999997
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p3-syn-044",
@@ -36979,18 +37431,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "generic_web_search": 2.692
+          "generic_web_search": 1.4859999999999998,
+          "official_domain_search": 0.9859999999999998,
+          "news_search": 0.6859999999999997,
+          "brave_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9099999999999997
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p3-syn-045",
@@ -37256,18 +37712,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "generic_web_search": 2.692
+          "generic_web_search": 1.4859999999999998,
+          "official_domain_search": 0.9859999999999998,
+          "news_search": 0.6859999999999997,
+          "brave_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9099999999999997
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p3-syn-046",
@@ -37533,18 +37993,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "generic_web_search": 2.692
+          "generic_web_search": 1.4859999999999998,
+          "official_domain_search": 0.9859999999999998,
+          "news_search": 0.6859999999999997,
+          "brave_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9099999999999997
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p3-syn-048",
@@ -37810,18 +38274,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "generic_web_search": 2.692
+          "generic_web_search": 1.4859999999999998,
+          "official_domain_search": 0.9859999999999998,
+          "news_search": 0.6859999999999997,
+          "brave_search": 0.6859999999999997
         },
         "query": {
-          "freshness_terms": 2.696
+          "freshness_terms": 0.9099999999999997
         },
         "stop": {
-          "stop_now": 2.496
+          "search_more": 0.7899999999999998,
+          "stop_now": 0.9899999999999998
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p3-syn-049",
@@ -38087,21 +38555,26 @@
       ],
       "arm_rewards": {
         "tool": {
-          "generic_web_search": 0.139,
-          "news_search": 0.139,
-          "official_domain_search": 0.439
+          "official_domain_search": 1.0899999999999999,
+          "news_search": 0.7899999999999998,
+          "generic_web_search": 0.7899999999999998,
+          "page_fetch": 1.5919999999999999
         },
         "query": {
-          "freshness_terms": 0.24300000000000002
+          "freshness_terms": 0.8939999999999998,
+          "fetch": 1.5939999999999999
         },
         "stop": {
-          "search_more": 0.443,
-          "stop_now": 0.14300000000000002
+          "search_more": 1.0939999999999999,
+          "fetch_page": 0.9939999999999999,
+          "stop_now": 1.0939999999999999
         },
-        "verify": {}
+        "verify": {
+          "fetch_page": 0.9939999999999999
+        }
       },
-      "correct": false,
-      "tool_calls": 3
+      "correct": true,
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p3-syn-053",
@@ -38367,21 +38840,26 @@
       ],
       "arm_rewards": {
         "tool": {
-          "generic_web_search": 0.139,
-          "news_search": 0.139,
-          "official_domain_search": 0.439
+          "official_domain_search": 1.0899999999999999,
+          "news_search": 0.7899999999999998,
+          "generic_web_search": 0.7899999999999998,
+          "page_fetch": 1.5919999999999999
         },
         "query": {
-          "freshness_terms": 0.24300000000000002
+          "freshness_terms": 0.8939999999999998,
+          "fetch": 1.5939999999999999
         },
         "stop": {
-          "search_more": 0.443,
-          "stop_now": 0.14300000000000002
+          "search_more": 1.0939999999999999,
+          "fetch_page": 0.9939999999999999,
+          "stop_now": 1.0939999999999999
         },
-        "verify": {}
+        "verify": {
+          "fetch_page": 0.9939999999999999
+        }
       },
-      "correct": false,
-      "tool_calls": 3
+      "correct": true,
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p3-syn-055",
@@ -38647,21 +39125,26 @@
       ],
       "arm_rewards": {
         "tool": {
-          "generic_web_search": 0.139,
-          "news_search": 0.139,
-          "official_domain_search": 0.439
+          "official_domain_search": 1.0899999999999999,
+          "news_search": 0.7899999999999998,
+          "generic_web_search": 0.7899999999999998,
+          "page_fetch": 1.5919999999999999
         },
         "query": {
-          "freshness_terms": 0.24300000000000002
+          "freshness_terms": 0.8939999999999998,
+          "fetch": 1.5939999999999999
         },
         "stop": {
-          "search_more": 0.443,
-          "stop_now": 0.14300000000000002
+          "search_more": 1.0939999999999999,
+          "fetch_page": 0.9939999999999999,
+          "stop_now": 1.0939999999999999
         },
-        "verify": {}
+        "verify": {
+          "fetch_page": 0.9939999999999999
+        }
       },
-      "correct": false,
-      "tool_calls": 3
+      "correct": true,
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p3-syn-057",
@@ -38927,18 +39410,17 @@
       ],
       "arm_rewards": {
         "tool": {
-          "news_search": 0.133,
-          "generic_web_search": 0.133,
-          "official_domain_search": 0.133,
-          "page_fetch": 0.135,
-          "brave_search": 0.433
+          "official_domain_search": 0.131,
+          "generic_web_search": 0.131,
+          "news_search": 0.131,
+          "brave_search": 0.431
         },
         "query": {
-          "freshness_terms": 0.197
+          "freshness_terms": 0.255
         },
         "stop": {
-          "search_more": 0.437,
-          "stop_now": 0.437
+          "search_more": 0.435,
+          "stop_now": 0.435
         },
         "verify": {}
       },
@@ -39209,18 +39691,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "generic_web_search": 2.0469999999999997
+          "generic_web_search": 1.2309999999999997,
+          "news_search": 1.2309999999999997,
+          "official_domain_search": 0.43099999999999966,
+          "brave_search": 0.43099999999999966
         },
         "query": {
-          "freshness_terms": 2.0509999999999997
+          "freshness_terms": 0.7549999999999997
         },
         "stop": {
-          "stop_now": 1.8509999999999998
+          "search_more": 0.5349999999999997,
+          "stop_now": 0.7349999999999997
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     },
     {
       "attempt_id": "experience-b5-p3-syn-061",
@@ -39486,18 +39972,22 @@
       ],
       "arm_rewards": {
         "tool": {
-          "generic_web_search": 2.0469999999999997
+          "generic_web_search": 1.2309999999999997,
+          "news_search": 1.2309999999999997,
+          "official_domain_search": 0.43099999999999966,
+          "brave_search": 0.43099999999999966
         },
         "query": {
-          "freshness_terms": 2.0509999999999997
+          "freshness_terms": 0.7549999999999997
         },
         "stop": {
-          "stop_now": 1.8509999999999998
+          "search_more": 0.5349999999999997,
+          "stop_now": 0.7349999999999997
         },
         "verify": {}
       },
       "correct": true,
-      "tool_calls": 1
+      "tool_calls": 5
     }
   ],
   "fragments": {
@@ -39505,105 +39995,105 @@
       "cluster_key": "freshness_sensitive+answer_shape_constrained+query_fragile+staleness_prone",
       "fragment_id": "frag_freshness_sensitive+answer_shape_constrained+query_fragile+staleness_prone",
       "tool_rewards": {
-        "page_fetch": {
-          "mean": 0.07399999999999982,
-          "n": 5.0
-        },
         "brave_search": {
-          "mean": 0.37199999999999983,
-          "n": 5.0
+          "mean": -0.030875000000000038,
+          "n": 16.0
         },
         "generic_web_search": {
-          "mean": 0.37199999999999983,
-          "n": 5.0
+          "mean": -0.030875000000000038,
+          "n": 16.0
         },
         "news_search": {
-          "mean": 2.02325,
+          "mean": 0.3191249999999999,
           "n": 16.0
         },
         "official_domain_search": {
-          "mean": 0.37199999999999983,
-          "n": 5.0
+          "mean": -0.030875000000000038,
+          "n": 16.0
         }
       },
       "query_rewards": {
         "direct_question": {
-          "mean": -0.7180000000000001,
+          "mean": -0.6600000000000001,
           "n": 1.0
         },
         "exact_answer_shape": {
-          "mean": -0.7180000000000001,
+          "mean": -0.7200000000000001,
           "n": 1.0
         },
         "freshness_terms": {
-          "mean": 2.346571428571429,
-          "n": 14.0
+          "mean": 0.22076923076923066,
+          "n": 13.0
+        },
+        "source_constrained": {
+          "mean": -0.6600000000000001,
+          "n": 1.0
         }
       },
       "verify_rewards": {
         "contradiction_check": {
-          "mean": -0.5980000000000001,
+          "mean": -0.6000000000000001,
           "n": 1.0
         },
         "corroborate": {
-          "mean": -0.5980000000000001,
+          "mean": -0.6000000000000001,
           "n": 1.0
         }
       },
       "stop_rewards": {
         "contradiction_check": {
-          "mean": -0.5980000000000001,
+          "mean": -0.6000000000000001,
           "n": 1.0
         },
         "stop_now": {
-          "mean": 1.8522499999999995,
+          "mean": -0.026875000000000034,
           "n": 16.0
         },
         "corroborate": {
-          "mean": -0.5980000000000001,
+          "mean": -0.6000000000000001,
           "n": 1.0
         },
         "search_more": {
-          "mean": 0.9586666666666664,
-          "n": 3.0
+          "mean": 0.04785714285714282,
+          "n": 14.0
         }
       },
       "top_tool_rewards": [
         {
           "arm": "news_search",
-          "mean": 2.0232,
+          "mean": 0.3191,
           "n": 16.0
         },
         {
           "arm": "brave_search",
-          "mean": 0.372,
-          "n": 5.0
+          "mean": -0.0309,
+          "n": 16.0
         },
         {
           "arm": "generic_web_search",
-          "mean": 0.372,
-          "n": 5.0
+          "mean": -0.0309,
+          "n": 16.0
         }
       ],
       "top_query_rewards": [
         {
           "arm": "freshness_terms",
-          "mean": 2.3466,
-          "n": 14.0
+          "mean": 0.2208,
+          "n": 13.0
         },
         {
           "arm": "direct_question",
-          "mean": -0.718,
+          "mean": -0.66,
           "n": 1.0
         },
         {
-          "arm": "exact_answer_shape",
-          "mean": -0.718,
+          "arm": "source_constrained",
+          "mean": -0.66,
           "n": 1.0
         }
       ],
       "support_count": 16,
-      "correct_count": 14,
+      "correct_count": 2,
       "best_tool": "news_search",
       "best_query_arm": "freshness_terms",
       "source_trace_ids": [
@@ -39650,69 +40140,87 @@
       "fragment_id": "frag_freshness_sensitive",
       "tool_rewards": {
         "news_search": {
-          "mean": 2.391,
+          "mean": 0.26749999999999996,
           "n": 20.0
         },
         "brave_search": {
-          "mean": 0.9879999999999999,
-          "n": 5.0
+          "mean": -0.11249999999999986,
+          "n": 20.0
         },
         "generic_web_search": {
-          "mean": 0.9879999999999999,
-          "n": 5.0
+          "mean": -0.11249999999999986,
+          "n": 20.0
         },
         "official_domain_search": {
-          "mean": 0.9879999999999999,
-          "n": 5.0
-        },
-        "page_fetch": {
-          "mean": 0.69,
-          "n": 5.0
+          "mean": -0.11249999999999986,
+          "n": 20.0
         }
       },
       "query_rewards": {
         "freshness_terms": {
-          "mean": 2.28,
-          "n": 20.0
+          "mean": 0.07823529411764707,
+          "n": 17.0
+        },
+        "keyword_compressed": {
+          "mean": -0.6600000000000001,
+          "n": 1.0
+        },
+        "quoted_entities": {
+          "mean": -0.6600000000000001,
+          "n": 1.0
+        },
+        "site_or_domain_constrained": {
+          "mean": -0.6600000000000001,
+          "n": 1.0
         }
       },
       "verify_rewards": {},
       "stop_rewards": {
         "search_more": {
-          "mean": 0.792,
-          "n": 5.0
+          "mean": -0.10849999999999986,
+          "n": 20.0
         },
         "stop_now": {
-          "mean": 2.12,
+          "mean": -0.10849999999999986,
           "n": 20.0
         }
       },
       "top_tool_rewards": [
         {
           "arm": "news_search",
-          "mean": 2.391,
+          "mean": 0.2675,
           "n": 20.0
         },
         {
           "arm": "brave_search",
-          "mean": 0.988,
-          "n": 5.0
+          "mean": -0.1125,
+          "n": 20.0
         },
         {
           "arm": "generic_web_search",
-          "mean": 0.988,
-          "n": 5.0
+          "mean": -0.1125,
+          "n": 20.0
         }
       ],
       "top_query_rewards": [
         {
           "arm": "freshness_terms",
-          "mean": 2.28,
-          "n": 20.0
+          "mean": 0.0782,
+          "n": 17.0
+        },
+        {
+          "arm": "keyword_compressed",
+          "mean": -0.66,
+          "n": 1.0
+        },
+        {
+          "arm": "quoted_entities",
+          "mean": -0.66,
+          "n": 1.0
         }
       ],
       "support_count": 20,
-      "correct_count": 20,
+      "correct_count": 0,
       "best_tool": "news_search",
       "best_query_arm": "freshness_terms",
       "source_trace_ids": [
@@ -39767,64 +40275,60 @@
       "fragment_id": "frag_source_authority_sensitive",
       "tool_rewards": {
         "news_search": {
-          "mean": 0.9594285714285713,
-          "n": 7.0
+          "mean": 0.9885641025641024,
+          "n": 39.0
         },
         "brave_search": {
-          "mean": 0.9594285714285713,
-          "n": 7.0
+          "mean": 0.9885641025641024,
+          "n": 39.0
         },
         "generic_web_search": {
-          "mean": 0.6594285714285713,
-          "n": 7.0
+          "mean": 0.6885641025641025,
+          "n": 39.0
         },
         "official_domain_search": {
-          "mean": 2.476300000000003,
+          "mean": 1.5186499999999987,
           "n": 40.0
-        },
-        "page_fetch": {
-          "mean": 0.6614285714285713,
-          "n": 7.0
         }
       },
       "query_rewards": {
         "freshness_terms": {
-          "mean": 2.389299999999999,
+          "mean": 1.019649999999999,
           "n": 40.0
         }
       },
       "verify_rewards": {},
       "stop_rewards": {
         "search_more": {
-          "mean": 0.7919999999999998,
-          "n": 7.0
+          "mean": 0.7964102564102558,
+          "n": 39.0
         },
         "stop_now": {
-          "mean": 2.2277999999999993,
+          "mean": 1.03015,
           "n": 40.0
         }
       },
       "top_tool_rewards": [
         {
           "arm": "official_domain_search",
-          "mean": 2.4763,
+          "mean": 1.5186,
           "n": 40.0
         },
         {
           "arm": "brave_search",
-          "mean": 0.9594,
-          "n": 7.0
+          "mean": 0.9886,
+          "n": 39.0
         },
         {
           "arm": "news_search",
-          "mean": 0.9594,
-          "n": 7.0
+          "mean": 0.9886,
+          "n": 39.0
         }
       ],
       "top_query_rewards": [
         {
           "arm": "freshness_terms",
-          "mean": 2.3893,
+          "mean": 1.0196,
           "n": 40.0
         }
       ],
@@ -39924,69 +40428,65 @@
       "fragment_id": "frag_answer_shape_constrained",
       "tool_rewards": {
         "official_domain_search": {
-          "mean": 0.692,
-          "n": 7.0
+          "mean": 0.7311538461538465,
+          "n": 39.0
         },
         "news_search": {
-          "mean": 0.6517499999999999,
-          "n": 4.0
+          "mean": 0.5254736842105263,
+          "n": 38.0
         },
         "brave_search": {
-          "mean": 0.6517499999999999,
-          "n": 4.0
+          "mean": 0.5254736842105263,
+          "n": 38.0
         },
         "generic_web_search": {
-          "mean": 2.5944444444444463,
-          "n": 36.0
-        },
-        "page_fetch": {
-          "mean": 0.7233333333333333,
-          "n": 3.0
+          "mean": 1.275897435897435,
+          "n": 39.0
         }
       },
       "query_rewards": {
         "freshness_terms": {
-          "mean": 2.335499999999999,
+          "mean": 0.762675,
           "n": 40.0
         }
       },
       "verify_rewards": {},
       "stop_rewards": {
-        "stop_now": {
-          "mean": 2.1509999999999994,
-          "n": 40.0
-        },
         "search_more": {
-          "mean": 0.704,
-          "n": 5.0
+          "mean": 0.6005263157894731,
+          "n": 38.0
+        },
+        "stop_now": {
+          "mean": 0.7716749999999992,
+          "n": 40.0
         }
       },
       "top_tool_rewards": [
         {
           "arm": "generic_web_search",
-          "mean": 2.5944,
-          "n": 36.0
-        },
-        {
-          "arm": "page_fetch",
-          "mean": 0.7233,
-          "n": 3.0
+          "mean": 1.2759,
+          "n": 39.0
         },
         {
           "arm": "official_domain_search",
-          "mean": 0.692,
-          "n": 7.0
+          "mean": 0.7312,
+          "n": 39.0
+        },
+        {
+          "arm": "brave_search",
+          "mean": 0.5255,
+          "n": 38.0
         }
       ],
       "top_query_rewards": [
         {
           "arm": "freshness_terms",
-          "mean": 2.3355,
+          "mean": 0.7627,
           "n": 40.0
         }
       ],
       "support_count": 40,
-      "correct_count": 36,
+      "correct_count": 30,
       "best_tool": "generic_web_search",
       "best_query_arm": "freshness_terms",
       "source_trace_ids": [
@@ -40081,63 +40581,85 @@
       "fragment_id": "frag_generic",
       "tool_rewards": {
         "official_domain_search": {
-          "mean": 0.44133333333333336,
+          "mean": 1.0074999999999998,
           "n": 12.0
         },
         "generic_web_search": {
-          "mean": 0.1398888888888889,
-          "n": 9.0
+          "mean": 0.7074999999999999,
+          "n": 12.0
+        },
+        "page_fetch": {
+          "mean": 1.5095,
+          "n": 12.0
         },
         "news_search": {
-          "mean": 0.1395,
-          "n": 8.0
+          "mean": 0.7899999999999999,
+          "n": 7.0
         }
       },
       "query_rewards": {
         "freshness_terms": {
-          "mean": 0.29116666666666663,
+          "mean": 0.8323333333333333,
+          "n": 12.0
+        },
+        "fetch": {
+          "mean": 1.5114999999999998,
           "n": 12.0
         }
       },
-      "verify_rewards": {},
+      "verify_rewards": {
+        "fetch_page": {
+          "mean": 0.8976111111111109,
+          "n": 12.0
+        }
+      },
       "stop_rewards": {
-        "stop_now": {
-          "mean": 0.14533333333333334,
+        "search_more": {
+          "mean": 1.0114999999999996,
           "n": 12.0
         },
-        "search_more": {
-          "mean": 0.44420000000000004,
-          "n": 10.0
+        "fetch_page": {
+          "mean": 0.8976111111111109,
+          "n": 12.0
+        },
+        "stop_now": {
+          "mean": 1.0114999999999996,
+          "n": 12.0
         }
       },
       "top_tool_rewards": [
         {
-          "arm": "official_domain_search",
-          "mean": 0.4413,
+          "arm": "page_fetch",
+          "mean": 1.5095,
           "n": 12.0
         },
         {
-          "arm": "generic_web_search",
-          "mean": 0.1399,
-          "n": 9.0
+          "arm": "official_domain_search",
+          "mean": 1.0075,
+          "n": 12.0
         },
         {
           "arm": "news_search",
-          "mean": 0.1395,
-          "n": 8.0
+          "mean": 0.79,
+          "n": 7.0
         }
       ],
       "top_query_rewards": [
         {
+          "arm": "fetch",
+          "mean": 1.5115,
+          "n": 12.0
+        },
+        {
           "arm": "freshness_terms",
-          "mean": 0.2912,
+          "mean": 0.8323,
           "n": 12.0
         }
       ],
       "support_count": 12,
-      "correct_count": 0,
-      "best_tool": "official_domain_search",
-      "best_query_arm": "freshness_terms",
+      "correct_count": 12,
+      "best_tool": "page_fetch",
+      "best_query_arm": "fetch",
       "source_trace_ids": [
         "1a4e2ecc1059120a",
         "aee9fca54def0b89",
@@ -40174,64 +40696,60 @@
       "fragment_id": "frag_evidence_sparse",
       "tool_rewards": {
         "official_domain_search": {
-          "mean": 0.1355,
+          "mean": 0.131,
           "n": 4.0
         },
         "generic_web_search": {
-          "mean": 0.1355,
-          "n": 4.0
-        },
-        "brave_search": {
-          "mean": 0.4355,
+          "mean": 0.131,
           "n": 4.0
         },
         "news_search": {
-          "mean": 0.13433333333333333,
-          "n": 3.0
+          "mean": 0.131,
+          "n": 4.0
         },
-        "page_fetch": {
-          "mean": 0.135,
-          "n": 1.0
+        "brave_search": {
+          "mean": 0.431,
+          "n": 4.0
         }
       },
       "query_rewards": {
         "freshness_terms": {
-          "mean": 0.21700000000000003,
+          "mean": 0.255,
           "n": 4.0
         }
       },
       "verify_rewards": {},
       "stop_rewards": {
         "search_more": {
-          "mean": 0.4395,
+          "mean": 0.435,
           "n": 4.0
         },
         "stop_now": {
-          "mean": 0.21450000000000002,
+          "mean": 0.435,
           "n": 4.0
         }
       },
       "top_tool_rewards": [
         {
           "arm": "brave_search",
-          "mean": 0.4355,
+          "mean": 0.431,
           "n": 4.0
         },
         {
           "arm": "generic_web_search",
-          "mean": 0.1355,
+          "mean": 0.131,
           "n": 4.0
         },
         {
-          "arm": "official_domain_search",
-          "mean": 0.1355,
+          "arm": "news_search",
+          "mean": 0.131,
           "n": 4.0
         }
       ],
       "top_query_rewards": [
         {
           "arm": "freshness_terms",
-          "mean": 0.217,
+          "mean": 0.255,
           "n": 4.0
         }
       ],
@@ -40258,71 +40776,67 @@
       "cluster_key": "freshness_sensitive+answer_shape_constrained",
       "fragment_id": "frag_freshness_sensitive+answer_shape_constrained",
       "tool_rewards": {
-        "generic_web_search": {
-          "mean": 1.8435000000000001,
+        "official_domain_search": {
+          "mean": 0.39349999999999963,
           "n": 8.0
         },
-        "official_domain_search": {
-          "mean": 0.4329999999999999,
-          "n": 2.0
+        "generic_web_search": {
+          "mean": 1.1934999999999998,
+          "n": 8.0
         },
         "news_search": {
-          "mean": 1.2329999999999999,
-          "n": 2.0
+          "mean": 1.1934999999999998,
+          "n": 8.0
         },
         "brave_search": {
-          "mean": 0.4329999999999999,
-          "n": 2.0
-        },
-        "page_fetch": {
-          "mean": 0.4349999999999999,
-          "n": 2.0
+          "mean": 0.39349999999999963,
+          "n": 8.0
         }
       },
       "query_rewards": {
         "freshness_terms": {
-          "mean": 1.7275,
+          "mean": 0.7174999999999998,
           "n": 8.0
         }
       },
       "verify_rewards": {},
       "stop_rewards": {
         "search_more": {
-          "mean": 0.5369999999999999,
-          "n": 2.0
+          "mean": 0.5037499999999997,
+          "n": 8.0
         },
         "stop_now": {
-          "mean": 1.5724999999999996,
+          "mean": 0.6974999999999996,
           "n": 8.0
         }
       },
       "top_tool_rewards": [
         {
           "arm": "generic_web_search",
-          "mean": 1.8435,
+          "mean": 1.1935,
           "n": 8.0
         },
         {
           "arm": "news_search",
-          "mean": 1.233,
-          "n": 2.0
+          "mean": 1.1935,
+          "n": 8.0
         },
         {
-          "arm": "page_fetch",
-          "mean": 0.435,
-          "n": 2.0
+          "arm": "brave_search",
+          "mean": 0.3935,
+          "n": 8.0
         }
       ],
       "top_query_rewards": [
         {
           "arm": "freshness_terms",
-          "mean": 1.7275,
+          "mean": 0.7175,
           "n": 8.0
         }
       ],
       "support_count": 8,
       "correct_count": 8,
-      "best_tool": "generic_web_search",
+      "best_tool": "news_search",
       "best_query_arm": "freshness_terms",
       "source_trace_ids": [
         "13d9c897c80f3d5b",

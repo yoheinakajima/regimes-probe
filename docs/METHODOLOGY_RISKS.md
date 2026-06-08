@@ -158,6 +158,15 @@ set — and the risk surface. Keep the experiment honest:
   policy-memory leakage. Only `memory_snapshot_leakage_pass` (frozen policy
   memory) gates eligibility; the raw audit trace may contain gold by design. Do
   not conflate the two layers (`LEAKAGE_CONTROLS.md`).
+- **Fetch/scrape tools are follow-up, not first-hop.** `page_fetch` (and
+  `firecrawl_scrape`) operate on a URL from evidence; they must never be routed as
+  a first-hop *search* arm. A real BrowseComp debug run that listed `page_fetch`
+  as a search arm called it with the question text and failed 78/78
+  (`provider_failure_rate=0.30`, blocking eligibility). The router now routes only
+  over `FIRST_HOP_FAMILIES` (search/specialized/discovery) and uses follow-up
+  tools only after a search returns URLs; a non-URL `page_fetch` call fails
+  gracefully with `requires_url`. When auditing a run, check that
+  `provider_failure_rate` is not dominated by one tool family.
 - **Offline forks are ablations, not measurements.** A forked run reuses a
   parent's cached outcomes and re-weights/re-routes over already-observed data;
   it can reveal which variant *would* have done better on the same evidence, but

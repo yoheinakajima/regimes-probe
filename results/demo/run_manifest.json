@@ -5,7 +5,7 @@
   "parent_run_id": null,
   "git": {
     "branch": "claude/regimes-probe-setup-ILfr0",
-    "commit": "0eac55dbed784fa80ab52abfc54b2f7ebde4610f",
+    "commit": "c9bccdbcc64c0f68f34712bcf52b371d8af82710",
     "dirty": true
   },
   "dataset": {

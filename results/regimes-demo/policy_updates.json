@@ -5,17 +5,17 @@
       "optimize_gate": {
         "kind": "optimize",
         "metric": "correct_per_tool_call",
-        "before": 0.815789,
-        "after": 0.837838,
-        "delta": 0.022048,
+        "before": 0.295238,
+        "after": 0.32381,
+        "delta": 0.028571,
         "threshold": 0.01,
         "passed": true
       },
       "confirm_gate": {
         "kind": "confirm",
         "metric": "correct_per_tool_call",
-        "before": 0.65625,
-        "after": 0.65625,
+        "before": 0.285714,
+        "after": 0.285714,
         "delta": 0.0,
         "threshold": 0.0,
         "passed": true
@@ -23,20 +23,20 @@
       "update": {
         "mutations": [
           {
-            "target": "bandit.exploration_coeff",
+            "target": "stop.stop_threshold",
             "old": 0.6,
-            "new": 0.8,
-            "delta": 0.2,
+            "new": 0.5,
+            "delta": -0.1,
             "tier": "safe",
-            "rationale": "route_miss: explore tool routing more"
+            "rationale": "over_search: stop sooner once evidence suffices"
           },
           {
-            "target": "router.cost_weight",
-            "old": 0.5,
-            "new": 0.3,
-            "delta": -0.2,
+            "target": "reward.extra_call_penalty",
+            "old": 0.2,
+            "new": 0.30000000000000004,
+            "delta": 0.1,
             "tier": "safe",
-            "rationale": "route_miss: stop over-penalizing useful pricier tools"
+            "rationale": "over_search: penalize redundant calls"
           }
         ]
       }
@@ -44,46 +44,46 @@
     "proposal": {
       "dominant_regimes": [
         [
-          "route_miss",
-          4
+          "over_search",
+          31
         ],
         [
-          "query_miss",
-          4
+          "stop_too_late",
+          31
         ]
       ],
       "mutations": [
         {
-          "target": "bandit.exploration_coeff",
-          "delta": 0.2,
+          "target": "stop.stop_threshold",
+          "delta": -0.1,
           "tier": "safe",
-          "rationale": "route_miss: explore tool routing more"
+          "rationale": "over_search: stop sooner once evidence suffices"
         },
         {
-          "target": "router.cost_weight",
-          "delta": -0.2,
+          "target": "reward.extra_call_penalty",
+          "delta": 0.1,
           "tier": "safe",
-          "rationale": "route_miss: stop over-penalizing useful pricier tools"
+          "rationale": "over_search: penalize redundant calls"
         }
       ],
-      "rationale": "route_miss\u00d74; query_miss\u00d74"
+      "rationale": "over_search\u00d731; stop_too_late\u00d731"
     },
     "mutation_records": [
       {
-        "target": "bandit.exploration_coeff",
+        "target": "stop.stop_threshold",
         "old": 0.6,
-        "new": 0.8,
-        "delta": 0.2,
+        "new": 0.5,
+        "delta": -0.1,
         "tier": "safe",
-        "rationale": "route_miss: explore tool routing more"
+        "rationale": "over_search: stop sooner once evidence suffices"
       },
       {
-        "target": "router.cost_weight",
-        "old": 0.5,
-        "new": 0.3,
-        "delta": -0.2,
+        "target": "reward.extra_call_penalty",
+        "old": 0.2,
+        "new": 0.30000000000000004,
+        "delta": 0.1,
         "tier": "safe",
-        "rationale": "route_miss: stop over-penalizing useful pricier tools"
+        "rationale": "over_search: penalize redundant calls"
       }
     ],
     "baseline_optimize": {
@@ -94,101 +94,101 @@
       "provider_failure_rate": 0.0,
       "failed_tool_calls_by_tool": {},
       "support_found_rate": 0.9714285714285714,
-      "evidence_score_mean": 0.9542857142857144,
-      "correct_per_tool_call": 0.8157894736842105,
-      "correct_per_dollar": 407.894736842105,
+      "evidence_score_mean": 0.7057142857142856,
+      "correct_per_tool_call": 0.29523809523809524,
+      "correct_per_dollar": 147.61904761904754,
       "correct_per_second": 0.0,
-      "total_tool_calls": 38,
-      "mean_tool_calls": 1.0857142857142856,
+      "total_tool_calls": 105,
+      "mean_tool_calls": 3.0,
       "first_tool_hit_rate": 0.8857142857142857,
-      "evidence_gain_per_call": 0.8789473684210528,
+      "evidence_gain_per_call": 0.2352380952380952,
       "primary_or_authoritative_source_rate": 0.8857142857142857,
       "stale_source_error_rate": 0.05714285714285714,
-      "false_stop_rate": 0.08571428571428572,
-      "over_search_rate": 0.0,
-      "under_search_rate": 0.08571428571428572,
+      "false_stop_rate": 0.0,
+      "over_search_rate": 0.8857142857142857,
+      "under_search_rate": 0.0,
       "abstention_rate": 0.02857142857142857,
       "abstention_precision": 1.0,
       "abstention_recall": 0.25,
-      "mean_attempt_reward": 1.9533714285714288
+      "mean_attempt_reward": 1.268285714285714
     },
     "baseline_confirm": {
       "n": 28,
-      "accuracy": 0.75,
+      "accuracy": 0.8571428571428571,
       "failed_tool_calls": 0,
       "failed_tool_call_count": 0,
       "provider_failure_rate": 0.0,
       "failed_tool_calls_by_tool": {},
       "support_found_rate": 0.9285714285714286,
-      "evidence_score_mean": 0.9125000000000002,
-      "correct_per_tool_call": 0.65625,
-      "correct_per_dollar": 328.12499999999983,
+      "evidence_score_mean": 0.6607142857142854,
+      "correct_per_tool_call": 0.2857142857142857,
+      "correct_per_dollar": 147.23926380368093,
       "correct_per_second": 0.0,
-      "total_tool_calls": 32,
-      "mean_tool_calls": 1.1428571428571428,
+      "total_tool_calls": 84,
+      "mean_tool_calls": 3.0,
       "first_tool_hit_rate": 0.75,
-      "evidence_gain_per_call": 0.7984375000000001,
-      "primary_or_authoritative_source_rate": 0.75,
+      "evidence_gain_per_call": 0.22023809523809512,
+      "primary_or_authoritative_source_rate": 0.9285714285714286,
       "stale_source_error_rate": 0.0,
-      "false_stop_rate": 0.17857142857142858,
-      "over_search_rate": 0.0,
-      "under_search_rate": 0.17857142857142858,
+      "false_stop_rate": 0.0,
+      "over_search_rate": 0.6785714285714286,
+      "under_search_rate": 0.0,
       "abstention_rate": 0.07142857142857142,
       "abstention_precision": 1.0,
-      "abstention_recall": 0.2857142857142857,
-      "mean_attempt_reward": 1.7441785714285716
+      "abstention_recall": 0.5,
+      "mean_attempt_reward": 1.2258571428571425
     },
     "candidate_optimize": {
       "n": 35,
-      "accuracy": 0.8857142857142857,
+      "accuracy": 0.9714285714285714,
       "failed_tool_calls": 0,
       "failed_tool_call_count": 0,
       "provider_failure_rate": 0.0,
       "failed_tool_calls_by_tool": {},
       "support_found_rate": 0.9714285714285714,
-      "evidence_score_mean": 0.9542857142857144,
-      "correct_per_tool_call": 0.8378378378378378,
-      "correct_per_dollar": 418.9189189189186,
+      "evidence_score_mean": 0.6928571428571425,
+      "correct_per_tool_call": 0.3238095238095238,
+      "correct_per_dollar": 164.25120772946852,
       "correct_per_second": 0.0,
-      "total_tool_calls": 37,
-      "mean_tool_calls": 1.0571428571428572,
+      "total_tool_calls": 105,
+      "mean_tool_calls": 3.0,
       "first_tool_hit_rate": 0.8857142857142857,
-      "evidence_gain_per_call": 0.9027027027027028,
-      "primary_or_authoritative_source_rate": 0.8857142857142857,
+      "evidence_gain_per_call": 0.23095238095238085,
+      "primary_or_authoritative_source_rate": 0.9714285714285714,
       "stale_source_error_rate": 0.05714285714285714,
-      "false_stop_rate": 0.08571428571428572,
-      "over_search_rate": 0.0,
-      "under_search_rate": 0.08571428571428572,
+      "false_stop_rate": 0.0,
+      "over_search_rate": 0.8857142857142857,
+      "under_search_rate": 0.0,
       "abstention_rate": 0.02857142857142857,
       "abstention_precision": 1.0,
-      "abstention_recall": 0.25,
-      "mean_attempt_reward": 1.9534857142857145
+      "abstention_recall": 1.0,
+      "mean_attempt_reward": 1.1645999999999996
     },
     "candidate_confirm": {
       "n": 28,
-      "accuracy": 0.75,
+      "accuracy": 0.8571428571428571,
       "failed_tool_calls": 0,
       "failed_tool_call_count": 0,
       "provider_failure_rate": 0.0,
       "failed_tool_calls_by_tool": {},
       "support_found_rate": 0.9285714285714286,
-      "evidence_score_mean": 0.9125000000000002,
-      "correct_per_tool_call": 0.65625,
-      "correct_per_dollar": 328.12499999999983,
+      "evidence_score_mean": 0.6607142857142854,
+      "correct_per_tool_call": 0.2857142857142857,
+      "correct_per_dollar": 147.23926380368093,
       "correct_per_second": 0.0,
-      "total_tool_calls": 32,
-      "mean_tool_calls": 1.1428571428571428,
+      "total_tool_calls": 84,
+      "mean_tool_calls": 3.0,
       "first_tool_hit_rate": 0.75,
-      "evidence_gain_per_call": 0.7984375000000001,
-      "primary_or_authoritative_source_rate": 0.75,
+      "evidence_gain_per_call": 0.22023809523809512,
+      "primary_or_authoritative_source_rate": 0.9285714285714286,
       "stale_source_error_rate": 0.0,
-      "false_stop_rate": 0.17857142857142858,
-      "over_search_rate": 0.0,
-      "under_search_rate": 0.17857142857142858,
+      "false_stop_rate": 0.0,
+      "over_search_rate": 0.6785714285714286,
+      "under_search_rate": 0.0,
       "abstention_rate": 0.07142857142857142,
       "abstention_precision": 1.0,
-      "abstention_recall": 0.2857142857142857,
-      "mean_attempt_reward": 1.7441785714285716
+      "abstention_recall": 0.5,
+      "mean_attempt_reward": 1.0758571428571426
     }
   }
 ]

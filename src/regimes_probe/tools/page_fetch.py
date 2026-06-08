@@ -17,6 +17,10 @@ from typing import Any
 from regimes_probe.tools.base import SearchProvider, SearchResponse, SearchResult
 
 
+def _looks_like_url(s: str) -> bool:
+    return isinstance(s, str) and s.strip().lower().startswith(("http://", "https://"))
+
+
 class _TextExtractor(HTMLParser):
     def __init__(self) -> None:
         super().__init__()
@@ -55,7 +59,19 @@ class PageFetch(SearchProvider):
         return True
 
     def search(self, query: str, *, limit: int = 1, **opts: Any) -> SearchResponse:
-        # ``query`` is the URL to fetch.
+        # ``query`` MUST be a URL — page_fetch is a follow-up tool, not a search
+        # arm. If routed first-hop with a search query, fail gracefully with a
+        # clear ``requires_url`` error instead of an opaque urllib failure.
+        if not _looks_like_url(query):
+            meta = {
+                "tool": self.name, "provider": self.name, "error_type": "requires_url",
+                "status_code": None, "success": False,
+                "message": ("page_fetch requires a URL (http/https), not a search query; "
+                            "it is a follow-up tool, not a first-hop search arm"),
+            }
+            return SearchResponse(
+                provider=self.name, query=query, results=(), cost=Decimal("0"),
+                latency_s=0.0, error=meta["message"], error_meta=meta)
         t0 = time.monotonic()
         try:
             req = urllib.request.Request(query, headers={"User-Agent": "regimes-probe/0.1"})

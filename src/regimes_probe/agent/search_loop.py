@@ -179,16 +179,26 @@ class SearchLoop:
         attempt_id: str,
         recorder: Optional[LoopRecorder] = None,
     ) -> AttemptTrace:
+        from regimes_probe.tools.metadata import first_hop_tools, followup_tools
+
         rec = recorder or LoopRecorder()
         tool_costs = {n: getattr(p, "cost_per_call", Decimal("0")) for n, p in providers.items()}
+        # First-hop arms are query tools (search family); follow-up tools
+        # (page_fetch/scrape) operate on a URL from evidence and must NOT be
+        # routed as a first-hop arm. The router only ranks first-hop tools.
+        first_hop = first_hop_tools(config.available_tools) or list(config.available_tools)
+        followup = [t for t in followup_tools(config.available_tools) if t in providers]
         routing_plan = self.router.route(
-            signature, memory, config.available_tools,
+            signature, memory, first_hop,
             budget=config.budget, tool_costs=tool_costs, explore=config.explore,
             salt=f"{attempt_id}:route",
         )
         rec.on_routing_plan(routing_plan.to_dict())
-        tool_seq = routing_plan.sequence or list(config.available_tools)
-        fetch_available = "page_fetch" in providers
+        tool_seq = routing_plan.sequence or list(first_hop)
+        # The follow-up tool used by the fetch_page mechanism (prefer page_fetch).
+        fetch_tool = ("page_fetch" if "page_fetch" in followup
+                      else (followup[0] if followup else None))
+        fetch_available = fetch_tool is not None
         known_domain = item.meta.get("known_domain")
         freshness_sensitive = bool(signature.features.get("freshness_sensitive"))
 
@@ -201,7 +211,7 @@ class SearchLoop:
 
         while len(calls) < config.budget:
             if pending_fetch_url is not None and fetch_available:
-                tool = "page_fetch"
+                tool = fetch_tool
                 query = pending_fetch_url
                 query_arm = "fetch"
                 opts: dict[str, Any] = {}

@@ -13,7 +13,7 @@
 
 ## Headline result
 
-Frozen policy memory vs no_memory_search baseline, correct_per_tool_call — budget 1: 0.000 → 0.750; budget 3: 0.095 → 0.656; budget 5: 0.086 → 0.618; budget 10: 0.021 → 0.618.
+Frozen policy memory vs no_memory_search baseline, correct_per_tool_call — budget 1: 0.000 → 0.750; budget 3: 0.071 → 0.286; budget 5: 0.043 → 0.086; budget 10: 0.021 → 0.043.
 
 ## Models, providers, tools
 
@@ -38,33 +38,33 @@ Frozen policy memory vs no_memory_search baseline, correct_per_tool_call — bud
 | no_memory_search | 1 | 0.000 | 0.000 | 1.00 | 0.000 |
 | policy_memory | 1 | 0.750 | 0.750 | 1.00 | 0.750 |
 | random_memory | 1 | 0.286 | 0.286 | 1.00 | 0.286 |
-| no_memory_search | 3 | 0.286 | 0.095 | 3.00 | 0.000 |
-| policy_memory | 3 | 0.750 | 0.656 | 1.14 | 0.750 |
+| no_memory_search | 3 | 0.214 | 0.071 | 3.00 | 0.000 |
+| policy_memory | 3 | 0.857 | 0.286 | 3.00 | 0.750 |
 | random_memory | 3 | 0.500 | 0.275 | 1.82 | 0.286 |
-| no_memory_search | 5 | 0.429 | 0.086 | 5.00 | 0.000 |
-| policy_memory | 5 | 0.750 | 0.618 | 1.21 | 0.750 |
-| random_memory | 5 | 0.500 | 0.222 | 2.25 | 0.286 |
+| no_memory_search | 5 | 0.214 | 0.043 | 5.00 | 0.000 |
+| policy_memory | 5 | 0.429 | 0.086 | 5.00 | 0.750 |
+| random_memory | 5 | 0.464 | 0.213 | 2.18 | 0.286 |
 | no_memory_search | 10 | 0.214 | 0.021 | 10.00 | 0.000 |
-| policy_memory | 10 | 0.750 | 0.618 | 1.21 | 0.750 |
-| random_memory | 10 | 0.464 | 0.157 | 2.96 | 0.286 |
+| policy_memory | 10 | 0.429 | 0.043 | 10.00 | 0.750 |
+| random_memory | 10 | 0.464 | 0.160 | 2.89 | 0.286 |
 
 ## Efficiency & epistemic-error rates
 
 | condition | budget | over_search | false_stop | stale_err | evidence_gain/call | provider_fail_rate |
 |---|---|---|---|---|---|---|
 | closed_book | 0 | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 |
-| no_memory_search | 1 | 0.000 | 0.000 | 0.000 | 0.112 | 0.000 |
+| no_memory_search | 1 | 0.000 | 0.000 | 0.250 | 0.612 | 0.000 |
 | policy_memory | 1 | 0.000 | 0.000 | 0.000 | 0.913 | 0.000 |
 | random_memory | 1 | 0.000 | 0.000 | 0.250 | 0.530 | 0.000 |
-| no_memory_search | 3 | 0.000 | 0.000 | 0.250 | 0.201 | 0.000 |
-| policy_memory | 3 | 0.000 | 0.179 | 0.000 | 0.798 | 0.000 |
+| no_memory_search | 3 | 0.214 | 0.000 | 0.250 | 0.210 | 0.000 |
+| policy_memory | 3 | 0.679 | 0.000 | 0.000 | 0.220 | 0.000 |
 | random_memory | 3 | 0.036 | 0.321 | 0.250 | 0.436 | 0.000 |
 | no_memory_search | 5 | 0.214 | 0.000 | 0.250 | 0.122 | 0.000 |
-| policy_memory | 5 | 0.000 | 0.250 | 0.000 | 0.793 | 0.000 |
-| random_memory | 5 | 0.036 | 0.321 | 0.250 | 0.375 | 0.000 |
+| policy_memory | 5 | 0.429 | 0.000 | 0.000 | 0.142 | 0.000 |
+| random_memory | 5 | 0.000 | 0.393 | 0.250 | 0.388 | 0.000 |
 | no_memory_search | 10 | 0.214 | 0.000 | 0.250 | 0.061 | 0.000 |
-| policy_memory | 10 | 0.000 | 0.250 | 0.000 | 0.793 | 0.000 |
-| random_memory | 10 | 0.000 | 0.393 | 0.250 | 0.285 | 0.000 |
+| policy_memory | 10 | 0.429 | 0.000 | 0.000 | 0.071 | 0.000 |
+| random_memory | 10 | 0.000 | 0.393 | 0.250 | 0.292 | 0.000 |
 
 ## Provider failures
 
@@ -77,15 +77,15 @@ Frozen policy memory vs no_memory_search baseline, correct_per_tool_call — bud
   "budget": 3,
   "mcnemar": {
     "b_only_baseline_correct": 0,
-    "c_only_treatment_correct": 13,
-    "statistic": 11.0769,
-    "p_value": 0.0009,
-    "n_discordant": 13
+    "c_only_treatment_correct": 18,
+    "statistic": 16.0556,
+    "p_value": 0.0001,
+    "n_discordant": 18
   },
   "policy_correct_per_tool_call_ci": {
-    "point": 0.65625,
-    "ci_lo": 0.447368,
-    "ci_hi": 0.866667,
+    "point": 0.285714,
+    "ci_lo": 0.238095,
+    "ci_hi": 0.321429,
     "level": 0.95
   }
 }
@@ -93,14 +93,14 @@ Frozen policy memory vs no_memory_search baseline, correct_per_tool_call — bud
 
 ## Failure regimes (dominant on evaluated set)
 
-- route_miss: 193
-- query_miss: 193
-- verification_miss: 114
-- evidence_sparse: 109
-- contradiction_unresolved: 51
-- stale_evidence: 49
-- stop_too_early: 48
-- under_search: 48
+- route_miss: 178
+- query_miss: 178
+- verification_miss: 124
+- contradiction_unresolved: 96
+- evidence_sparse: 94
+- over_search: 62
+- stop_too_late: 62
+- stale_evidence: 56
 
 ## Promotions
 
@@ -108,7 +108,7 @@ Frozen policy memory vs no_memory_search baseline, correct_per_tool_call — bud
 
 ## Replay
 
-- projection_matches: **True** (998 events)
+- projection_matches: **True** (1768 events)
 
 ## Limitations
 

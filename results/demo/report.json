@@ -12,6 +12,7 @@
     "embedder": "hash_embedder",
     "query_decomposition_enabled": false,
     "iterative_clue_resolution_enabled": false,
+    "task_frame_enabled": false,
     "dataset": "synthetic_browse",
     "dataset_version": "synthetic_browse@44963c46dfcf",
     "split": {
@@ -143,6 +144,7 @@
   },
   "query_decomposition_enabled": false,
   "iterative_clue_resolution_enabled": false,
+  "task_frame_enabled": false,
   "leakage_check_details": {
     "memory_snapshot_leakage_pass": true,
     "report_artifacts_leakage_pass": true,

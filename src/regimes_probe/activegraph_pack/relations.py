@@ -29,6 +29,18 @@ class Relations:
     MEMORY_SNAPSHOT_CONTAINS_FRAGMENT = "memory_snapshot_contains_fragment"
     ELIGIBILITY_FOR_RUN = "eligibility_for_run"
     CLAIM_SUPPORTED_BY_ARTIFACT = "claim_supported_by_artifact"
+    # Level 4 task-frame / constraint-graph relations
+    CONSTRAINT_APPLIES_TO_SLOT = "constraint_applies_to_slot"
+    ACTION_TESTS_CONSTRAINT = "action_tests_constraint"
+    ACTION_TARGETS_SLOT = "action_targets_slot"
+    EVIDENCE_SUPPORTS_CONSTRAINT = "evidence_supports_constraint"
+    EVIDENCE_SUPPORTS_SLOT = "evidence_supports_slot"
+    HYPOTHESIS_ASSIGNS_CANDIDATE = "hypothesis_assigns_candidate"
+    HYPOTHESIS_SUPPORTED_BY_EVIDENCE = "hypothesis_supported_by_evidence"
+    HYPOTHESIS_REJECTED_BY_EVIDENCE = "hypothesis_rejected_by_evidence"
+    ANSWER_SUPPORTED_BY_HYPOTHESIS = "answer_supported_by_hypothesis"
+    FRAME_FOR_ATTEMPT = "frame_for_attempt"
+    SLOT_IN_FRAME = "slot_in_frame"
     UPDATE_FROM_REWARD = "update_from_reward"
     REGIME_FOR_FAILURE = "regime_for_failure"
     PROMOTION_FOR_UPDATE = "promotion_for_update"
@@ -69,4 +81,15 @@ PROJECTION_RELATIONS: tuple[str, ...] = (
     Relations.MEMORY_SNAPSHOT_CONTAINS_FRAGMENT,
     Relations.ELIGIBILITY_FOR_RUN,
     Relations.CLAIM_SUPPORTED_BY_ARTIFACT,
+    Relations.FRAME_FOR_ATTEMPT,
+    Relations.SLOT_IN_FRAME,
+    Relations.CONSTRAINT_APPLIES_TO_SLOT,
+    Relations.ACTION_TARGETS_SLOT,
+    Relations.ACTION_TESTS_CONSTRAINT,
+    Relations.EVIDENCE_SUPPORTS_CONSTRAINT,
+    Relations.EVIDENCE_SUPPORTS_SLOT,
+    Relations.HYPOTHESIS_ASSIGNS_CANDIDATE,
+    Relations.HYPOTHESIS_SUPPORTED_BY_EVIDENCE,
+    Relations.HYPOTHESIS_REJECTED_BY_EVIDENCE,
+    Relations.ANSWER_SUPPORTED_BY_HYPOTHESIS,
 )

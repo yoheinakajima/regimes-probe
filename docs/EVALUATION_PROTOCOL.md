@@ -192,3 +192,22 @@ Metrics (`candidate_role_match_rate`, `sticky_candidate_count`,
 `evidence_improved_after_candidate_rate`, `candidate_switch_count`, …) make the
 selection behavior measurable. Scrape/fetch is evaluated only after candidate
 targeting improves, since scraping wrong pages only produces richer wrong evidence.
+
+### Level 4: task-frame / constraint-graph search
+
+The deepest layer reframes the bottleneck: a BrowseComp item is **constraint
+satisfaction over latent variables**, not a clue bag. The agent parses the question
+into a generic `TaskFrame` (typed target + intermediate slots, typed constraints,
+dependency edges, known-context terms), then drives search/candidate-selection/
+reading/stopping over an explicit hypothesis table + evidence ledger
+(`QUERY_POLICY.md` Level 4). Evaluate it as an **ablation** (`--enable-task-frame`
+on vs off, same tool set), reading the frame metrics: `slot_resolution_rate`,
+`constraint_support_rate`, `target_slot_support_rate`, `hypothesis_coverage_score`,
+`evidence_progress_per_action`, `read_value_precision`, `no_progress_action_rate`,
+`repeated_equivalent_query_rate`, and `final_answer_supported_by_constraints_rate`.
+The success signal is not just answer rate but whether reads/queries are
+**frame-grounded** (each action tests a specific unresolved constraint/slot) and the
+final answer is **supported by the question's own constraints** — a guard against
+answering with an ungrounded high-frequency entity. The v0 parser is heuristic and
+gold-free; an LLM parser is future work, and per-item/per-topic rules are forbidden
+(that would overfit the benchmark, see `METHODOLOGY_RISKS.md`).

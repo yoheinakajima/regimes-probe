@@ -228,6 +228,20 @@ _ARTICLES = {"the", "a", "an"}
 _DATE_RE = re.compile(r"^(1[0-9]{3}|20[0-9]{2})s?$")
 
 
+# Extra organization / source / place suffix words for stricter candidate typing.
+_ORG_EXTRA = {"museum", "hotel", "restaurant", "church", "monastery", "cathedral",
+              "temple", "gallery", "theater", "theatre", "library", "observatory",
+              "zoo", "stadium", "arena", "embassy", "consulate", "winery", "brewery"}
+_SOURCE_EXTRA = {"records", "record", "archive", "archives", "registry", "register",
+                 "ledger", "encyclopedia", "almanac", "atlas", "directory", "database"}
+#: Place-name pattern words (city/state/country/place suffixes & prefixes).
+_PLACE_WORDS = {"town", "city", "ville", "burg", "port", "lake", "mount", "mountain",
+                "cape", "bay", "beach", "valley", "falls", "springs", "heights",
+                "island", "river", "harbor", "harbour", "hill", "fort", "county",
+                "village", "township", "district", "peninsula", "gulf", "sea",
+                "ocean", "desert", "forest", "park", "creek", "ridge", "glen"}
+
+
 def _norm(text: str) -> str:
     return " ".join(text.lower().split())
 
@@ -244,11 +258,13 @@ def classify_entity_role(text: str) -> str:
         return "location"
     if low and low[0] in _ARTICLES and len(words) >= 2:
         return "title_or_work"
-    if any(w in _SOURCE_WORDS for w in low):
+    if any(w in _SOURCE_WORDS or w in _SOURCE_EXTRA for w in low):
         return "publication_or_source"
-    if any(w in _ORG_WORDS for w in low) or (low and low[0] in _ORG_BROAD_PREFIX
-                                             and len(words) >= 2):
+    if any(w in _ORG_WORDS or w in _ORG_EXTRA for w in low) or (
+            low and low[0] in _ORG_BROAD_PREFIX and len(words) >= 2):
         return "organization"
+    if any(w in _PLACE_WORDS for w in low):
+        return "location"
     if any(w in _CONCEPTS for w in low):
         return "concept"
     if len(words) >= 2:

@@ -121,14 +121,24 @@ ablation) reads instead of transient in-memory objects.
 `report`. Several are the public names of event-log objects
 (`final_answer`→`answer_attempt`, `trace_reward`/`tool_reward`→`reward_assignment`,
 `regime_label`→`failure_regime`, `policy_memory_snapshot`→`memory_snapshot`); see
-`CANONICAL_PROJECTION_TYPE`.
+`CANONICAL_PROJECTION_TYPE`. The Level-4 task-frame layer (see `QUERY_POLICY.md`)
+adds `task_frame`, `latent_slot`, `constraint`, `hypothesis`, `slot_assignment`,
+`evidence_record`, `epistemic_action`, and `read_value_decision` — emitted only for
+attempts run with `policy.enable_task_frame` on (off in the byte-identical demo).
 
 **Relation types** (`relations.py:PROJECTION_RELATIONS`): `attempt_for_item`,
 `plan_for_attempt`, `query_for_tool_call`, `response_for_tool_call`,
 `evidence_from_tool_response`, `answer_supported_by_evidence`, `grade_for_answer`,
 `reward_from_tool_call`, `reward_for_attempt`, `regime_for_attempt`,
 `policy_fragment_from_traces`, `memory_snapshot_contains_fragment`,
-`eligibility_for_run`, `claim_supported_by_artifact`.
+`eligibility_for_run`, `claim_supported_by_artifact`. Level-4 relations:
+`frame_for_attempt`, `slot_in_frame`, `constraint_applies_to_slot`,
+`action_targets_slot`, `action_tests_constraint`, `evidence_supports_constraint`,
+`evidence_supports_slot`, `hypothesis_assigns_candidate`,
+`hypothesis_supported_by_evidence`, `hypothesis_rejected_by_evidence`,
+`answer_supported_by_hypothesis` — making the constraint graph an auditable
+subgraph: which action tested which constraint on which slot, and which evidence
+advanced or rejected which hypothesis.
 
 **Bounding / safety.** Every attempt gets compact `question_attempt`/
 `answer_attempt`/`grade_result`/`reward_assignment` (+ `failure_regime` when it

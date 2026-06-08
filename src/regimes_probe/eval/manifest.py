@@ -118,6 +118,9 @@ def build_manifest(
         "iterative_clue_resolution_enabled": ls.get(
             "iterative_clue_resolution_enabled",
             bool(cfg.get("policy", {}).get("enable_iterative_clue_resolution", False))),
+        "task_frame_enabled": ls.get(
+            "task_frame_enabled",
+            bool(cfg.get("policy", {}).get("enable_task_frame", False))),
         "live_settings": ls,
         "prompts": prompts.registry_dict(),
         # Tool inventory, split by routing role:

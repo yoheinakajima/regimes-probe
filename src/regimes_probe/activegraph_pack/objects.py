@@ -34,6 +34,15 @@ class Objects:
     MEMORY_SNAPSHOT = "memory_snapshot"
     ELIGIBILITY_VERDICT = "eligibility_verdict"
     CLAIM_CANDIDATE = "claim_candidate"
+    # Level 4 task-frame / constraint-graph objects
+    TASK_FRAME = "task_frame"
+    LATENT_SLOT = "latent_slot"
+    CONSTRAINT = "constraint"
+    HYPOTHESIS = "hypothesis"
+    SLOT_ASSIGNMENT = "slot_assignment"
+    EVIDENCE_RECORD = "evidence_record"
+    EPISTEMIC_ACTION = "epistemic_action"
+    READ_VALUE_DECISION = "read_value_decision"
     POLICY_UPDATE = "policy_update"
     PROMOTION_DECISION = "promotion_decision"
     REPORT = "report"
@@ -86,6 +95,14 @@ PROJECTION_OBJECTS: tuple[str, ...] = (
     Objects.ELIGIBILITY_VERDICT,
     Objects.CLAIM_CANDIDATE,
     Objects.REPORT,
+    Objects.TASK_FRAME,
+    Objects.LATENT_SLOT,
+    Objects.CONSTRAINT,
+    Objects.HYPOTHESIS,
+    Objects.SLOT_ASSIGNMENT,
+    Objects.EVIDENCE_RECORD,
+    Objects.EPISTEMIC_ACTION,
+    Objects.READ_VALUE_DECISION,
 )
 
 #: Map an event-log object type onto its standardized projection type.

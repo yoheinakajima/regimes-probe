@@ -176,6 +176,79 @@ def build_graph_projection(
                 if ev.get("supports"):
                     g.rel(ans_node, ev_node, Relations.ANSWER_SUPPORTED_BY_EVIDENCE)
 
+            # --- Level 4 task-frame subgraph (when present) ---
+            tf = d.get("task_frame") or {}
+            if tf:
+                tf_node = g.obj(f"task_frame#{aid}", Objects.TASK_FRAME, {
+                    "n_target_slots": len(tf.get("target_answer_slots", [])),
+                    "n_latent_slots": len(tf.get("latent_slots", [])),
+                    "n_constraints": len(tf.get("constraints", [])),
+                    "parse_quality": tf.get("parse_quality"),
+                    "known_context_terms": tf.get("known_context_terms", [])[:8]})
+                g.rel(tf_node, a_node, Relations.FRAME_FOR_ATTEMPT)
+                for s in (tf.get("target_answer_slots", []) + tf.get("latent_slots", [])):
+                    s_node = g.obj(f"latent_slot#{aid}#{s['slot_id']}", Objects.LATENT_SLOT, {
+                        "slot_name": s.get("slot_name"), "slot_role": s.get("slot_role"),
+                        "is_target_answer_slot": s.get("is_target_answer_slot"),
+                        "is_intermediate_slot": s.get("is_intermediate_slot")})
+                    g.rel(s_node, tf_node, Relations.SLOT_IN_FRAME)
+                for con in tf.get("constraints", []):
+                    c_node = g.obj(f"constraint#{aid}#{con['constraint_id']}", Objects.CONSTRAINT, {
+                        "constraint_type": con.get("constraint_type"),
+                        "status": con.get("status"),
+                        "specificity_score": con.get("specificity_score"),
+                        "text_span": con.get("text_span", "")[:120]})
+                    for sid in con.get("applies_to", []):
+                        g.rel(c_node, f"latent_slot#{aid}#{sid}", Relations.CONSTRAINT_APPLIES_TO_SLOT)
+                # epistemic actions + evidence records (per call)
+                for i, c in enumerate(d.get("calls", [])):
+                    ta = c.get("task_action") or {}
+                    if ta.get("kind"):
+                        act_node = g.obj(f"epistemic_action#{aid}#{i}", Objects.EPISTEMIC_ACTION, {
+                            "kind": ta.get("kind"), "query_arm": ta.get("query_arm"),
+                            "query_text_preview": ta.get("query_text_preview", ""),
+                            "expected_information_gain": ta.get("expected_information_gain")})
+                        if ta.get("target_slot_id"):
+                            g.rel(act_node, f"latent_slot#{aid}#{ta['target_slot_id']}",
+                                  Relations.ACTION_TARGETS_SLOT)
+                        for cid in ta.get("tested_constraint_ids", []):
+                            g.rel(act_node, f"constraint#{aid}#{cid}", Relations.ACTION_TESTS_CONSTRAINT)
+                        if "read_value" in ta:
+                            rv_node = g.obj(f"read_value_decision#{aid}#{i}",
+                                            Objects.READ_VALUE_DECISION, ta["read_value"])
+                            g.rel(act_node, rv_node, Relations.ACTION_TESTS_CONSTRAINT)
+                    er = c.get("evidence_record") or {}
+                    if er.get("evidence_id"):
+                        er_node = g.obj(f"evidence_record#{aid}#{er['evidence_id']}",
+                                        Objects.EVIDENCE_RECORD, {
+                            "source_tool": er.get("source_tool"), "domain": er.get("domain"),
+                            "evidence_progress_score": er.get("evidence_progress_score"),
+                            "read_depth": er.get("read_depth")})
+                        for cid in er.get("supports_constraint_ids", []):
+                            g.rel(er_node, f"constraint#{aid}#{cid}", Relations.EVIDENCE_SUPPORTS_CONSTRAINT)
+                        for sid in er.get("supports_slot_ids", []):
+                            g.rel(er_node, f"latent_slot#{aid}#{sid}", Relations.EVIDENCE_SUPPORTS_SLOT)
+                # hypotheses
+                hs = d.get("hypothesis_summary") or {}
+                for h in hs.get("top_hypotheses", []):
+                    h_node = g.obj(f"hypothesis#{aid}#{h['hypothesis_id']}", Objects.HYPOTHESIS, {
+                        "support_score": h.get("support_score"),
+                        "confidence_score": h.get("confidence_score"),
+                        "coverage_score": h.get("coverage_score"), "active": h.get("active")})
+                    for sid, ctext in (h.get("slot_assignments") or {}).items():
+                        sa_node = g.obj(f"slot_assignment#{aid}#{h['hypothesis_id']}#{sid}",
+                                        Objects.SLOT_ASSIGNMENT,
+                                        {"slot_id": sid, "candidate_text": str(ctext)[:80]})
+                        g.rel(h_node, sa_node, Relations.HYPOTHESIS_ASSIGNS_CANDIDATE)
+                    if h.get("support_score", 0) > 0:
+                        g.rel(h_node, tf_node, Relations.HYPOTHESIS_SUPPORTED_BY_EVIDENCE)
+                    if d.get("frame_coverage", {}).get("final_answer_supported_by_constraints"):
+                        g.rel(ans_node, h_node, Relations.ANSWER_SUPPORTED_BY_HYPOTHESIS)
+                for h in hs.get("rejected_hypotheses", []):
+                    hr = g.obj(f"hypothesis#{aid}#{h['hypothesis_id']}", Objects.HYPOTHESIS,
+                               {"active": False, "rejection_reason": h.get("rejection_reason")})
+                    g.rel(hr, tf_node, Relations.HYPOTHESIS_REJECTED_BY_EVIDENCE)
+
     # --- run-level objects: memory_snapshot + policy_fragment lineage ---
     fragments = snapshot.get("fragments", {}) if snapshot else {}
     if snapshot:

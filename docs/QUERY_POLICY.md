@@ -338,3 +338,77 @@ records per read: `read_tool`, `scrape_url`, `scrape_provider`,
 
 **Sequencing:** scrape is **Level 3**, applied only after search and candidate
 targeting — scraping the wrong page just yields richer wrong evidence.
+
+## Level 4: task-frame / constraint-graph search (constraint satisfaction over latent variables)
+
+**Motivation.** Levels 1–3 treat a question as a bag of clues and high-frequency
+entities. But a BrowseComp-style question is a **constraint-satisfaction problem
+over latent variables**: it describes a *target answer* (one hidden variable of a
+known type) plus several *intermediate* hidden variables, with *constraints*
+linking them ("a restaurant **in New Mexico** founded **by a chef** born **in which
+year**"). The bottleneck on hard items is not provider quality or scrape mechanics —
+it is **task-state representation**. Without an explicit model of *which hidden
+variable each search/read is meant to resolve*, the agent chases the most frequent
+proper noun and never tests the discriminative constraints. Level 4 makes that
+state first-class and uses it to drive search, candidate selection, reading, and
+stopping. It is **generic** (no per-item or per-topic rules) and gated behind
+`policy.enable_task_frame` (default **off**, so the synthetic demo is byte-identical).
+
+**Task frame** (`agent/task_frame.py:parse_task_frame`, deterministic v0, gold-free):
+- **Slots** — typed hidden variables. `target_answer_slots` (what the question asks
+  for) vs `latent_slots` (intermediates). The target's role comes from the
+  *interrogative head noun* ("which TV **series**" → `title_or_work`; "…in which
+  **year**" → `date_or_time`; "**who**…" → `person`), so secondary entities ("an
+  actor who…") become intermediates, not competing answers. Each `Slot` carries
+  `slot_role`, `is_target_answer_slot`, `is_intermediate_slot`, `depends_on`,
+  `expected_evidence_type`.
+- **Constraints** — one per clause, typed (`identity`/`attribute`/`relation`/
+  `temporal`/`location`/`distance`/`source`/`authorship`/`membership`/`title_work`/
+  `answer_shape`), with `normalized_terms`, `applies_to` (slot ids),
+  `specificity_score`/`discriminative_score`, and a `status`
+  (`unresolved`/`resolved`/`contradicted`) tracking supporting/contradicting
+  evidence.
+- **Known context terms** — entities/quoted phrases/acronyms *given* in the question
+  (e.g. **WHO** in "released by WHO"). These are constraints/context and are **never
+  promoted into a target answer slot** — a guard against answering with a term the
+  question handed you.
+- `dependency_edges` chain intermediates → target; `parse_quality` scores whether we
+  found a target plus at least one specific constraint.
+
+**Hypothesis table + evidence ledger** (`agent/hypothesis_table.py`): a *hypothesis*
+is a partial assignment of candidates to slots, scored by constraints
+supported/contradicted and slot coverage (`confidence = support − 1.5·contradiction
++ 0.5·coverage`). Each result becomes an `EvidenceRecord` linked to the slots,
+constraints, and candidates it touches, with an `evidence_progress_score`. Candidate
+**role typing is strict and context-aware**: a bare multi-word proper noun cannot be
+typed in isolation, so the surrounding evidence's role-trigger noun is trusted ("Casa
+Verde **restaurant**" → organization; "**actor** Jane Doe" → person). Hypotheses are
+**downweighted/deactivated after repeated no-progress** actions
+(`repeated_no_progress`) and **rejected when contradicted** with no support.
+
+**Action planner** (`agent/action_planner.py`): chooses the next *epistemic action*
+over the frame — `answer_if_supported` (target bound and ≥2 supporting evidences),
+`abstain_if_no_path`, `search_with_candidate_and_constraint`, `search_for_slot`
+(targets the highest-specificity unresolved constraint), `read_url_for_constraint`,
+`extract_candidate_from_evidence`. Queries are generated from slots + constraints and
+de-duplicated by hash so the loop never repeats an equivalent query.
+
+**Read-value gate over the frame** (`action_planner.frame_read_value`): a read fires
+only with a frame-grounded reason — `supports_candidate_hypothesis`,
+`contains_unresolved_clue`, `contains_answer_shape_hint`,
+`cross_provider_same_url_or_domain`, or `structured_or_pdf_and_high_relevance`. It is
+**rejected** for `benchmark_contaminated`, social, or — critically —
+`no_unresolved_slot_or_constraint` (a generically authoritative page with an
+insufficient snippet is *not* a sufficient reason on its own). The tested
+constraint ids are recorded on the decision.
+
+Debug (`debug_questions.jsonl`; `scripts/debug_run_failures.py`) records per attempt
+the `task_frame` summary (targets/latent/constraints/known-context), `frame_coverage`
+(`slot_resolution_rate`, `constraint_support_rate`, `target_slot_support_rate`,
+`hypothesis_coverage_score`), the `hypothesis_summary` (`top_hypotheses` +
+rejected), and per call the chosen `task_action` (kind) and `evidence_record`.
+Metrics add `evidence_progress_per_action`, `read_value_precision`,
+`no_progress_action_rate`, `repeated_equivalent_query_rate`,
+`hypothesis_rejection_counts`, and `final_answer_supported_by_constraints_rate`.
+Policy memory remains **answer-free**: only the route/query/verify/stop policy is
+learned; no slot value, candidate, or answer text is ever written.

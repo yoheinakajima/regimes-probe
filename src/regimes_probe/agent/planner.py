@@ -35,6 +35,7 @@ class AgentConfig:
     stop_mode: str = "learned"           # always_full | first_candidate | learned
     enable_query_decomposition: bool = False  # Level 2 multi-query decomposition
     enable_iterative_clue_resolution: bool = False  # staged candidate-entity resolution
+    enable_task_frame: bool = False  # Level 4 constraint-graph / hypothesis-table policy
     scrape_fallback_to_page_fetch: bool = True  # firecrawl_scrape fail -> page_fetch
     allow_social_scrape: bool = False
     as_of: str = "2026-06-01"
@@ -81,6 +82,7 @@ class EpistemicAgent:
             verification=self.config.verification,
             enable_query_decomposition=self.config.enable_query_decomposition,
             enable_iterative_clue_resolution=self.config.enable_iterative_clue_resolution,
+            enable_task_frame=self.config.enable_task_frame,
             scrape_fallback_to_page_fetch=self.config.scrape_fallback_to_page_fetch,
             allow_social_scrape=self.config.allow_social_scrape,
         )

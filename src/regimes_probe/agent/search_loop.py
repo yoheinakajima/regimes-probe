@@ -140,6 +140,9 @@ class CallRecord:
     no_progress: bool = False
     # Level 3 evidence reading (page_fetch vs firecrawl_scrape)
     scrape: dict[str, Any] = field(default_factory=dict)
+    # Level 4 task-frame action + evidence record
+    task_action: dict[str, Any] = field(default_factory=dict)
+    evidence_record: dict[str, Any] = field(default_factory=dict)
 
     @property
     def contaminated_results(self) -> int:
@@ -170,6 +173,8 @@ class CallRecord:
             "sticky_penalty": round(float(self.sticky_penalty), 3),
             "no_progress": self.no_progress,
             "scrape": self.scrape,
+            "task_action": self.task_action,
+            "evidence_record": self.evidence_record,
             "cost": self.cost,
             "latency": self.latency,
             "stop_arm": self.stop_arm,
@@ -194,6 +199,9 @@ class AttemptTrace:
     vstate: VerificationState
     budget: int
     mode: str
+    task_frame: dict[str, Any] = field(default_factory=dict)
+    hypothesis_summary: dict[str, Any] = field(default_factory=dict)
+    frame_coverage: dict[str, Any] = field(default_factory=dict)
 
     @property
     def tool_calls(self) -> int:
@@ -226,6 +234,7 @@ class SearchLoopConfig:
     verification: VerificationConfig = field(default_factory=VerificationConfig)
     enable_query_decomposition: bool = False
     enable_iterative_clue_resolution: bool = False
+    enable_task_frame: bool = False
     scrape_fallback_to_page_fetch: bool = True
     allow_social_scrape: bool = False
 
@@ -318,16 +327,37 @@ class SearchLoop:
         prev_vscore = 0.0
         current_selected_norm: Optional[str] = None
 
+        # Level 4 task frame: constraint-satisfaction state over latent slots. When
+        # enabled it drives query/read/stop via an action planner (supersedes the
+        # iterative beam). Clue terms feed the answer/read gating.
+        task_frame = config.enable_task_frame
+        frame = htable = planner = None
+        if task_frame:
+            from regimes_probe.agent.task_frame import parse_task_frame
+            from regimes_probe.agent.hypothesis_table import HypothesisTable
+            from regimes_probe.agent.action_planner import ActionPlanner, frame_read_value
+            frame = parse_task_frame(item.id, item.question)
+            htable = HypothesisTable(frame)
+            planner = ActionPlanner(frame, htable)
+            if not clue_terms:
+                clue_terms = [t for c in frame.constraints for t in c.normalized_terms]
+            if not answer_shape:
+                answer_shape = list(frame.answer_shape_hints)
+
         calls: list[CallRecord] = []
         observations: list[EvidenceObservation] = []
         candidate = CandidateAnswer(None, 0, 0.0, [])
         vstate = VerificationState()
+        task_actions: list[dict[str, Any]] = []
+        terminal_action: dict[str, Any] = {}
         step = 0
 
         while len(calls) < config.budget:
             query_text_hash, clue_ids = "", []
             stage_info: dict[str, Any] = {}
             scrape_info: dict[str, Any] = {}
+            task_action_info: dict[str, Any] = {}
+            evidence_record_info: dict[str, Any] = {}
             current_selected_norm = None
             # Decide whether/how to READ a pending URL (Level 3) before anything else.
             # The reading policy (tool choice + gating/dedup) engages only when a
@@ -359,7 +389,63 @@ class SearchLoop:
                     read_dec = None
             beam_sel = beam.select() if (iterative and beam is not None and calls) else None
             read_target_obs = None
-            if read_dec is not None:
+            if task_frame:
+                from urllib.parse import urlparse as _up
+                from regimes_probe.agent.reading_policy import (
+                    normalize_url as _nurl, select_reading_tool as _srt)
+                from regimes_probe.agent.action_planner import frame_read_value
+                cross = {d for d, ts in domain_providers.items() if len(ts) >= 2}
+                chosen_read = None
+                if reading_tools:
+                    for o in observations:
+                        if getattr(o, "failed", False) or not getattr(o, "url", ""):
+                            continue
+                        host = (_up(o.url).hostname or "").lower()
+                        if _nurl(o.url) in scraped_urls or host in no_progress_domains:
+                            continue
+                        rv = frame_read_value(o, frame, htable, cross_provider=(host in cross),
+                                              allow_social=config.allow_social_scrape)
+                        if not rv.should_read:
+                            continue
+                        rd = _srt(url=o.url, title=getattr(o, "title", ""), snippet=o.snippet,
+                                  source_authority=float(getattr(o, "source_authority", 0.0)),
+                                  contaminated=False, unresolved_clue_terms=clue_terms,
+                                  answer_shape=answer_shape, cross_provider_domains=cross,
+                                  page_fetch_available=page_fetch_available,
+                                  scrape_available=scrape_available, scraped_urls=scraped_urls,
+                                  no_progress_domains=no_progress_domains,
+                                  allow_social=config.allow_social_scrape,
+                                  prefer_page_fetch=force_page_fetch, force_read=True)
+                        if rd.tool:
+                            chosen_read = (o, rv, rd)
+                            break
+                if chosen_read is not None:
+                    o, rv, rd = chosen_read
+                    tool, query, query_arm, opts = rd.tool, o.url, rd.query_arm, {}
+                    read_target_obs = o
+                    force_page_fetch = False
+                    scrape_info = {"read_tool": tool, "scrape_url": query, "scrape_provider": tool,
+                                   "scrape_selected_reason": rd.reason, "is_scrape": rd.is_scrape}
+                    task_action_info = {"action_id": planner._next_id(),
+                                        "kind": "read_url_for_constraint",
+                                        "target_slot_id": rv.target_slot_id,
+                                        "tested_constraint_ids": rv.tested_constraint_ids,
+                                        "hypothesis_id": rv.hypothesis_id,
+                                        "query_text_preview": query[:160], "query_arm": query_arm,
+                                        "read_value": rv.to_dict()}
+                    task_actions.append(task_action_info)
+                else:
+                    action = planner.plan(budget_remaining=config.budget - len(calls),
+                                          reading_available=bool(reading_tools))
+                    task_action_info = action.to_dict()
+                    task_actions.append(task_action_info)
+                    if action.kind in ("answer_if_supported", "abstain_if_no_path"):
+                        terminal_action = task_action_info
+                        break
+                    tool = tool_seq[step] if step < len(tool_seq) else tool_seq[-1]
+                    query = action.query or signature.question
+                    query_arm, opts = action.query_arm, {}
+            elif read_dec is not None:
                 tool = read_dec.tool
                 query = pending_read.url
                 query_arm = read_dec.query_arm
@@ -526,6 +612,21 @@ class SearchLoop:
                     intermediate_roles=intermediate_roles, clue_terms=clue_terms,
                     stage_found=stage))
 
+            # Level 4: fold this call's evidence into the hypothesis table.
+            if task_frame and htable is not None:
+                ev = htable.ingest_evidence(
+                    obs, source_tool=tool, stage=ci + 1,
+                    read_depth=(2 if scrape_info.get("is_scrape") else (1 if scrape_info else 0)),
+                    action_id=task_action_info.get("action_id"))
+                htable.reject_contradicted()
+                evidence_record_info = ev.to_dict()
+                if not getattr(ev, "_progressed", False):
+                    if scrape_info and ev.domain:
+                        no_progress_domains.add(ev.domain)
+                    best = htable.best_hypothesis()
+                    if best is not None:
+                        htable.note_no_progress(best.hypothesis_id)
+
             calls.append(
                 CallRecord(
                     call_index=ci,
@@ -558,12 +659,14 @@ class SearchLoop:
                     sticky_penalty=stage_info.get("sticky_penalty", 0.0),
                     no_progress=no_progress_flag,
                     scrape=scrape_info,
+                    task_action=task_action_info,
+                    evidence_record=evidence_record_info,
                 )
             )
 
-            if decision.stop:
+            if decision.stop and not task_frame:
                 break
-            if decision.arm == "fetch_page" and reading_tools:
+            if decision.arm == "fetch_page" and reading_tools and not task_frame:
                 # Choose a URL to read: a known multihop target first, else (in
                 # iterative mode) the best unread, non-contaminated evidence page.
                 target = next((o for o in observations if getattr(o, "fetchable", False)), None)
@@ -588,4 +691,12 @@ class SearchLoop:
             vstate=vstate,
             budget=config.budget,
             mode="explore" if config.explore else "exploit",
+            task_frame=(frame.to_dict() if task_frame and frame is not None else {}),
+            hypothesis_summary=(htable.to_debug() if task_frame and htable is not None else {}),
+            frame_coverage=(dict(htable.coverage(),
+                                 final_answer_supported_by_constraints=bool(
+                                     terminal_action.get("kind") == "answer_if_supported"),
+                                 terminal_action=terminal_action.get("kind", ""),
+                                 n_actions=len(task_actions))
+                            if task_frame and htable is not None else {}),
         )

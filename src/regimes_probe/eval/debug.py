@@ -91,6 +91,9 @@ class DebugRecord:
     stage_depth_used: int = 1
     followup_query_count: int = 0
     target_roles: list[str] = field(default_factory=list)
+    task_frame: dict[str, Any] = field(default_factory=dict)
+    hypothesis_summary: dict[str, Any] = field(default_factory=dict)
+    frame_coverage: dict[str, Any] = field(default_factory=dict)
     evidence_titles: list[str] = field(default_factory=list)
     evidence_urls: list[str] = field(default_factory=list)
     evidence_snippet_previews: list[str] = field(default_factory=list)
@@ -168,6 +171,9 @@ def build_debug_record(*, item, trace, grade, reward, condition: str, budget: in
             "evidence_improved": bool(getattr(c, "evidence_improved", False)),
             # Level 3 reading (page_fetch vs firecrawl_scrape); bounded counts only
             "scrape": dict(getattr(c, "scrape", {})),
+            # Level 4 task-frame action + evidence record
+            "task_action": dict(getattr(c, "task_action", {})),
+            "evidence_record": dict(getattr(c, "evidence_record", {})),
             "n_results": n_ok, "contaminated_results": c_cont,
             "failed": bool(getattr(c, "failed", False)),
             "error_type": getattr(c, "error_type", None),
@@ -225,6 +231,9 @@ def build_debug_record(*, item, trace, grade, reward, condition: str, budget: in
         followup_query_count=sum(1 for c in trace.calls if getattr(c, "stage", 1) >= 2),
         target_roles=list(next((getattr(c, "target_roles", []) for c in trace.calls
                                 if getattr(c, "target_roles", [])), [])),
+        task_frame=dict(getattr(trace, "task_frame", {}) or {}),
+        hypothesis_summary=dict(getattr(trace, "hypothesis_summary", {}) or {}),
+        frame_coverage=dict(getattr(trace, "frame_coverage", {}) or {}),
         evidence_titles=[e["title_preview"] for e in evidence],
         evidence_urls=[e["url"] for e in evidence],
         evidence_snippet_previews=[e["snippet_preview"] for e in evidence])

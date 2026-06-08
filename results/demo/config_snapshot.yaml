@@ -78,6 +78,7 @@ policy:
   allow_social_scrape: false
   enable_iterative_clue_resolution: false
   enable_query_decomposition: false
+  enable_task_frame: false
   query_mode: learned
   scrape_fallback_to_page_fetch: true
   stop_mode: learned

@@ -111,6 +111,9 @@ def main() -> int:
     ap.add_argument("--enable-iterative-clue-resolution", action="store_true",
                     help="Staged search: extract candidate entities from results and "
                          "search them with the next clue. Off by default.")
+    ap.add_argument("--enable-task-frame", action="store_true",
+                    help="Level 4: parse a task frame (slots+constraints) and plan "
+                         "actions to resolve it. Off by default.")
     ap.add_argument("--judge-model", default=None,
                     help="(reserved) LLM judge; grading currently uses exact/normalized match")
     ap.add_argument("--split-seed", default=None)
@@ -140,6 +143,8 @@ def main() -> int:
                          or bool(cfg.get("policy", {}).get("enable_query_decomposition", False)))
     iterative_enabled = (args.enable_iterative_clue_resolution
                          or bool(cfg.get("policy", {}).get("enable_iterative_clue_resolution", False)))
+    task_frame_enabled = (args.enable_task_frame
+                          or bool(cfg.get("policy", {}).get("enable_task_frame", False)))
 
     # Resolve models + tools from mode/CLI/config/env (cheap-first; OpenAI hosted
     # web_search is opt-in, never a silent default).
@@ -157,10 +162,12 @@ def main() -> int:
         allow_stateful_or_paid_tools=args.allow_stateful_or_paid_tools,
         enable_query_decomposition=decompose_enabled,
         enable_iterative_clue_resolution=iterative_enabled,
+        enable_task_frame=task_frame_enabled,
     )
     # Stamp the effective flags into cfg.policy so the agent + manifest both see them.
     cfg.setdefault("policy", {})["enable_query_decomposition"] = decompose_enabled
     cfg.setdefault("policy", {})["enable_iterative_clue_resolution"] = iterative_enabled
+    cfg.setdefault("policy", {})["enable_task_frame"] = task_frame_enabled
     tools = settings.tools
     search_tools = settings.search_tools
     answer_model = settings.answer_model
@@ -211,7 +218,8 @@ def main() -> int:
     print(f"all enabled tools={settings.tools}")
     print(f"provider_classes={settings.provider_classes()}")
     print(f"query_decomposition_enabled={settings.query_decomposition_enabled}  "
-          f"iterative_clue_resolution_enabled={settings.iterative_clue_resolution_enabled}")
+          f"iterative_clue_resolution_enabled={settings.iterative_clue_resolution_enabled}  "
+          f"task_frame_enabled={settings.task_frame_enabled}")
     print(f"flags: agentic_discovery={settings.agentic_tool_discovery_enabled} "
           f"scrape={settings.scrape_tools_enabled} browserish={settings.browserish_tools_enabled} "
           f"stateful_or_paid_allowed={settings.stateful_or_paid_tools_allowed}")
@@ -260,6 +268,7 @@ def main() -> int:
                             stop_mode=cfg["policy"]["stop_mode"],
                             enable_query_decomposition=decompose_enabled,
                             enable_iterative_clue_resolution=iterative_enabled,
+                            enable_task_frame=task_frame_enabled,
                             scrape_fallback_to_page_fetch=bool(
                                 cfg["policy"].get("scrape_fallback_to_page_fetch", True)),
                             allow_social_scrape=bool(cfg["policy"].get("allow_social_scrape", False)),

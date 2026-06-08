@@ -404,6 +404,9 @@ def run_live_pipeline(cfg, items, *, providers, search_agent, cb_agent, cache,
         "iterative_clue_resolution_enabled": ls.get(
             "iterative_clue_resolution_enabled",
             bool(cfg.get("policy", {}).get("enable_iterative_clue_resolution", False))),
+        "task_frame_enabled": ls.get(
+            "task_frame_enabled",
+            bool(cfg.get("policy", {}).get("enable_task_frame", False))),
         "tools_enabled": search_tools, "embedder": "hash_embedder",
         "dataset": dataset_label, "dataset_version": ver,
         "split": split.to_dict() | {"optimize_ids": "...", "confirm_ids": "..."},

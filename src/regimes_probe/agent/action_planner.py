@@ -1,0 +1,224 @@
+"""Epistemic action planner over task-frame slots and constraints.
+
+Replaces the "top candidate + next clue" follow-up with a planner that asks, each
+step: which slot am I binding, which constraint does this query test, which
+hypothesis would it distinguish, and what would count as progress. It chooses an
+action type, generates a query from slots+constraints (not loose spans), or gates a
+read by whether the URL could resolve an unresolved slot/constraint. Deterministic,
+gold-free.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Any, Optional
+from urllib.parse import urlparse
+
+from regimes_probe.policy.query_decomposition import (
+    _cap, _tokens, _is_rare, extract_clues, MAX_QUERY_CHARS, MAX_QUERY_TOKENS)
+
+ACTION_TYPES = ("search_for_slot", "verify_constraint",
+                "search_with_candidate_and_constraint", "read_url_for_constraint",
+                "extract_candidate_from_evidence", "answer_if_supported",
+                "abstain_if_no_path")
+#: A target hypothesis needs at least this much constraint support to answer.
+_MIN_SUPPORT_TO_ANSWER = 2
+
+
+@dataclass
+class EpistemicAction:
+    action_id: str
+    kind: str
+    target_slot_id: Optional[str] = None
+    tested_constraint_ids: list[str] = field(default_factory=list)
+    hypothesis_id: Optional[str] = None
+    query: str = ""
+    query_arm: str = ""
+    expected_information_gain: float = 0.0
+    rationale: str = ""
+    read_obs_url: Optional[str] = None
+
+    def to_dict(self, *, preview: int = 160) -> dict[str, Any]:
+        q = self.query if len(self.query) <= preview else self.query[:preview - 1] + "…"
+        return {"action_id": self.action_id, "kind": self.kind,
+                "target_slot_id": self.target_slot_id,
+                "tested_constraint_ids": list(self.tested_constraint_ids),
+                "hypothesis_id": self.hypothesis_id, "query_text_preview": q,
+                "query_arm": self.query_arm,
+                "expected_information_gain": round(self.expected_information_gain, 3),
+                "rationale": self.rationale}
+
+
+@dataclass
+class ReadValueDecision:
+    should_read: bool
+    target_slot_id: Optional[str] = None
+    tested_constraint_ids: list[str] = field(default_factory=list)
+    hypothesis_id: Optional[str] = None
+    read_selected_reason: Optional[str] = None
+    read_rejected_reason: Optional[str] = None
+    read_candidate_score: float = 0.0
+    no_evidence_reason: Optional[str] = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"should_read": self.should_read, "target_slot_id": self.target_slot_id,
+                "tested_constraint_ids": list(self.tested_constraint_ids),
+                "hypothesis_id": self.hypothesis_id,
+                "read_selected_reason": self.read_selected_reason,
+                "read_rejected_reason": self.read_rejected_reason,
+                "read_candidate_score": round(self.read_candidate_score, 3),
+                "no_evidence_reason": self.no_evidence_reason}
+
+
+def _distinctive_phrase(constraint) -> str:
+    """The most distinctive contiguous span of a constraint (for a query)."""
+    spans = extract_clues(constraint.text_span).phrase_spans
+    if spans:
+        return spans[0]
+    rare = [t for t in constraint.normalized_terms if _is_rare(t)]
+    return " ".join((rare or constraint.normalized_terms)[:4])
+
+
+def _constraint_text_match(obs, constraint) -> bool:
+    text_l = f"{getattr(obs, 'title', '') or ''} {getattr(obs, 'snippet', '') or ''}".lower()
+    terms = [t for t in constraint.normalized_terms if len(t) >= 4]
+    return bool(terms and sum(1 for t in terms if t in text_l) >= max(2, (len(terms) + 1) // 2))
+
+
+def frame_read_value(obs, frame, table, *, cross_provider: bool = False,
+                     allow_social: bool = False) -> ReadValueDecision:
+    """Gate a read by whether the URL could resolve an unresolved slot/constraint."""
+    from regimes_probe.agent.reading_policy import _is_social, normalize_url, _STRUCTURED_MARKERS
+    url = getattr(obs, "url", "") or ""
+    host = (urlparse(url).hostname or "").lower()
+    text = f"{getattr(obs, 'title', '') or ''} {getattr(obs, 'snippet', '') or ''}"
+    text_l = text.lower()
+    if getattr(obs, "benchmark_contaminated", False):
+        return ReadValueDecision(False, read_rejected_reason="benchmark_contaminated")
+    if _is_social(host) and not allow_social:
+        return ReadValueDecision(False, read_rejected_reason="social_or_platform_page")
+    matched = [c.constraint_id for c in frame.unresolved_constraints
+               if _constraint_text_match(obs, c)]
+    shape = any(h.lower() in text_l for h in frame.answer_shape_hints)
+    authority = float(getattr(obs, "source_authority", 0.0))
+    structured = url.lower().endswith(".pdf") or any(m in text_l for m in _STRUCTURED_MARKERS)
+    # supports the current best hypothesis's target candidate?
+    best = table.best_hypothesis()
+    supports_hyp = False
+    if best:
+        for cid in best.slot_assignments.values():
+            ct = table.candidate_text(cid).lower()
+            if ct and ct in text_l:
+                supports_hyp = True
+                break
+    reason = None
+    if supports_hyp:
+        reason = "supports_candidate_hypothesis"
+    elif matched:
+        reason = "contains_unresolved_clue"
+    elif shape:
+        reason = "contains_answer_shape_hint"
+    elif cross_provider:
+        reason = "cross_provider_same_url_or_domain"
+    elif structured and authority >= 0.6 and matched:
+        reason = "structured_or_pdf_and_high_relevance"
+    if reason is None:
+        # 'generic authoritative + insufficient snippet' is NOT a valid reason alone.
+        return ReadValueDecision(False, read_rejected_reason="no_unresolved_slot_or_constraint",
+                                 no_evidence_reason="url_matches_no_constraint")
+    tgt = frame.target_answer_slots[0].slot_id if frame.target_answer_slots else None
+    score = float(len(matched) + (1.0 if supports_hyp else 0.0) + (0.5 if shape else 0.0)
+                  + authority)
+    return ReadValueDecision(True, target_slot_id=tgt, tested_constraint_ids=matched,
+                             hypothesis_id=(best.hypothesis_id if best else None),
+                             read_selected_reason=reason, read_candidate_score=score)
+
+
+class ActionPlanner:
+    """Pick the next epistemic action from the frame + hypothesis table."""
+
+    def __init__(self, frame, table) -> None:
+        self.frame = frame
+        self.table = table
+        self._ac = 0
+        self._query_hashes: set[str] = set()
+        self._slot_attempts: dict[str, int] = {}
+
+    def _next_id(self) -> str:
+        self._ac += 1
+        return f"a{self._ac}"
+
+    def _unbound_slots(self) -> list:
+        bound = {sid for h in self.table.hypotheses.values() for sid in h.slot_assignments}
+        return [s for s in self.frame.all_slots if s.slot_id not in bound]
+
+    def _query(self, q: str) -> tuple[str, bool]:
+        q = _cap(q)
+        import hashlib
+        h = hashlib.sha256(q.lower().encode()).hexdigest()[:16]
+        repeat = h in self._query_hashes
+        self._query_hashes.add(h)
+        return q, repeat
+
+    def plan(self, *, budget_remaining: int, reading_available: bool) -> EpistemicAction:
+        f, t = self.frame, self.table
+        best = t.best_hypothesis()
+        tgt_slot = f.target_answer_slots[0] if f.target_answer_slots else None
+
+        # 1. Answer if the target hypothesis has enough supported constraints.
+        if best and tgt_slot and tgt_slot.slot_id in best.slot_assignments \
+                and best.support_score >= _MIN_SUPPORT_TO_ANSWER:
+            return EpistemicAction(self._next_id(), "answer_if_supported",
+                                   target_slot_id=tgt_slot.slot_id,
+                                   hypothesis_id=best.hypothesis_id,
+                                   rationale="target slot bound with supported constraints")
+        # 2. Abstain when out of budget and no supported path exists.
+        if budget_remaining <= 0 or (not f.unresolved_constraints and not best
+                                     and not f.all_slots):
+            return EpistemicAction(self._next_id(), "abstain_if_no_path",
+                                   rationale="no supported hypothesis / budget exhausted")
+
+        # 3. Verify a target candidate against the most specific unresolved constraint.
+        if best and tgt_slot and tgt_slot.slot_id in best.slot_assignments:
+            cand = t.candidate_text(best.slot_assignments[tgt_slot.slot_id])
+            uncon = sorted([c for c in f.unresolved_constraints if c.constraint_type != "answer_shape"],
+                           key=lambda c: -c.specificity_score)
+            if uncon:
+                con = uncon[0]
+                phrase = _distinctive_phrase(con)
+                q, repeat = self._query(f'"{cand}" {phrase}')
+                if not repeat:
+                    return EpistemicAction(
+                        self._next_id(), "search_with_candidate_and_constraint",
+                        target_slot_id=tgt_slot.slot_id, tested_constraint_ids=[con.constraint_id],
+                        hypothesis_id=best.hypothesis_id, query=q,
+                        query_arm="candidate_constraint",
+                        expected_information_gain=con.specificity_score + 1.0,
+                        rationale=f"verify candidate '{cand}' against constraint {con.constraint_id}")
+
+        # 4. Slot-seeking: the highest-specificity unresolved constraint for an
+        #    unbound slot — search the distinctive phrase + the slot's object type.
+        unbound_ids = {s.slot_id for s in self._unbound_slots()}
+        cons = sorted(f.unresolved_constraints, key=lambda c: -c.specificity_score)
+        for con in cons:
+            if con.constraint_type == "answer_shape":
+                continue
+            slot = next((f.slot(sid) for sid in con.applies_to if sid in unbound_ids), None)
+            slot = slot or (tgt_slot if tgt_slot and tgt_slot.slot_id in unbound_ids else None)
+            phrase = _distinctive_phrase(con)
+            obj = slot.slot_name if slot else (tgt_slot.slot_name if tgt_slot else "")
+            q, repeat = self._query(f'"{phrase}" {obj}' if phrase else obj)
+            if repeat or not q:
+                continue
+            self._slot_attempts[slot.slot_id if slot else "?"] = \
+                self._slot_attempts.get(slot.slot_id if slot else "?", 0) + 1
+            return EpistemicAction(
+                self._next_id(), "search_for_slot",
+                target_slot_id=(slot.slot_id if slot else None),
+                tested_constraint_ids=[con.constraint_id], query=q, query_arm="slot_seeking",
+                expected_information_gain=con.specificity_score,
+                rationale=f"bind slot via constraint {con.constraint_id}")
+
+        # 5. Nothing distinguishing left to try.
+        return EpistemicAction(self._next_id(), "abstain_if_no_path",
+                               rationale="no unresolved distinguishing constraint remains")

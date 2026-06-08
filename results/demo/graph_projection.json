@@ -18,7 +18,15 @@
     "memory_snapshot",
     "eligibility_verdict",
     "claim_candidate",
-    "report"
+    "report",
+    "task_frame",
+    "latent_slot",
+    "constraint",
+    "hypothesis",
+    "slot_assignment",
+    "evidence_record",
+    "epistemic_action",
+    "read_value_decision"
   ],
   "relation_types": [
     "attempt_for_item",
@@ -34,7 +42,18 @@
     "policy_fragment_from_traces",
     "memory_snapshot_contains_fragment",
     "eligibility_for_run",
-    "claim_supported_by_artifact"
+    "claim_supported_by_artifact",
+    "frame_for_attempt",
+    "slot_in_frame",
+    "constraint_applies_to_slot",
+    "action_targets_slot",
+    "action_tests_constraint",
+    "evidence_supports_constraint",
+    "evidence_supports_slot",
+    "hypothesis_assigns_candidate",
+    "hypothesis_supported_by_evidence",
+    "hypothesis_rejected_by_evidence",
+    "answer_supported_by_hypothesis"
   ],
   "detail_limit": 60,
   "event_log": {

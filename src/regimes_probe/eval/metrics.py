@@ -50,6 +50,8 @@ class AttemptOutcome:
     iterative: dict = field(default_factory=dict)
     # Level 3 evidence reading (page_fetch vs firecrawl_scrape)
     scrape: dict = field(default_factory=dict)
+    # Level 4 task-frame / hypothesis-table stats
+    frame: dict = field(default_factory=dict)
 
     def to_row(self) -> dict[str, Any]:
         return {
@@ -151,6 +153,40 @@ def _scrape_metrics(outcomes: list["AttemptOutcome"]) -> dict[str, Any]:
     }
 
 
+def _frame_metrics(stats: list[dict]) -> dict[str, Any]:
+    """Aggregate Level 4 task-frame / hypothesis-table stats across a cell."""
+    from collections import Counter
+    used = [s for s in stats if s]
+    if not used:
+        return {}
+    rejection_counts: Counter = Counter()
+    for s in used:
+        rejection_counts.update(s.get("hypothesis_rejection_reasons", []))
+
+    def avg(key: str) -> float:
+        vals = [s.get(key, 0.0) for s in used]
+        return sum(vals) / len(vals) if vals else 0.0
+
+    n_reads = sum(s.get("n_reads", 0) for s in used)
+    reads_with_evidence = sum(s.get("reads_with_evidence", 0) for s in used)
+    n_actions = sum(s.get("n_actions", 0) for s in used)
+    no_progress_actions = sum(s.get("no_progress_actions", 0) for s in used)
+    repeated_queries = sum(s.get("repeated_queries", 0) for s in used)
+    return {
+        "slot_resolution_rate": avg("slot_resolution_rate"),
+        "constraint_support_rate": avg("constraint_support_rate"),
+        "target_slot_support_rate": avg("target_slot_support_rate"),
+        "hypothesis_coverage_score": avg("hypothesis_coverage_score"),
+        "evidence_progress_per_action": avg("evidence_progress_per_action"),
+        "read_value_precision": _safe_div(reads_with_evidence, n_reads),
+        "no_progress_action_rate": _safe_div(no_progress_actions, n_actions),
+        "repeated_equivalent_query_rate": _safe_div(repeated_queries, n_actions),
+        "hypothesis_rejection_counts": dict(rejection_counts),
+        "final_answer_supported_by_constraints_rate": _safe_div(
+            sum(1 for s in used if s.get("final_answer_supported_by_constraints")), len(used)),
+    }
+
+
 def compute_metrics(outcomes: list[AttemptOutcome]) -> dict[str, Any]:
     """Aggregate metrics for one condition+budget cell."""
     n = len(outcomes)
@@ -198,6 +234,8 @@ def compute_metrics(outcomes: list[AttemptOutcome]) -> dict[str, Any]:
         **_iterative_metrics([o.iterative for o in outcomes]),
         # Level 3 scrape/read aggregates
         **_scrape_metrics(outcomes),
+        # Level 4 task-frame / hypothesis aggregates
+        **_frame_metrics([o.frame for o in outcomes]),
         "correct_per_tool_call": _safe_div(correct, calls),
         "correct_per_dollar": _safe_div(correct, cost) if cost else 0.0,
         "correct_per_second": _safe_div(correct, latency) if latency else 0.0,

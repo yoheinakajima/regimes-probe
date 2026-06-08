@@ -79,7 +79,48 @@ def _outcome(trace, grade, reward, *, condition: str, budget: int) -> AttemptOut
         stage_depth_used=max((getattr(c, "stage", 1) for c in trace.calls), default=0),
         iterative=_iterative_stats(trace),
         scrape=_scrape_stats(trace),
+        frame=_frame_stats(trace),
     )
+
+
+def _frame_stats(trace) -> dict:
+    """Per-attempt task-frame / hypothesis-table stats (aggregated by compute_metrics)."""
+    cov = getattr(trace, "frame_coverage", {}) or {}
+    if not cov:
+        return {}
+    actions = [c.task_action for c in trace.calls if getattr(c, "task_action", {})]
+    reads = [a for a in actions if a.get("kind") == "read_url_for_constraint"]
+    progresses = [float(c.evidence_record.get("evidence_progress_score", 0.0))
+                  for c in trace.calls if getattr(c, "evidence_record", {})]
+    reads_with_evidence = sum(
+        1 for c in trace.calls
+        if c.task_action.get("kind") == "read_url_for_constraint"
+        and float(c.evidence_record.get("evidence_progress_score", 0.0)) > 0)
+    no_progress_actions = sum(1 for p in progresses if p == 0.0)
+    seen, repeated = set(), 0
+    for c in trace.calls:
+        q = (c.query or "").lower().strip()
+        if q in seen:
+            repeated += 1
+        seen.add(q)
+    rejection_reasons = [h.get("rejection_reason")
+                         for h in (trace.hypothesis_summary or {}).get("rejected_hypotheses", [])
+                         if h.get("rejection_reason")]
+    return {
+        "slot_resolution_rate": cov.get("slot_resolution_rate", 0.0),
+        "constraint_support_rate": cov.get("constraint_support_rate", 0.0),
+        "target_slot_support_rate": cov.get("target_slot_support_rate", 0.0),
+        "hypothesis_coverage_score": cov.get("hypothesis_coverage_score", 0.0),
+        "evidence_progress_per_action": (sum(progresses) / len(progresses)) if progresses else 0.0,
+        "n_reads": len(reads),
+        "reads_with_evidence": reads_with_evidence,
+        "n_actions": len(actions),
+        "no_progress_actions": no_progress_actions,
+        "repeated_queries": repeated,
+        "hypothesis_rejection_reasons": rejection_reasons,
+        "final_answer_supported_by_constraints": bool(
+            cov.get("final_answer_supported_by_constraints")),
+    }
 
 
 def _scrape_stats(trace) -> dict:

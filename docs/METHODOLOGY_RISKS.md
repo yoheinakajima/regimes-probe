@@ -213,3 +213,24 @@ set — and the risk surface. Keep the experiment honest:
   and `evidence_added_by_scrape_rate` — if scraping does not raise answer rate, it is
   just adding cost. Compare scrape on/off as an explicit ablation (same tool set
   otherwise), since richer extraction can change correctness independent of policy.
+- **Task-state representation is the real bottleneck (not providers/contamination/
+  scrape).** A BrowseComp-style question is constraint satisfaction over latent
+  variables — a typed target answer plus intermediate hidden variables linked by
+  constraints. Without an explicit task frame, an agent cannot say *which hidden
+  variable a given search/read is meant to resolve*, so it chases the most frequent
+  entity and never tests the discriminative constraints. The Level-4 task-frame
+  layer (`agent/task_frame.py` + `hypothesis_table.py` + `action_planner.py`,
+  `QUERY_POLICY.md`) is the **generic** fix: typed slots/constraints, a hypothesis
+  table scored by constraints supported/contradicted, and a frame-grounded
+  read-value gate. Risks to watch: (a) the v0 parser is heuristic and deterministic —
+  it can mis-type a slot or mis-attach a constraint, so `parse_quality` and
+  `slot_resolution_rate` are audit signals, not guarantees, and an LLM parser
+  (cached/prompt-versioned) is the planned upgrade; (b) **do not encode per-item or
+  per-topic rules** into the parser — the slot roles, constraint types, and the
+  interrogative-head-noun target rule must stay generic, or you are overfitting the
+  benchmark; (c) the layer must stay **answer-free in policy memory** — slot values,
+  candidates, and answer text are never written (only the route/query/verify/stop
+  policy is learned), enforced by `assert_no_answer_leakage`; (d) known-context terms
+  given in the question (e.g. an org named in the prompt) must **never** be promoted
+  into a target answer slot. Watch `read_value_precision`, `no_progress_action_rate`,
+  `repeated_equivalent_query_rate`, and `final_answer_supported_by_constraints_rate`.

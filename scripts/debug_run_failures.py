@@ -65,6 +65,26 @@ def main() -> int:
               f"followups={r.get('followup_query_count', 0)}")
         if r.get("target_roles"):
             print(f"  target_roles: {r['target_roles']}")
+        # Level 4 task frame: target/latent slots, constraints, coverage, hypotheses.
+        tf = r.get("task_frame") or {}
+        if tf:
+            print(f"  TASK FRAME: targets="
+                  f"{[(s['slot_role'], s['slot_name']) for s in tf.get('target_answer_slots', [])]} "
+                  f"latent={[(s['slot_role'], s['slot_name']) for s in tf.get('latent_slots', [])]}")
+            print(f"    constraints: "
+                  f"{[(c['constraint_type'], c['status']) for c in tf.get('constraints', [])][:6]}")
+            print(f"    known_context: {tf.get('known_context_terms', [])[:6]}")
+            cov = r.get("frame_coverage", {})
+            print(f"    coverage: slot_res={cov.get('slot_resolution_rate')} "
+                  f"constraint_sup={cov.get('constraint_support_rate')} "
+                  f"target_sup={cov.get('target_slot_support_rate')} "
+                  f"terminal={cov.get('terminal_action')} "
+                  f"answer_supported={cov.get('final_answer_supported_by_constraints')}")
+            for h in (r.get("hypothesis_summary") or {}).get("top_hypotheses", [])[:3]:
+                print(f"    hyp {h['hypothesis_id']}: {h['slot_assignments']} "
+                      f"support={h['support_score']} conf={h['confidence_score']} active={h['active']}")
+            for h in (r.get("hypothesis_summary") or {}).get("rejected_hypotheses", []):
+                print(f"    ✗ hyp {h['hypothesis_id']}: {h['rejection_reason']}")
         # Stage chain (iterative clue resolution): query -> results -> typed candidates.
         for c in r.get("calls", []):
             cands = c.get("candidate_entities", [])
@@ -75,6 +95,16 @@ def main() -> int:
                   + (f", q={c.get('query_quality')}" if c.get('query_quality') else "")
                   + (f", no_progress" if c.get('no_progress') else "")
                   + (f", sticky={c.get('sticky_penalty')}" if c.get('sticky_penalty') else ""))
+            ta = c.get("task_action") or {}
+            if ta.get("kind"):
+                print(f"        action[{ta['kind']}] slot={ta.get('target_slot_id')} "
+                      f"constraints={ta.get('tested_constraint_ids')} "
+                      f"eig={ta.get('expected_information_gain')}")
+                er = c.get("evidence_record") or {}
+                if er:
+                    print(f"        evidence: progress={er.get('evidence_progress_score')} "
+                          f"new_candidates={er.get('newly_introduced_candidates')} "
+                          f"supports_constraints={er.get('supports_constraint_ids')}")
             sc = c.get("scrape") or {}
             if sc.get("read_tool"):
                 print(f"        read [{sc.get('read_tool')}]: {sc.get('scrape_url','')}  "

@@ -36,6 +36,10 @@ def main() -> int:
     ap.add_argument("--web-search-model", default=None)
     ap.add_argument("--web-search-context-size", default=None)
     ap.add_argument("--disable-openai-web-search", action="store_true")
+    ap.add_argument("--enable-agentic-tool-discovery", action="store_true")
+    ap.add_argument("--enable-scrape-tools", action="store_true")
+    ap.add_argument("--enable-browserish-tools", action="store_true")
+    ap.add_argument("--allow-stateful-or-paid-tools", action="store_true")
     args = ap.parse_args()
     cfg = load_config(args.config)
     live = cfg.get("live", {})
@@ -51,6 +55,10 @@ def main() -> int:
         web_search_context_size=(args.web_search_context_size
                                  or live.get("web_search_context_size", "low")),
         disable_openai_web_search=args.disable_openai_web_search,
+        enable_agentic_tool_discovery=args.enable_agentic_tool_discovery,
+        enable_scrape_tools=args.enable_scrape_tools,
+        enable_browserish_tools=args.enable_browserish_tools,
+        allow_stateful_or_paid_tools=args.allow_stateful_or_paid_tools,
     )
     est = estimate_live(
         conditions, budgets, n_opt=args.optimize, n_con=args.confirm,
@@ -64,6 +72,12 @@ def main() -> int:
     print(f"  web_search model/ctx   : {est['web_search_model']} / {est['web_search_context_size']}"
           f"  (enabled={est['openai_web_search_enabled']})")
     print(f"  enabled tools (arms)   : {est['enabled_tools']}")
+    print(f"  provider classes       : {est.get('provider_classes')}")
+    print(f"  flags                  : agentic_discovery={est.get('agentic_tool_discovery_enabled')} "
+          f"scrape={est.get('scrape_tools_enabled')} browserish={est.get('browserish_tools_enabled')} "
+          f"stateful_or_paid={est.get('stateful_or_paid_tools_allowed')}")
+    print(f"  stateful arms          : "
+          f"{[n for n, m in est.get('tools_meta', {}).items() if m.get('stateful')] or 'none'}")
     print(f"  optimize/confirm       : {est['n_optimize']} / {est['n_confirm']}   "
           f"budgets={est['budgets']}  passes={est['passes']}")
     print(f"  answerer calls         : {est['answerer_calls']}")

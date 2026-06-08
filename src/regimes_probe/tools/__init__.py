@@ -47,4 +47,17 @@ ADAPTER_REGISTRY: dict[str, dict[str, str]] = {
     "serper_search": {"module": "serper_search", "key": "SERPER_API_KEY", "optional": "yes"},
     "academic_search": {"module": "generic_web_search", "key": "ACADEMIC_API_KEY", "optional": "yes"},
     "code_search": {"module": "generic_web_search", "key": "CODE_SEARCH_API_KEY", "optional": "yes"},
+    # Firecrawl (search/scrape/interact)
+    "firecrawl_search": {"module": "firecrawl", "key": "FIRECRAWL_API_KEY", "optional": "yes"},
+    "firecrawl_scrape": {"module": "firecrawl", "key": "FIRECRAWL_API_KEY", "optional": "yes"},
+    "firecrawl_interact": {"module": "firecrawl", "key": "FIRECRAWL_API_KEY", "optional": "yes"},
+    # Monid (agentic tool discovery)
+    "monid_discover": {"module": "monid", "key": "MONID_API_KEY", "optional": "yes"},
+    "monid_inspect": {"module": "monid", "key": "MONID_API_KEY", "optional": "yes"},
+    "monid_run": {"module": "monid", "key": "MONID_API_KEY", "optional": "yes"},
+    # Wokelo (specialized research; needs base URL/path)
+    "wokelo_research": {"module": "wokelo", "key": "WOKELO_API_KEY", "optional": "yes"},
+    "wokelo_company_lookup": {"module": "wokelo", "key": "WOKELO_API_KEY", "optional": "yes"},
+    # Deferred (not implemented as a live adapter)
+    "browser_use": {"module": "", "key": "", "optional": "deferred"},
 }

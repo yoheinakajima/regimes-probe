@@ -114,10 +114,23 @@ live:
   search_baseline: "openai_web_search"  # hosted baseline adapter NAME (opt-in only)
   # Tools considered for cheap/diverse modes (each is a separate bandit arm).
   # openai_web_search is deliberately absent here; add it via --tools or
-  # --search-provider-mode openai-hosted.
+  # --search-provider-mode openai-hosted. Agentic-discovery (Monid), scrape
+  # (firecrawl_scrape), browser-like (firecrawl_interact) and stateful/paid
+  # (monid_run) tools are OFF unless their explicit flags are set; browser-use is
+  # DEFERRED. See docs/TOOL_ABSTRACTIONS.md.
   tools_enabled:
     - "page_fetch"
     - "serper_search"
     - "brave_search"
     - "tavily_search"
     - "exa_search"
+    - "firecrawl_search"          # search; cheap/diverse-eligible with FIRECRAWL_API_KEY
+  # Optional providers (opt-in via CLI flags; never auto in cheap mode):
+  #   monid_discover/monid_inspect  --enable-agentic-tool-discovery (auto in diverse)
+  #   firecrawl_scrape              --enable-scrape-tools
+  #   firecrawl_interact           --enable-browserish-tools
+  #   monid_run                    --allow-stateful-or-paid-tools
+  #   wokelo_research/company_lookup  need WOKELO_BASE_URL + endpoint path (fail closed)
+  # Env vars (optional; documented in config/tools.example.yaml):
+  #   FIRECRAWL_API_KEY, MONID_API_KEY, WOKELO_API_KEY, WOKELO_BASE_URL,
+  #   WOKELO_RESEARCH_PATH, WOKELO_COMPANY_PATH, WOKELO_OPENAPI_PATH

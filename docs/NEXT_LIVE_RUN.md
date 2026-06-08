@@ -93,6 +93,17 @@ real arms. In `config/default.yaml` (already cheap-first):
    `--answer-model gpt-5.5 --web-search-model gpt-5.5`) — a **later strong/expensive
    baseline only**. Do NOT treat OpenAI hosted browsing as the default test.
 
+**Keep the FIRST BrowseComp runs cheap and search-only.** Add the extra tool
+families only **after** a baseline cheap provider-diverse run works, in this order
+(see `docs/TOOL_ABSTRACTIONS.md`):
+- `--enable-scrape-tools` → `firecrawl_scrape` (richer evidence than snippets);
+- `--enable-agentic-tool-discovery` → Monid `monid_discover`/`monid_inspect` (a
+  learned tool-discovery arm; auto-on in diverse);
+- Wokelo (`wokelo_research`/`company_lookup`) once its endpoint shape/OpenAPI is
+  known (it fails closed until `WOKELO_BASE_URL` + path are configured).
+- `monid_run` (stateful/paid), `firecrawl_interact` (browser-like), and
+  **browser-use** stay **off** — not part of the search-routing experiment.
+
 ## 5. First tiny live run — **budgets [1, 3], OPTIMIZE=10, CONFIRM=20**
 
 The exact escalating commands (A–E) live in **[`docs/LIVE_LADDER.md`](./LIVE_LADDER.md)**

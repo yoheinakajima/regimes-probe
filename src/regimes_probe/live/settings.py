@@ -1,19 +1,28 @@
 """Resolve live model + tool settings from mode/CLI/config/env (no network).
 
-This centralizes the *cheap-first* policy: OpenAI hosted ``web_search`` is opt-in,
-never the silent default. Three provider modes:
+Centralizes the *cheap-first, safety-gated* policy across many tool families:
+ordinary search, page fetch/scrape, agentic tool discovery, and specialized
+research. OpenAI hosted ``web_search`` is opt-in; stateful/paid and browser-like
+tools are off unless explicitly allowed.
 
+Provider modes:
   * ``cheap``        — default. Answerer ``gpt-5.4-mini``; search = ``page_fetch``
-    plus any low-cost external search adapter whose key is present. OpenAI
-    web_search is NOT added. If no external search key exists, we explain which
-    env vars would enable one (rather than falling back to expensive hosted search).
-  * ``diverse``      — the main experiment. ``page_fetch`` + every external search
-    adapter with a key (Brave/Tavily/Exa/Serper), and OpenAI web_search as ONE arm
-    among many (unless disabled). Each provider is a separate bandit arm.
+    + cheap external search adapters with keys (Serper/Brave/Tavily/Exa) +
+    ``firecrawl_search`` if its key is present. NO OpenAI web_search, NO scrape,
+    NO discovery, NO stateful/browser tools. If no search provider key exists, we
+    explain which env vars to set rather than falling back to hosted search.
+  * ``diverse``      — the main experiment. Everything in cheap, plus
+    ``monid_discover``/``monid_inspect`` (if MONID key) and OpenAI web_search as
+    one arm among many (unless disabled). Each provider is a separate bandit arm.
   * ``openai-hosted``— explicit strong/expensive baseline: ``openai_web_search`` +
-    ``page_fetch``; may use ``gpt-5.5`` if requested.
+    ``page_fetch``; may use ``gpt-5.5``.
 
-``--tools`` overrides a mode's tool set explicitly.
+Safety gates (apply to mode- and ``--tools``-derived sets alike):
+  * ``firecrawl_scrape``   needs ``--enable-scrape-tools``.
+  * ``monid_discover/inspect`` need ``--enable-agentic-tool-discovery`` OR diverse.
+  * ``monid_run`` (stateful/paid) needs ``--allow-stateful-or-paid-tools``; never auto.
+  * ``firecrawl_interact`` (browser-like) needs ``--enable-browserish-tools``; never auto.
+  * ``browser_use`` is DEFERRED and never enabled.
 """
 
 from __future__ import annotations
@@ -22,19 +31,16 @@ import os
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
-from regimes_probe.live.providers import _ADAPTER_ENV
+from regimes_probe.tools.metadata import tool_meta, tools_meta_dict
 
-#: External search adapters, cheapest-first, eligible for cheap/diverse auto-add.
 _EXTERNAL_SEARCH = ("serper_search", "brave_search", "tavily_search", "exa_search")
-_EXTERNAL_KEYS = {
-    "serper_search": "SERPER_API_KEY", "brave_search": "BRAVE_SEARCH_API_KEY",
-    "tavily_search": "TAVILY_API_KEY", "exa_search": "EXA_API_KEY",
-}
 MODES = ("cheap", "diverse", "openai-hosted")
+_GATED = ("monid_run", "firecrawl_interact", "browser_use",
+          "firecrawl_scrape", "monid_discover", "monid_inspect")
 
 
 def _has_key(tool: str, env) -> bool:
-    var = _ADAPTER_ENV.get(tool)
+    var = tool_meta(tool).requires_api_key
     return var is None or bool(env.get(var))
 
 
@@ -46,6 +52,10 @@ class LiveSettings:
     web_search_model: str
     web_search_context_size: str
     openai_web_search_enabled: bool
+    agentic_tool_discovery_enabled: bool = False
+    scrape_tools_enabled: bool = False
+    browserish_tools_enabled: bool = False
+    stateful_or_paid_tools_allowed: bool = False
     missing_search_keys: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
@@ -53,6 +63,12 @@ class LiveSettings:
     @property
     def search_tools(self) -> list[str]:
         return [t for t in self.tools if t != "page_fetch"]
+
+    def tools_meta(self) -> dict[str, Any]:
+        return tools_meta_dict(self.tools)
+
+    def provider_classes(self) -> list[str]:
+        return sorted({tool_meta(t).family for t in self.tools})
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -62,10 +78,37 @@ class LiveSettings:
             "web_search_model": self.web_search_model,
             "web_search_context_size": self.web_search_context_size,
             "openai_web_search_enabled": self.openai_web_search_enabled,
+            "agentic_tool_discovery_enabled": self.agentic_tool_discovery_enabled,
+            "scrape_tools_enabled": self.scrape_tools_enabled,
+            "browserish_tools_enabled": self.browserish_tools_enabled,
+            "stateful_or_paid_tools_allowed": self.stateful_or_paid_tools_allowed,
+            "provider_classes": self.provider_classes(),
+            "tools_meta": self.tools_meta(),
             "missing_search_keys": self.missing_search_keys,
             "notes": self.notes,
             "warnings": self.warnings,
         }
+
+
+def _safety_filter(tools, *, mode, enable_agentic, enable_scrape, enable_browserish,
+                   allow_stateful, notes):
+    out: list[str] = []
+    for t in tools:
+        if t == "browser_use":
+            notes.append("browser_use is DEFERRED (browser control; prompt-injection/state "
+                         "risk) — not enabled in v0.")
+        elif t == "monid_run" and not allow_stateful:
+            notes.append("monid_run requires --allow-stateful-or-paid-tools (stateful/paid) "
+                         "— dropped.")
+        elif t == "firecrawl_interact" and not enable_browserish:
+            notes.append("firecrawl_interact requires --enable-browserish-tools — dropped.")
+        elif t == "firecrawl_scrape" and not enable_scrape:
+            notes.append("firecrawl_scrape requires --enable-scrape-tools — dropped.")
+        elif t in ("monid_discover", "monid_inspect") and not (enable_agentic or mode == "diverse"):
+            notes.append(f"{t} requires --enable-agentic-tool-discovery or diverse mode — dropped.")
+        else:
+            out.append(t)
+    return out
 
 
 def resolve_live_settings(
@@ -76,6 +119,10 @@ def resolve_live_settings(
     web_search_model: str = "gpt-5.4-mini",
     web_search_context_size: str = "low",
     disable_openai_web_search: bool = False,
+    enable_agentic_tool_discovery: bool = False,
+    enable_scrape_tools: bool = False,
+    enable_browserish_tools: bool = False,
+    allow_stateful_or_paid_tools: bool = False,
     env: Optional[dict[str, str]] = None,
 ) -> LiveSettings:
     if mode not in MODES:
@@ -85,48 +132,63 @@ def resolve_live_settings(
     warnings: list[str] = []
     missing: list[str] = []
 
-    if cli_tools:                                   # explicit --tools wins
+    def has(t: str) -> bool:
+        return _has_key(t, env)
+
+    if cli_tools:                                   # explicit --tools wins (still gated)
         tools = list(dict.fromkeys(cli_tools))
-        notes.append("tool set fixed by --tools (overrides provider mode default)")
+        notes.append("tool set fixed by --tools (overrides provider-mode default; safety "
+                     "gates still apply)")
     elif mode == "openai-hosted":
         tools = ["openai_web_search"]
     elif mode == "diverse":
-        external = [t for t in _EXTERNAL_SEARCH if _has_key(t, env)]
-        tools = list(external)
-        if _has_key("openai_web_search", env) and not disable_openai_web_search:
+        tools = [t for t in _EXTERNAL_SEARCH if has(t)]
+        if has("firecrawl_search"):
+            tools.append("firecrawl_search")
+        if has("monid_discover"):                   # diverse auto-includes discovery
+            tools += ["monid_discover", "monid_inspect"]
+        if enable_scrape_tools and has("firecrawl_scrape"):
+            tools.append("firecrawl_scrape")
+        if has("openai_web_search") and not disable_openai_web_search:
             tools.append("openai_web_search")
-        if not external:
-            missing = [v for v in _EXTERNAL_KEYS.values() if not env.get(v)]
-            notes.append(
-                "diverse mode found NO external (non-OpenAI) search providers; set some of "
-                + " / ".join(sorted(set(missing)))
-                + " so the bandit has multiple provider arms. "
-                + ("openai_web_search is the only search arm right now."
-                   if "openai_web_search" in tools else
-                   "Only page_fetch is available right now."))
+        if not any(t in tools for t in (*_EXTERNAL_SEARCH, "firecrawl_search")):
+            notes.append("diverse mode found NO non-OpenAI search providers; set some of "
+                         "SERPER_API_KEY / BRAVE_SEARCH_API_KEY / TAVILY_API_KEY / "
+                         "EXA_API_KEY / FIRECRAWL_API_KEY for real provider arms.")
     else:  # cheap (default)
-        tools = [t for t in _EXTERNAL_SEARCH if _has_key(t, env)]
+        tools = [t for t in _EXTERNAL_SEARCH if has(t)]
+        if has("firecrawl_search"):
+            tools.append("firecrawl_search")
+        if enable_agentic_tool_discovery and has("monid_discover"):
+            tools += ["monid_discover", "monid_inspect"]
+        if enable_scrape_tools and has("firecrawl_scrape"):
+            tools.append("firecrawl_scrape")
         if not tools:
-            missing = [_EXTERNAL_KEYS[t] for t in _EXTERNAL_SEARCH]
+            missing = ["SERPER_API_KEY", "BRAVE_SEARCH_API_KEY", "TAVILY_API_KEY",
+                       "EXA_API_KEY", "FIRECRAWL_API_KEY"]
             notes.append(
-                "cheap mode found NO non-OpenAI search provider key. The agent will "
-                "only be able to page_fetch known URLs. Set one of "
-                + " / ".join(missing)
-                + ", or use --search-provider-mode openai-hosted (expensive). "
-                "NOT falling back to OpenAI web_search.")
+                "cheap mode found NO non-OpenAI search provider key. The agent can only "
+                "page_fetch known URLs. Set one of " + " / ".join(missing)
+                + ", or use --search-provider-mode openai-hosted (expensive). NOT falling "
+                "back to OpenAI web_search.")
 
+    tools = _safety_filter(tools, mode=mode, enable_agentic=enable_agentic_tool_discovery,
+                           enable_scrape=enable_scrape_tools,
+                           enable_browserish=enable_browserish_tools,
+                           allow_stateful=allow_stateful_or_paid_tools, notes=notes)
     if disable_openai_web_search:
         tools = [t for t in tools if t != "openai_web_search"]
         notes.append("openai_web_search disabled via --disable-openai-web-search")
+    tools = list(dict.fromkeys(tools))
     if "page_fetch" not in tools:                   # free; always available
         tools.append("page_fetch")
 
     openai_enabled = "openai_web_search" in tools
     if openai_enabled and (answer_model == "gpt-5.5" or web_search_model == "gpt-5.5"):
         warnings.append(
-            "EXPENSIVE: gpt-5.5 + openai_web_search selected. This is the strong "
-            "hosted baseline, NOT the default regimes-probe experiment. Prefer "
-            "cheap/diverse with gpt-5.4-mini for the learning runs.")
+            "EXPENSIVE: gpt-5.5 + openai_web_search selected. This is the strong hosted "
+            "baseline, NOT the default regimes-probe experiment. Prefer cheap/diverse with "
+            "gpt-5.4-mini for the learning runs.")
     if mode == "openai-hosted" and not openai_enabled:
         warnings.append("openai-hosted mode but openai_web_search is not enabled "
                         "(disabled or overridden by --tools).")
@@ -134,5 +196,9 @@ def resolve_live_settings(
     return LiveSettings(
         provider_mode=mode, tools=tools, answer_model=answer_model,
         web_search_model=web_search_model, web_search_context_size=web_search_context_size,
-        openai_web_search_enabled=openai_enabled, missing_search_keys=sorted(set(missing)),
-        notes=notes, warnings=warnings)
+        openai_web_search_enabled=openai_enabled,
+        agentic_tool_discovery_enabled=any(t.startswith("monid") for t in tools),
+        scrape_tools_enabled="firecrawl_scrape" in tools,
+        browserish_tools_enabled=any(tool_meta(t).family == "browserish" for t in tools),
+        stateful_or_paid_tools_allowed=allow_stateful_or_paid_tools,
+        missing_search_keys=sorted(set(missing)), notes=notes, warnings=warnings)

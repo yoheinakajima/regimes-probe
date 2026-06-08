@@ -3,7 +3,7 @@
   "live": false,
   "git": {
     "branch": "claude/regimes-probe-setup-ILfr0",
-    "commit": "a4ca599ab0b744a7955687a9993ef6b232c90aed",
+    "commit": "13ffc860cae27e6bfa0dfba3eacfcb510633339d",
     "dirty": true
   },
   "dataset": {
@@ -93,7 +93,13 @@
     "search_baseline": "openai_web_search"
   },
   "provider_mode": null,
+  "provider_classes": [],
+  "tools_meta": {},
   "openai_web_search_enabled": null,
+  "agentic_tool_discovery_enabled": null,
+  "scrape_tools_enabled": null,
+  "browserish_tools_enabled": null,
+  "stateful_or_paid_tools_allowed": null,
   "live_settings": {},
   "prompts": {
     "answerer": {

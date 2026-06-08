@@ -103,3 +103,8 @@ class SearchProvider(ABC):
 
 class ProviderUnavailable(RuntimeError):
     """Raised when a live adapter is invoked without its credentials/deps."""
+
+
+class ToolDisabled(RuntimeError):
+    """Raised when a tool exists but is disabled by a safety flag (e.g. stateful/
+    paid actions, browser-like interaction) and was not explicitly enabled."""

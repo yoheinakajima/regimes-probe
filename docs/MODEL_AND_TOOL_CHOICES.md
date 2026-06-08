@@ -94,6 +94,18 @@ change, not a router change.
 | `serper_search` | Serper (Google SERP) API |
 | `academic_search` | scholarly/paper search |
 | `code_search` | code/repository search |
+| `firecrawl_search` | Firecrawl web search (+ optional page content) — `search` family |
+| `firecrawl_scrape` | Firecrawl full-page markdown/metadata — `scrape` family (needs `--enable-scrape-tools`) |
+| `firecrawl_interact` | Firecrawl browser-like interaction — `browserish`, **disabled by default** |
+| `monid_discover` / `monid_inspect` | Monid agentic **tool discovery** (needs `--enable-agentic-tool-discovery`, auto in diverse) |
+| `monid_run` | Monid tool **execution** — stateful/paid, **disabled by default** |
+| `wokelo_research` / `wokelo_company_lookup` | Wokelo specialized research — **scaffold; fails closed** without base URL/path |
+| `browser_use` | **DEFERRED** — browser control; not a live adapter in v0 |
+
+These extra families (scrape / agentic-discovery / specialized-research /
+browserish) are documented in **[TOOL_ABSTRACTIONS.md](./TOOL_ABSTRACTIONS.md)**,
+including per-arm metadata and the safety gates. Add them only **after** a cheap
+search-only provider-diverse run works.
 
 All adapters implement the same interface (request signature, normalized
 `evidence_observation` output, cost/latency reporting) so they are interchangeable from the
@@ -112,6 +124,12 @@ that run and is excluded from its action set.
 | `TAVILY_API_KEY` | `tavily_search` | optional |
 | `EXA_API_KEY` | `exa_search` | optional |
 | `SERPER_API_KEY` | `serper_search` | optional |
+| `FIRECRAWL_API_KEY` | `firecrawl_search` / `firecrawl_scrape` / `firecrawl_interact` | optional |
+| `MONID_API_KEY` | `monid_discover` / `monid_inspect` / `monid_run` | optional |
+| `WOKELO_API_KEY` | `wokelo_research` / `wokelo_company_lookup` | optional |
+| `WOKELO_BASE_URL` | Wokelo endpoint base (no default; required to call) | optional |
+| `WOKELO_RESEARCH_PATH` / `WOKELO_COMPANY_PATH` | Wokelo endpoint paths | optional |
+| `WOKELO_OPENAPI_PATH` | reserved for loading a Wokelo OpenAPI spec later | optional |
 
 If a key referenced by a configured adapter is missing at run time, the harness logs the
 exclusion in the `benchmark_run`/`report` and continues with the remaining roster, keeping

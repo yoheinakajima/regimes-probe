@@ -90,7 +90,13 @@ def build_manifest(
             "search_baseline": live_cfg.get("search_baseline"),
         },
         "provider_mode": ls.get("provider_mode"),
+        "provider_classes": ls.get("provider_classes", []),
+        "tools_meta": ls.get("tools_meta", {}),       # family/cost/stateful/safe per arm
         "openai_web_search_enabled": ls.get("openai_web_search_enabled"),
+        "agentic_tool_discovery_enabled": ls.get("agentic_tool_discovery_enabled"),
+        "scrape_tools_enabled": ls.get("scrape_tools_enabled"),
+        "browserish_tools_enabled": ls.get("browserish_tools_enabled"),
+        "stateful_or_paid_tools_allowed": ls.get("stateful_or_paid_tools_allowed"),
         "live_settings": ls,
         "prompts": prompts.registry_dict(),
         "tools_enabled": list(search_tools),

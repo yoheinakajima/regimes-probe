@@ -68,5 +68,47 @@ adapters:
     enabled: false
     api_key_env: "CODE_SEARCH_API_KEY"
 
+  # --- Firecrawl: search + scrape (+ interact, browser-like, off by default) ---
+  firecrawl_search:                 # family=search; cheap/diverse-eligible with key
+    enabled: false
+    api_key_env: "FIRECRAWL_API_KEY"
+  firecrawl_scrape:                 # family=scrape; needs --enable-scrape-tools
+    enabled: false
+    api_key_env: "FIRECRAWL_API_KEY"
+  firecrawl_interact:               # family=browserish; needs --enable-browserish-tools
+    enabled: false
+    api_key_env: "FIRECRAWL_API_KEY"
+
+  # --- Monid: agentic tool discovery (NOT an ordinary search engine) ---
+  monid_discover:                   # needs --enable-agentic-tool-discovery (auto in diverse)
+    enabled: false
+    api_key_env: "MONID_API_KEY"
+  monid_inspect:
+    enabled: false
+    api_key_env: "MONID_API_KEY"
+  monid_run:                        # stateful/paid; needs --allow-stateful-or-paid-tools
+    enabled: false
+    api_key_env: "MONID_API_KEY"
+
+  # --- Wokelo: specialized company/market research (SCAFFOLD; fails closed) ---
+  wokelo_research:
+    enabled: false
+    api_key_env: "WOKELO_API_KEY"
+    base_url_env: "WOKELO_BASE_URL"       # REQUIRED — endpoint shape unknown; no default
+    path_env: "WOKELO_RESEARCH_PATH"
+    openapi_path_env: "WOKELO_OPENAPI_PATH"   # optional, reserved for later
+  wokelo_company_lookup:
+    enabled: false
+    api_key_env: "WOKELO_API_KEY"
+    base_url_env: "WOKELO_BASE_URL"
+    path_env: "WOKELO_COMPANY_PATH"
+
+  # --- DEFERRED: browser-use is intentionally NOT a live adapter in v0 ---
+  browser_use:
+    enabled: false
+    note: "DEFERRED — browser control; prompt-injection/state risk. Docs/scaffold only."
+
 # Required env vars (documented, not required for tests):
-#   OPENAI_API_KEY, BRAVE_SEARCH_API_KEY, TAVILY_API_KEY, EXA_API_KEY, SERPER_API_KEY
+#   OPENAI_API_KEY, BRAVE_SEARCH_API_KEY, TAVILY_API_KEY, EXA_API_KEY, SERPER_API_KEY,
+#   FIRECRAWL_API_KEY, MONID_API_KEY, WOKELO_API_KEY
+#   Optional: WOKELO_BASE_URL, WOKELO_RESEARCH_PATH, WOKELO_COMPANY_PATH, WOKELO_OPENAPI_PATH

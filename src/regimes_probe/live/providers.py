@@ -22,19 +22,11 @@ from regimes_probe.agent.evidence import EvidenceObservation
 from regimes_probe.live.cache import RecordingCache, ReplayMiss
 from regimes_probe.tools.base import ProviderUnavailable, SearchProvider, SearchResponse
 
-# Env var each adapter needs (None = no key required).
-_ADAPTER_ENV = {
-    "openai_web_search": "OPENAI_API_KEY",
-    "openai_web_search_low_context": "OPENAI_API_KEY",
-    "page_fetch": None,
-    "brave_search": "BRAVE_SEARCH_API_KEY",
-    "tavily_search": "TAVILY_API_KEY",
-    "exa_search": "EXA_API_KEY",
-    "serper_search": "SERPER_API_KEY",
-    "news_search": "NEWS_API_KEY",
-    "official_domain_search": "OFFICIAL_SEARCH_API_KEY",
-    "generic_web_search": None,
-}
+# Env var each adapter needs (None = no key required). Derived from the central
+# tool metadata registry so there is a single source of truth.
+from regimes_probe.tools.metadata import TOOL_META as _TOOL_META
+
+_ADAPTER_ENV = {name: meta.requires_api_key for name, meta in _TOOL_META.items()}
 
 
 class NotArmed(RuntimeError):
@@ -170,7 +162,9 @@ class LiveClosedBookAnswerer(_BaseLiveAnswerer):
 
 # ----------------------------------------------------------------- builders
 def _build_inner(name: str, *, web_search_model: str = "gpt-5.4-mini",
-                 web_search_context: str = "low") -> Optional[SearchProvider]:
+                 web_search_context: str = "low",
+                 allow_stateful_or_paid: bool = False,
+                 enable_browserish: bool = False) -> Optional[SearchProvider]:
     if name in ("openai_web_search", "openai_web_search_low_context"):
         from regimes_probe.tools.openai_web_search import (
             openai_web_search, openai_web_search_low_context)
@@ -178,6 +172,33 @@ def _build_inner(name: str, *, web_search_model: str = "gpt-5.4-mini",
         if name.endswith("low_context"):
             return openai_web_search_low_context(model=web_search_model)
         return openai_web_search(model=web_search_model, context_size=web_search_context)
+    # --- Firecrawl ---
+    if name == "firecrawl_search":
+        from regimes_probe.tools.firecrawl import firecrawl_search
+        return firecrawl_search()
+    if name == "firecrawl_scrape":
+        from regimes_probe.tools.firecrawl import firecrawl_scrape
+        return firecrawl_scrape()
+    if name == "firecrawl_interact":   # browser-like; only callable if enabled
+        from regimes_probe.tools.firecrawl import firecrawl_interact
+        return firecrawl_interact(enabled=enable_browserish)
+    # --- Monid (agentic tool discovery) ---
+    if name == "monid_discover":
+        from regimes_probe.tools.monid import monid_discover
+        return monid_discover()
+    if name == "monid_inspect":
+        from regimes_probe.tools.monid import monid_inspect
+        return monid_inspect()
+    if name == "monid_run":            # stateful/paid; only callable if allowed
+        from regimes_probe.tools.monid import monid_run
+        return monid_run(enabled=allow_stateful_or_paid)
+    # --- Wokelo (specialized research; fails closed without base url/path) ---
+    if name == "wokelo_research":
+        from regimes_probe.tools.wokelo import wokelo_research
+        return wokelo_research()
+    if name == "wokelo_company_lookup":
+        from regimes_probe.tools.wokelo import wokelo_company_lookup
+        return wokelo_company_lookup()
     if name == "page_fetch":
         from regimes_probe.tools.page_fetch import PageFetch
         return PageFetch()
@@ -206,16 +227,22 @@ def _build_inner(name: str, *, web_search_model: str = "gpt-5.4-mini",
 
 def build_live_providers(tool_names: list[str], *, cache: RecordingCache, armed: bool,
                          web_search_model: str = "gpt-5.4-mini",
-                         web_search_context: str = "low") -> dict[str, SearchProvider]:
+                         web_search_context: str = "low",
+                         allow_stateful_or_paid: bool = False,
+                         enable_browserish: bool = False) -> dict[str, SearchProvider]:
     """Construct + cache-wrap the requested live providers (no network at build).
 
     Each provider becomes a separate bandit arm. ``web_search_model``/
-    ``web_search_context`` are applied to the OpenAI hosted adapter only.
+    ``web_search_context`` apply to the OpenAI hosted adapter only. Stateful/paid
+    (``monid_run``) and browser-like (``firecrawl_interact``) tools are built in a
+    DISABLED state unless their allow flag is set.
     """
     providers: dict[str, SearchProvider] = {}
     for name in tool_names:
         inner = _build_inner(name, web_search_model=web_search_model,
-                             web_search_context=web_search_context)
+                             web_search_context=web_search_context,
+                             allow_stateful_or_paid=allow_stateful_or_paid,
+                             enable_browserish=enable_browserish)
         if inner is None:
             continue
         providers[name] = CachedProvider(inner, cache, armed=armed)

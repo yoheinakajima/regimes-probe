@@ -36,7 +36,8 @@ from regimes_probe.tools import ADAPTER_REGISTRY
 
 PASS, WARN, FAIL = "PASS", "WARN", "FAIL"
 _ENV_VARS = ["OPENAI_API_KEY", "BRAVE_SEARCH_API_KEY", "TAVILY_API_KEY",
-             "EXA_API_KEY", "SERPER_API_KEY"]
+             "EXA_API_KEY", "SERPER_API_KEY", "FIRECRAWL_API_KEY", "MONID_API_KEY",
+             "WOKELO_API_KEY"]
 
 
 class Report:

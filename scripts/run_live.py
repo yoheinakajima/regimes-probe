@@ -97,6 +97,14 @@ def main() -> int:
                     choices=["low", "medium", "high", "unlimited"], help="default: low")
     ap.add_argument("--disable-openai-web-search", action="store_true",
                     help="remove openai_web_search from the tool set entirely")
+    ap.add_argument("--enable-agentic-tool-discovery", action="store_true",
+                    help="enable Monid discover/inspect arms (auto in diverse mode)")
+    ap.add_argument("--enable-scrape-tools", action="store_true",
+                    help="enable firecrawl_scrape (full-page markdown evidence)")
+    ap.add_argument("--enable-browserish-tools", action="store_true",
+                    help="enable browser-like tools (firecrawl_interact). Off by default.")
+    ap.add_argument("--allow-stateful-or-paid-tools", action="store_true",
+                    help="allow stateful/paid execution (monid_run). Off by default.")
     ap.add_argument("--judge-model", default=None,
                     help="(reserved) LLM judge; grading currently uses exact/normalized match")
     ap.add_argument("--split-seed", default=None)
@@ -131,6 +139,10 @@ def main() -> int:
         web_search_context_size=(args.web_search_context_size
                                  or live_cfg.get("web_search_context_size", "low")),
         disable_openai_web_search=args.disable_openai_web_search,
+        enable_agentic_tool_discovery=args.enable_agentic_tool_discovery,
+        enable_scrape_tools=args.enable_scrape_tools,
+        enable_browserish_tools=args.enable_browserish_tools,
+        allow_stateful_or_paid_tools=args.allow_stateful_or_paid_tools,
     )
     tools = settings.tools
     search_tools = settings.search_tools
@@ -178,6 +190,10 @@ def main() -> int:
           f"run_id={run_id} ===")
     print(f"provider_mode={settings.provider_mode}  conditions={conditions}  budgets={budgets}")
     print(f"tools (bandit arms)={tools}")
+    print(f"provider_classes={settings.provider_classes()}")
+    print(f"flags: agentic_discovery={settings.agentic_tool_discovery_enabled} "
+          f"scrape={settings.scrape_tools_enabled} browserish={settings.browserish_tools_enabled} "
+          f"stateful_or_paid_allowed={settings.stateful_or_paid_tools_allowed}")
     print(f"answer_model={settings.answer_model}  "
           f"web_search_model={settings.web_search_model} (ctx={settings.web_search_context_size})  "
           f"openai_web_search_enabled={settings.openai_web_search_enabled}")
@@ -211,7 +227,9 @@ def main() -> int:
     cache = RecordingCache(args.recording_cache, mode=args.cache_mode)
     providers = build_live_providers(tools, cache=cache, armed=True,
                                      web_search_model=settings.web_search_model,
-                                     web_search_context=settings.web_search_context_size)
+                                     web_search_context=settings.web_search_context_size,
+                                     allow_stateful_or_paid=args.allow_stateful_or_paid_tools,
+                                     enable_browserish=args.enable_browserish_tools)
     agent_cfg = AgentConfig(available_tools=tools,
                             query_mode=cfg["policy"]["query_mode"],
                             stop_mode=cfg["policy"]["stop_mode"],

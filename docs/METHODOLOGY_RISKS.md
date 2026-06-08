@@ -113,3 +113,29 @@ A learned-policy improvement is reportable only if **all** hold:
 
 Until then, the honest statement is: **the scaffold demonstrates the intended
 mechanism on a synthetic fixture.**
+
+## 11. Tool-family scope creep (Monid / Firecrawl / Wokelo / browser-use)
+
+Adding agentic, scrape, specialized-research, and browser tools widens the arm
+set — and the risk surface. Keep the experiment honest:
+
+- **browser-use is deferred on purpose.** A browser-control agent turns BrowseComp
+  search-routing into open-ended browser automation, and introduces
+  **prompt-injection and state-mutation** risks (a malicious page can steer the
+  agent). It is NOT implemented as a live adapter in v0; it is registry/docs
+  scaffold only.
+- **Stateful/paid tools (`monid_run`) and browser-like tools (`firecrawl_interact`)
+  are off by default** and require explicit allow flags. They can take
+  side-effecting/paid actions, which breaks the "read-only evidence acquisition"
+  framing of the benchmark — exclude them from headline runs.
+- **Agentic discovery (Monid) is a *different* capability** from search. Treat it as
+  a distinct arm/ablation ("does a learned tool-discovery policy help?"), not as a
+  search provider; don't let it quietly inflate or deflate the search-routing result.
+- **Scrape (Firecrawl) changes evidence quality**, not just routing. Full-page
+  markdown can raise correctness independent of the *policy* — so compare like with
+  like (same tool set across conditions; the same-conditions validator enforces
+  this) and report scrape on/off as an explicit ablation.
+- **Wokelo is unverified here** (JS-rendered docs); the adapter fails closed until
+  the official endpoint shape/OpenAPI is supplied. Do not guess endpoints.
+- **First BrowseComp runs stay cheap search-only.** Add families one at a time,
+  after a baseline works, so any change in `correct_per_tool_call` is attributable.

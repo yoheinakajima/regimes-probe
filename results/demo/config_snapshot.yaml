@@ -60,6 +60,7 @@ live:
   - brave_search
   - tavily_search
   - exa_search
+  - firecrawl_search
   web_search_context_size: low
   web_search_model: gpt-5.4-mini
 main_metric: correct_per_tool_call

@@ -127,3 +127,19 @@ python scripts/compare_runs.py results/live/<run_id>/report.json results/live/<o
 - Secrets are env-only; the cache and manifest redact key-like fields.
 - A synthetic/placeholder dataset is always `headline_eligible=false`. Until a run
   clears `docs/FIRST_REAL_RESULT_CRITERIA.md`, **no benchmark result is claimed.**
+
+## Extra tool families (opt-in; add only after cheap search works)
+- `--enable-scrape-tools` adds `firecrawl_scrape` (full-page markdown — richer
+  evidence than snippets).
+- `--enable-agentic-tool-discovery` adds Monid `monid_discover`/`monid_inspect`
+  (a learned *tool-discovery* arm; auto-on in `diverse`).
+- `--allow-stateful-or-paid-tools` (Monid `monid_run`) and
+  `--enable-browserish-tools` (`firecrawl_interact`) are **off by default** and are
+  NOT part of the first BrowseComp runs.
+- `browser_use` is **deferred** (browser control; prompt-injection/state risk).
+- Wokelo (`wokelo_research`/`wokelo_company_lookup`) needs `WOKELO_BASE_URL` +
+  endpoint path; otherwise it fails closed.
+
+See **[TOOL_ABSTRACTIONS.md](./TOOL_ABSTRACTIONS.md)** for the full taxonomy,
+per-arm metadata, and the safety gates. Recommended order: cheap search-only →
+add scrape → add agentic discovery → (later) specialized research.

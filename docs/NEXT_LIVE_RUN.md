@@ -67,6 +67,9 @@ plus **≥2 independent** search adapters. In `config/default.yaml`:
 
 ## 5. First tiny live run — **budgets [1, 3], OPTIMIZE=10, CONFIRM=20**
 
+The exact escalating commands (A–E) live in **[`docs/LIVE_LADDER.md`](./LIVE_LADDER.md)**
+— each is dry-run unless you add `--execute`. The executor is `scripts/run_live.py`.
+
 Start small to validate plumbing and **cost**, not to make a claim. These are the
 exact parameters for the first run; do not scale up until it works.
 

@@ -93,10 +93,18 @@ snapshot → report + replay check → `results/demo/`. Other no-key helpers:
 `run_ablations.py`, `inspect_memory_snapshot.py`, `compare_runs.py`,
 `hash_artifacts.py`, `generate_claims.py` (and `make help`).
 
-**For a real run** (needs keys), follow **[`docs/NEXT_LIVE_RUN.md`](docs/NEXT_LIVE_RUN.md)**.
-First validate config (calls no providers): `python scripts/validate_live_readiness.py`
-and `python scripts/preflight_first_live_run.py` (defaults to a tiny
-10 OPTIMIZE / 20 CONFIRM run).
+**For a real run** (needs keys), follow **[`docs/LIVE_LADDER.md`](docs/LIVE_LADDER.md)**
+(the A–E command ladder) and **[`docs/NEXT_LIVE_RUN.md`](docs/NEXT_LIVE_RUN.md)**.
+The executor `scripts/run_live.py` is **safe by default** (dry-run; refuses to
+spend without `--execute`):
+
+```bash
+python scripts/validate_live_readiness.py            # config check, no calls
+python scripts/preflight_first_live_run.py           # preflight + manifest, no calls
+python scripts/run_live.py --dataset real-shaped --optimize 5 --confirm 10 \
+    --budgets 1 --conditions closed_book,no_memory_search   # DRY-RUN (no calls)
+# add --execute (and a dataset path + OPENAI_API_KEY) to actually run.
+```
 
 Representative **synthetic-fixture** result (committed under `results/demo/`) —
 this validates the *mechanism and harness*, **not** any real benchmark. The

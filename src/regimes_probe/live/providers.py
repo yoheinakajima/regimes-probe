@@ -1,0 +1,231 @@
+"""Live provider + answerer builders (env-gated, cache-wrapped, opt-in).
+
+Builds the OpenAI Responses answerer, the OpenAI ``web_search`` tool adapter, the
+page-fetch adapter, and any keyed independent search adapters already in
+``regimes_probe.tools``. Every live call flows through a
+:class:`~regimes_probe.live.cache.RecordingCache`, and every wrapper carries an
+``armed`` flag: when not armed (dry-run) any attempt to actually call a provider
+raises instead of spending.
+
+Credentials are read from environment variables only and never stored.
+"""
+
+from __future__ import annotations
+
+import os
+from decimal import Decimal
+from typing import Any, Optional
+
+from regimes_probe.activegraph_pack.tools import payload_to_response
+from regimes_probe.agent.answerer import CandidateAnswer
+from regimes_probe.agent.evidence import EvidenceObservation
+from regimes_probe.live.cache import RecordingCache, ReplayMiss
+from regimes_probe.tools.base import ProviderUnavailable, SearchProvider, SearchResponse
+
+# Env var each adapter needs (None = no key required).
+_ADAPTER_ENV = {
+    "openai_web_search": "OPENAI_API_KEY",
+    "openai_web_search_low_context": "OPENAI_API_KEY",
+    "page_fetch": None,
+    "brave_search": "BRAVE_SEARCH_API_KEY",
+    "tavily_search": "TAVILY_API_KEY",
+    "exa_search": "EXA_API_KEY",
+    "serper_search": "SERPER_API_KEY",
+    "news_search": "NEWS_API_KEY",
+    "official_domain_search": "OFFICIAL_SEARCH_API_KEY",
+    "generic_web_search": None,
+}
+
+
+class NotArmed(RuntimeError):
+    """Raised when a live call is attempted in dry-run (un-armed) mode."""
+
+
+class CachedProvider(SearchProvider):
+    """Wrap a live provider so calls are cached/replayable and spend-guarded."""
+
+    def __init__(self, inner: SearchProvider, cache: RecordingCache, *, armed: bool) -> None:
+        self.inner = inner
+        self.cache = cache
+        self.armed = armed
+        self.name = inner.name
+        self.cost_per_call = getattr(inner, "cost_per_call", Decimal("0"))
+        self.deterministic = False
+        self.is_fetch = getattr(inner, "is_fetch", False)
+
+    def available(self) -> bool:
+        return self.inner.available()
+
+    def search(self, query: str, *, limit: int = 5, **opts: Any) -> SearchResponse:
+        meta = {"query": query, "limit": limit, "opts": opts}
+        h = self.cache.request_hash(self.name, self.name, meta)
+        entry = self.cache.get(h)
+        if entry and self.cache.mode in ("auto", "replay"):
+            self.cache.hits += 1
+            return payload_to_response(entry["response"])
+        if self.cache.mode == "replay":
+            raise ReplayMiss(f"{self.name}: no cached response for this request (replay mode)")
+        if not self.armed:
+            raise NotArmed(f"{self.name}: refusing to call provider in dry-run "
+                           "(pass --execute to arm live calls)")
+        resp = self.inner.search(query, limit=limit, **opts)   # the only network
+        self.cache.calls += 1
+        if self.cache.mode != "off":
+            self.cache.store(h, provider=self.name, name=self.name,
+                             request_meta=meta, response_payload=resp.to_dict())
+        return resp
+
+
+# ----------------------------------------------------------------- answerers
+class _BaseLiveAnswerer:
+    model: str
+    cache: RecordingCache
+    armed: bool
+    prompt_name: str
+
+    def available(self) -> bool:
+        if not os.environ.get("OPENAI_API_KEY"):
+            return False
+        try:
+            import openai  # noqa: F401
+        except Exception:
+            return False
+        return True
+
+    def _call_openai(self, instructions: str, user_input: str) -> str:
+        from openai import OpenAI  # local import: never at module load
+        client = OpenAI()
+        resp = client.responses.create(model=self.model, instructions=instructions,
+                                        input=user_input)
+        return (getattr(resp, "output_text", "") or "").strip()
+
+    def _cached_or_call(self, meta: dict[str, Any], instructions: str,
+                        user_input: str) -> str:
+        h = self.cache.request_hash("openai_responses", self.model, meta)
+        entry = self.cache.get(h)
+        if entry and self.cache.mode in ("auto", "replay"):
+            self.cache.hits += 1
+            return entry["response"].get("text", "")
+        if self.cache.mode == "replay":
+            raise ReplayMiss(f"answerer: no cached response (replay mode)")
+        if not self.armed:
+            raise NotArmed("answerer: refusing to call model in dry-run "
+                           "(pass --execute to arm live calls)")
+        text = self._call_openai(instructions, user_input)
+        self.cache.calls += 1
+        if self.cache.mode != "off":
+            self.cache.store(h, provider="openai_responses", name=self.model,
+                             request_meta=meta, response_payload={"text": text})
+        return text
+
+
+class LiveAnswerer(_BaseLiveAnswerer):
+    """Evidence-grounded answerer for the search conditions (OpenAI Responses)."""
+
+    name = "live_answerer"
+    prompt_name = "answerer"
+
+    def __init__(self, model: str, cache: RecordingCache, *, armed: bool) -> None:
+        self.model = model
+        self.cache = cache
+        self.armed = armed
+
+    def answer(self, observations: list[EvidenceObservation], *, item=None) -> CandidateAnswer:
+        from regimes_probe.agent import prompts
+        supports = [o for o in observations if o.supports]
+        evidence = [{"url": o.url, "snippet": o.snippet} for o in supports]
+        if not evidence:
+            return CandidateAnswer(None, 0, 0.0, [])
+        meta = {"model": self.model, "prompt": prompts.fingerprint("answerer"),
+                "question": (item.question if item else ""), "evidence": evidence}
+        instr = prompts.get("answerer").content
+        user = (f"Question: {item.question if item else ''}\n\nEvidence:\n"
+                + "\n".join(f"- ({e['url']}) {e['snippet']}" for e in evidence))
+        text = self._cached_or_call(meta, instr, user)
+        ans = None if (not text or text.strip().upper() == "ABSTAIN") else text.strip()
+        auth = max((o.source_authority for o in supports), default=0.0)
+        return CandidateAnswer(ans, len(supports), auth, [o.url for o in supports])
+
+
+class LiveClosedBookAnswerer(_BaseLiveAnswerer):
+    """Closed-book answerer (no tools): intrinsic-knowledge estimate."""
+
+    name = "live_closed_book_answerer"
+    prompt_name = "closed_book"
+
+    def __init__(self, model: str, cache: RecordingCache, *, armed: bool) -> None:
+        self.model = model
+        self.cache = cache
+        self.armed = armed
+
+    def answer(self, observations: list[EvidenceObservation], *, item=None) -> CandidateAnswer:
+        from regimes_probe.agent import prompts
+        meta = {"model": self.model, "prompt": prompts.fingerprint("closed_book"),
+                "question": (item.question if item else "")}
+        text = self._cached_or_call(meta, prompts.get("closed_book").content,
+                                    f"Question: {item.question if item else ''}")
+        ans = None if (not text or text.strip().upper() == "ABSTAIN") else text.strip()
+        return CandidateAnswer(ans, 0, 1.0 if ans else 0.0, ["intrinsic:closed_book"])
+
+
+# ----------------------------------------------------------------- builders
+def _build_inner(name: str) -> Optional[SearchProvider]:
+    if name in ("openai_web_search", "openai_web_search_low_context"):
+        from regimes_probe.tools.openai_web_search import (
+            openai_web_search, openai_web_search_low_context)
+        return (openai_web_search_low_context() if name.endswith("low_context")
+                else openai_web_search())
+    if name == "page_fetch":
+        from regimes_probe.tools.page_fetch import PageFetch
+        return PageFetch()
+    if name == "brave_search":
+        from regimes_probe.tools.brave_search import BraveSearch
+        return BraveSearch()
+    if name == "tavily_search":
+        from regimes_probe.tools.tavily_search import TavilySearch
+        return TavilySearch()
+    if name == "exa_search":
+        from regimes_probe.tools.exa_search import ExaSearch
+        return ExaSearch()
+    if name == "serper_search":
+        from regimes_probe.tools.serper_search import SerperSearch
+        return SerperSearch()
+    if name in ("news_search", "official_domain_search", "generic_web_search"):
+        from regimes_probe.tools.generic_web_search import (
+            GenericWebSearch, news_search, official_domain_search)
+        if name == "news_search":
+            return news_search()
+        if name == "official_domain_search":
+            return official_domain_search()
+        return GenericWebSearch(name="generic_web_search")
+    return None
+
+
+def build_live_providers(tool_names: list[str], *, cache: RecordingCache,
+                         armed: bool) -> dict[str, SearchProvider]:
+    """Construct + cache-wrap the requested live providers (no network at build)."""
+    providers: dict[str, SearchProvider] = {}
+    for name in tool_names:
+        inner = _build_inner(name)
+        if inner is None:
+            continue
+        providers[name] = CachedProvider(inner, cache, armed=armed)
+    return providers
+
+
+def build_live_answerer(kind: str, *, model: str, cache: RecordingCache, armed: bool):
+    if kind == "closed_book":
+        return LiveClosedBookAnswerer(model, cache, armed=armed)
+    return LiveAnswerer(model, cache, armed=armed)
+
+
+def missing_keys(tool_names: list[str], *, answer_model_needs_openai: bool = True) -> list[str]:
+    """Env-var NAMES that are required but absent (for execute/strict errors)."""
+    needed: set[str] = set()
+    if answer_model_needs_openai:
+        needed.add("OPENAI_API_KEY")
+    for name in tool_names:
+        env = _ADAPTER_ENV.get(name)
+        if env:
+            needed.add(env)
+    return sorted(k for k in needed if not os.environ.get(k))

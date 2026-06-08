@@ -66,6 +66,34 @@ claims:
 docs-check:
 	$(PY) scripts/docs_check.py
 
+# --- Live ladder (NO provider calls except an explicit --execute you type) ---
+.PHONY: live-preflight
+live-preflight:  ## validate config + preflight (NO provider calls)
+	$(PY) scripts/validate_live_readiness.py
+	$(PY) scripts/preflight_first_live_run.py
+
+.PHONY: live-dry-run
+live-dry-run:    ## plan a tiny live run (NO provider calls)
+	$(PY) scripts/run_live.py --dataset real-shaped --optimize 5 --confirm 10 \
+		--budgets 1 --conditions closed_book,no_memory_search
+
+.PHONY: live-tiny-command-print
+live-tiny-command-print:  ## print the tiny live commands (does NOT run them)
+	@echo "Tiny plumbing run (calls providers — needs OPENAI_API_KEY):"
+	@echo "  python scripts/run_live.py --dataset livebrowsecomp --dataset-path PATH \\"
+	@echo "      --optimize 5 --confirm 10 --budgets 1 \\"
+	@echo "      --conditions closed_book,no_memory_search \\"
+	@echo "      --recording-cache results/live/cache.json --execute"
+
+.PHONY: live-execute-help
+live-execute-help:  ## explain how to actually execute (prints only; runs nothing)
+	@echo "run_live is SAFE BY DEFAULT (dry-run). To spend money you must type --execute"
+	@echo "yourself; no Make target runs providers. See docs/LIVE_LADDER.md. Example:"
+	@echo "  python scripts/run_live.py --dataset livebrowsecomp --dataset-path PATH \\"
+	@echo "      --optimize 10 --confirm 20 --budgets 1,3 \\"
+	@echo "      --recording-cache results/live/cache.json --execute"
+	@$(PY) scripts/run_live.py --help | sed -n '1,3p'
+
 .PHONY: check
 check: test docs-check
 	$(PY) scripts/run_synthetic_full.py --run-id _check >/dev/null && echo "synthetic-full OK"

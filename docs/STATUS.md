@@ -6,12 +6,12 @@ the honesty contract for the project (mirrors the `regimes` discipline).
 
 Last updated for: v0 (synthetic harness, Study 0 + Study 1).
 
-**Readiness: READY FOR A TINY LIVE RUN; NOT BENCHMARK-CLAIMED.** The no-key
-scaffold is frozen and auditable — split, four baselines/controls, frozen-memory
-CONFIRM, leakage guards, replay, manifest, prompt pinning, cost estimate, and
-headline-eligibility all pass offline. The only remaining step before numbers is
-wiring live providers and running the tiny 10/20 run in `docs/NEXT_LIVE_RUN.md`
-(budgets [1, 3]). Until that run clears `docs/FIRST_REAL_RESULT_CRITERIA.md` with
+**Readiness: LIVE EXECUTOR WIRED BUT NOT EXECUTED; NOT BENCHMARK-CLAIMED.** The
+no-key scaffold is frozen and auditable, **and** the live executor
+(`scripts/run_live.py` + `src/regimes_probe/live/`) is now wired into the same
+harness — safe by default (dry-run; refuses to spend without `--execute`). **No
+provider-calling run has been performed; the first one is still pending.** The
+ladder is `docs/LIVE_LADDER.md` (A–E); start with the tiny 10/20, budgets [1, 3]. Until that run clears `docs/FIRST_REAL_RESULT_CRITERIA.md` with
 `headline_eligible = true`, **no benchmark performance is claimed.**
 
 **One-line summary:** the scaffold demonstrates the intended mechanism on a
@@ -51,7 +51,11 @@ real result is `docs/REAL_BENCHMARK_READINESS.md` + `docs/NEXT_LIVE_RUN.md`.
 | A **run manifest** records git/dataset/split/models/prompts/tools/budgets/memory/eligibility/cost with **no secrets** (env-var names only). | `eval/manifest.py`; `results/demo/run_manifest.json`; `tests/test_live_readiness_scaffold.py`. |
 | **Prompts are version+hash pinned** and folded into the same-conditions fingerprint. | `agent/prompts.py`; `ConditionSpec.answer_prompt_version`; `tests/test_live_readiness_scaffold.py`. |
 | Run artifacts have a **hash ledger**; a **conservative claim generator** REFUSES performance claims when `headline_eligible=false`. | `scripts/hash_artifacts.py` (`results/demo/artifact_hashes.json`), `scripts/generate_claims.py` (`results/demo/claims_candidates.md`). |
-| Docs lint + no-overclaim check passes; no-key Make targets run. | `scripts/docs_check.py` (24 docs), `Makefile` (`make check`). |
+| Docs lint + no-overclaim check passes; no-key Make targets run. | `scripts/docs_check.py` (25 docs), `Makefile` (`make check`). |
+| The **live executor is wired** into the provider-agnostic harness, **safe by default** (dry-run; `--execute` required to spend). | `scripts/run_live.py`, `src/regimes_probe/live/{providers,cache,runner}.py`; `tests/test_run_live_safety.py`. |
+| Live calls are **cache/replay-guarded** (no re-spend) and **un-armed in dry-run** (refuse to call). | `RecordingCache`, `CachedProvider`/`NotArmed`; `tests/test_run_live_safety.py`. |
+| The execute pipeline passes **same-conditions + headline-eligibility** plumbing (verified with mock providers, no network). | `tests/test_run_live_safety.py::test_run_live_pipeline_with_mocks_passes_plumbing`. |
+| Secrets never enter cache/manifest/artifacts (env-var names only; key-like fields redacted). | `live/cache.sanitize`; `tests/test_run_live_safety.py`. |
 | The graph is a deterministic projection of the event log (replay passes). | `results/demo/replay_check.md` (`projection_matches: true`); `tests/test_fake_tool_replay.py`. |
 | Fake tool calls are replayable; replay detects divergence. | `tests/test_fake_tool_replay.py::test_recording_then_replay_reproduces_responses`, `::test_replay_divergence_is_detected`. |
 | The project also runs with the standard library + PyYAML only (no `activegraph`). | `EventLog` fallback in `activegraph_pack/behaviors.py`; verified by blocking the import. |
@@ -78,9 +82,16 @@ python scripts/estimate_live_cost.py --optimize 10 --confirm 20
 python scripts/inspect_memory_snapshot.py results/demo/memory_snapshot.json   # leakage PASS
 python scripts/hash_artifacts.py results/demo
 python scripts/generate_claims.py results/demo/report.json   # REFUSES perf claims
-python scripts/docs_check.py                      # 24 docs, no overclaim
+python scripts/docs_check.py                      # 25 docs, no overclaim
+python scripts/run_live.py --dataset real-shaped --optimize 5 --confirm 10 \
+    --budgets 1 --conditions closed_book,no_memory_search   # DRY-RUN, no calls
+make live-dry-run                                 # no provider calls
 make check
 ```
+
+**Live executor: wired, not executed.** `scripts/run_live.py` calls providers
+ONLY with `--execute` (never run here). First provider-calling run is pending;
+see `docs/LIVE_LADDER.md`.
 
 ## ◑ Partially verified claims
 

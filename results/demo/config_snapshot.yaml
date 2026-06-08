@@ -1,0 +1,108 @@
+ablations:
+  correctness_only_reward:
+    reward:
+      preset: correctness_only
+  frozen_memory_confirm:
+    memory:
+      confirm_updates_memory: false
+  full_epistemic_reward:
+    reward:
+      preset: full
+  online_learning_confirm:
+    _non_headline: true
+    _online_confirm: true
+    memory:
+      confirm_updates_memory: true
+  routing_only:
+    policy:
+      query_mode: fixed
+      stop_mode: always_full
+  routing_plus_query_plus_stop_verify:
+    policy:
+      query_mode: learned
+      stop_mode: learned
+  routing_plus_query_policy:
+    policy:
+      query_mode: learned
+      stop_mode: always_full
+bandit:
+  blend_global: 0.4
+  blend_local: 1.0
+  blend_neighbor: 0.7
+  confidence_penalty: 0.1
+  exploration_coeff: 0.6
+  recency_decay: 0.98
+  seed: 1729
+  strategy: ucb
+budgets:
+- 1
+- 3
+- 5
+- 10
+dataset:
+  browsecomp_csv: ''
+  default: synthetic
+  fake_corpus_path: fixtures/fake_search_corpus.json
+  livebrowsecomp_hf: Forival/LiveBrowseComp
+  livebrowsecomp_local_jsonl: ''
+  primary: LiveBrowseComp
+  secondary: BrowseComp
+  synthetic_path: fixtures/synthetic_browse.json
+live:
+  answer_model: gpt-5.5
+  cheaper_answer_model: gpt-5.4-mini
+  embedder: hash_embedder
+  search_baseline: openai_web_search
+  tools_enabled:
+  - generic_web_search
+  - news_search
+  - official_domain_search
+  - brave_search
+  - page_fetch
+main_metric: correct_per_tool_call
+memory:
+  confirm_updates_memory: false
+  confirm_uses_frozen_snapshot: true
+  experience_budget: 5
+  experience_passes: 4
+  nearest_k: 8
+  optimize_allows_exploration: true
+policy:
+  query_mode: learned
+  stop_mode: learned
+regimes_loop:
+  confirm_max_regression: 0.0
+  enabled: false
+  gate_budget: 3
+  optimize_min_delta: 0.01
+  passes: 4
+reward:
+  preset: full
+  weights:
+    contradiction_penalty: 0.3
+    correctness: 1.0
+    cost_penalty: 2.0
+    evidence_quality: 0.3
+    extra_call_penalty: 0.2
+    first_tool_hit: 0.5
+    freshness: 0.2
+    latency_penalty: 0.0
+    source_authority: 0.2
+    stale_penalty: 0.4
+router:
+  cost_weight: 0.5
+run:
+  as_of: '2026-06-01'
+  results_root: results
+  run_id_prefix: regimes-probe
+split:
+  confirm_fraction: 0.4
+  mode: hash
+  salt: regimes-probe-v0
+stopping:
+  min_calls_before_stop: 1
+  stop_threshold: 0.6
+verification:
+  authority_threshold: 0.7
+  freshness_required_when_sensitive: true
+  min_support: 1

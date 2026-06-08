@@ -82,7 +82,7 @@ See `docs/BENCHMARK_TARGETS.md`. Unit tests never require real benchmark data.
 
 ```bash
 pip install -e .            # or: pip install -e '.[dev,activegraph]'
-python -m pytest -q         # 60 tests, no keys/network
+python -m pytest -q         # 68 tests, no keys/network
 
 # The whole no-key pipeline in one command (the first demo):
 python scripts/run_synthetic_full.py --run-id demo   # split -> baseline -> experience ->
@@ -101,8 +101,16 @@ python scripts/run_ablations.py                  # Level1/Level2/reward/online a
 python scripts/inspect_memory_snapshot.py results/demo/memory_snapshot.json   # audit a snapshot
 python scripts/compare_runs.py results/a/report.json results/b/report.json    # diff two runs
 
-# Real-benchmark readiness (validates config only; calls NO providers):
+# Real-benchmark readiness (all validate config only; call NO providers):
 python scripts/validate_live_readiness.py        # add --strict to gate on gaps
+python scripts/preflight_first_live_run.py --optimize 10 --confirm 20  # writes dry-run manifest
+python scripts/estimate_live_cost.py --optimize 10 --confirm 20        # call/cost footprint
+python scripts/hash_artifacts.py results/demo    # artifact hash ledger
+python scripts/generate_claims.py results/demo/report.json   # conservative claim candidates
+
+# Or via Make (all no-key unless labelled live):
+make check          # test + docs-check + synthetic-full + real-shaped-smoke
+make preflight-live # preflight (no provider calls)
 ```
 
 Representative **synthetic-fixture** result (committed under `results/demo/`) —
@@ -159,7 +167,8 @@ protocol, leakage controls, reporting, implementation plan, and `STATUS.md`.
 
 For the path to a real benchmark: `docs/REAL_BENCHMARK_READINESS.md`,
 `docs/NEXT_LIVE_RUN.md`, `docs/FIRST_REAL_RESULT_CRITERIA.md`, and
-`docs/METHODOLOGY_RISKS.md` (read this one before believing any number).
+`docs/METHODOLOGY_RISKS.md` (read this one before believing any number). For
+review/merge: `docs/PUBLIC_REVIEW_CHECKLIST.md` and `docs/MERGE_READINESS.md`.
 
 ## Repository layout
 

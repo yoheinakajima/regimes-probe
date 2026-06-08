@@ -1,0 +1,211 @@
+{
+  "run_id": "demo",
+  "live": false,
+  "git": {
+    "branch": "claude/regimes-probe-setup-ILfr0",
+    "commit": "eafd8e09ac9a306ac8b99a03498ba5bb4e90bc49",
+    "dirty": true
+  },
+  "dataset": {
+    "name": "synthetic_browse",
+    "version": "synthetic_browse@44963c46dfcf",
+    "checksum": "c98af17175176473",
+    "path": null
+  },
+  "split": {
+    "seed": "regimes-probe-v0",
+    "mode": "hash",
+    "n_optimize": 35,
+    "n_confirm": 28,
+    "optimize_ids": [
+      "syn-003",
+      "syn-004",
+      "syn-006",
+      "syn-007",
+      "syn-009",
+      "syn-010",
+      "syn-012",
+      "syn-013",
+      "syn-015",
+      "syn-017",
+      "syn-018",
+      "syn-020",
+      "syn-024",
+      "syn-025",
+      "syn-027",
+      "syn-028",
+      "syn-029",
+      "syn-031",
+      "syn-032",
+      "syn-033",
+      "syn-036",
+      "syn-038",
+      "syn-041",
+      "syn-042",
+      "syn-043",
+      "syn-044",
+      "syn-045",
+      "syn-046",
+      "syn-048",
+      "syn-049",
+      "syn-053",
+      "syn-055",
+      "syn-057",
+      "syn-060",
+      "syn-061"
+    ],
+    "confirm_ids": [
+      "syn-001",
+      "syn-002",
+      "syn-005",
+      "syn-008",
+      "syn-011",
+      "syn-014",
+      "syn-016",
+      "syn-019",
+      "syn-021",
+      "syn-022",
+      "syn-023",
+      "syn-026",
+      "syn-030",
+      "syn-034",
+      "syn-035",
+      "syn-037",
+      "syn-039",
+      "syn-040",
+      "syn-047",
+      "syn-050",
+      "syn-051",
+      "syn-052",
+      "syn-054",
+      "syn-056",
+      "syn-058",
+      "syn-059",
+      "syn-062",
+      "syn-063"
+    ]
+  },
+  "models": {
+    "answer_model": "gpt-5.5",
+    "cheaper_answer_model": "gpt-5.4-mini",
+    "embedder": "hash_embedder",
+    "search_baseline": "openai_web_search"
+  },
+  "prompts": {
+    "answerer": {
+      "name": "answerer",
+      "version": "v1",
+      "content_hash": "2d3530407bf5e36c",
+      "fingerprint": "answerer@v1#2d353040",
+      "intended_use": "evidence-grounded short-answer extraction (search conditions)",
+      "allowed_to_vary": false
+    },
+    "closed_book": {
+      "name": "closed_book",
+      "version": "v1",
+      "content_hash": "1bddf7d564cfa05d",
+      "fingerprint": "closed_book@v1#1bddf7d5",
+      "intended_use": "intrinsic-knowledge answer with no tools (closed_book baseline)",
+      "allowed_to_vary": false
+    },
+    "judge": {
+      "name": "judge",
+      "version": "v1",
+      "content_hash": "83c18a8a5dd61326",
+      "fingerprint": "judge@v1#83c18a8a",
+      "intended_use": "optional LLM judge for free-form grading",
+      "allowed_to_vary": false
+    },
+    "query_llm": {
+      "name": "query_llm",
+      "version": "v1",
+      "content_hash": "7014092a3e253215",
+      "fingerprint": "query_llm@v1#7014092a",
+      "intended_use": "LLM query generation (Level 2; replaceable by templates)",
+      "allowed_to_vary": true
+    }
+  },
+  "tools_enabled": [
+    "generic_web_search",
+    "news_search",
+    "official_domain_search",
+    "brave_search"
+  ],
+  "provider_names": [
+    "generic_web_search",
+    "news_search",
+    "official_domain_search",
+    "brave_search"
+  ],
+  "provider_config": {},
+  "budgets": [
+    1,
+    3,
+    5,
+    10
+  ],
+  "memory": {
+    "condition": "frozen_policy_memory",
+    "confirm_uses_frozen_snapshot": true,
+    "confirm_updates_memory": false,
+    "freezes_during_confirm": true
+  },
+  "grader": "normalized_match",
+  "headline_eligibility_preflight": {
+    "headline_eligible": false,
+    "mechanism_ok": true,
+    "dataset_is_real": false,
+    "checks": {
+      "optimize_confirm_disjoint": true,
+      "confirm_memory_frozen": true,
+      "no_answer_leakage": true,
+      "same_conditions": true,
+      "replay_passed": true,
+      "baseline_and_policy_completed": true,
+      "budget_enforced": true,
+      "no_live_updates_during_confirm": true
+    },
+    "reasons": [
+      "dataset is a synthetic/placeholder fixture \u2014 not a benchmark headline"
+    ]
+  },
+  "cost_estimate": {
+    "n_optimize": 35,
+    "n_confirm": 28,
+    "budgets": [
+      1,
+      3,
+      5,
+      10
+    ],
+    "passes": 4,
+    "experience_budget": 5,
+    "answerer_calls": 504,
+    "grader_calls": 504,
+    "judge_calls": 0,
+    "worst_case_tool_calls": 2296,
+    "worst_case_search_calls": 2296,
+    "worst_case_page_fetch_calls": 2296,
+    "per_condition": {
+      "experience": {
+        "attempts": 140,
+        "max_tool_calls": 700
+      },
+      "closed_book": {
+        "attempts": 28,
+        "max_tool_calls": 0
+      },
+      "search_conditions": {
+        "attempts": 336,
+        "max_tool_calls": 1596,
+        "names": [
+          "no_memory_search",
+          "policy_memory",
+          "random_memory"
+        ]
+      }
+    },
+    "prices": {},
+    "estimated_cost_usd": "unknown"
+  }
+}

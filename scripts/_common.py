@@ -82,7 +82,9 @@ from regimes_probe.activegraph_pack import replay_check
 from regimes_probe.agent.answerer import build_closed_book_knowledge
 from regimes_probe.agent.planner import build_closed_book_agent
 from regimes_probe.eval.conditions import ConditionSpec, same_conditions
+from regimes_probe.eval.cost import estimate_calls
 from regimes_probe.eval.eligibility import compute_eligibility
+from regimes_probe.eval.manifest import build_manifest, write_manifest
 from regimes_probe.eval.harness import experience_phase, run_condition
 from regimes_probe.eval.metrics import compute_metrics
 from regimes_probe.eval.report import ConditionRun, write_full_report
@@ -98,10 +100,18 @@ def _hash(*parts: Any) -> str:
     return hashlib.sha256("|".join(str(p) for p in parts).encode()).hexdigest()[:12]
 
 
+def _dataset_checksum(items) -> str:
+    h = hashlib.sha256()
+    for it in sorted(items, key=lambda i: i.id):
+        h.update(it.id.encode()); h.update(b"\x00"); h.update(it.question.encode())
+    return h.hexdigest()[:16]
+
+
 def _condition_spec(cfg, search_tools, budget, split, memory_access) -> ConditionSpec:
+    from regimes_probe.agent import prompts
     return ConditionSpec(
         answer_model=cfg.get("live", {}).get("answer_model", "deterministic_answerer"),
-        answer_prompt_version="v0",
+        answer_prompt_version=prompts.fingerprint("answerer"),
         enabled_tools=tuple(sorted(search_tools)),
         tool_budget=budget,
         split_id=_hash(split.mode, split.salt, tuple(split.confirm_ids)),
@@ -275,7 +285,7 @@ def full_pipeline(
             "No claim benchmark answers are stored in policy memory (they are not).",
         ],
     }
-    step("write report artifacts")
+    step("write report artifacts + run manifest")
     run_dir = write_full_report(run_id, runs=runs, snapshot=snapshot.to_dict(),
                                 replay=replay, significance=significance, meta=meta,
                                 eligibility=eligibility.to_dict(),
@@ -283,6 +293,28 @@ def full_pipeline(
                                 condition_specs={"no_memory_search": base_spec.to_dict(),
                                                  "policy_memory": pol_spec.to_dict()},
                                 results_root=results_root)
+
+    # Run manifest (no secrets) — written for every run dir so any run is
+    # auditable. The eligibility/cost here describe the run that just executed.
+    cost = estimate_calls(
+        n_optimize=len(opt_items), n_confirm=len(con_items), budgets=budgets,
+        passes=mem_cfg.get("experience_passes", 4),
+        experience_budget=mem_cfg.get("experience_budget", 5),
+        judge=cfg.get("grading", {}).get("judge", "exact"),
+        prices=cfg.get("pricing"),
+    ).to_dict()
+    manifest = build_manifest(
+        run_id=run_id, cfg=cfg, dataset_label=dataset_label,
+        dataset_version=dataset_version, dataset_checksum=_dataset_checksum(items),
+        dataset_path=None, split=split, search_tools=search_tools, tools_cfg=None,
+        memory_cfg=mem_cfg, eligibility_preflight=eligibility.to_dict(),
+        cost_estimate=cost, live=False,
+    )
+    write_manifest(run_dir, manifest)
+    # Snapshot the effective config into the run dir so it is part of the
+    # hashable artifact set (scripts/hash_artifacts.py).
+    (Path(run_dir) / "config_snapshot.yaml").write_text(
+        yaml.safe_dump(cfg, sort_keys=True), encoding="utf-8")
 
     headline = {b: {
         "no_memory_search": compute_metrics(aligned[b][0]),

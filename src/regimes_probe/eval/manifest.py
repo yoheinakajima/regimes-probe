@@ -1,0 +1,117 @@
+"""Dry-run manifest: everything needed to audit/reproduce a run, no secrets.
+
+The manifest is written *before* any live call so a run is fully described up
+front. It records git provenance, dataset identity, the exact split, model/prompt
+versions, tool/provider names (never secret values), budgets, memory policy, the
+preflight eligibility verdict, and the call/cost estimate.
+"""
+
+from __future__ import annotations
+
+import subprocess
+from pathlib import Path
+from typing import Any, Optional
+
+from regimes_probe.agent import prompts
+
+
+def _git(args: list[str]) -> Optional[str]:
+    try:
+        out = subprocess.run(["git", *args], capture_output=True, text=True, timeout=5)
+        if out.returncode == 0:
+            return out.stdout.strip()
+    except Exception:
+        pass
+    return None
+
+
+def git_provenance() -> dict[str, Any]:
+    branch = _git(["rev-parse", "--abbrev-ref", "HEAD"])
+    commit = _git(["rev-parse", "HEAD"])
+    status = _git(["status", "--porcelain"])
+    return {
+        "branch": branch,
+        "commit": commit,
+        "dirty": (bool(status) if status is not None else None),
+    }
+
+
+def build_manifest(
+    *,
+    run_id: str,
+    cfg: dict[str, Any],
+    dataset_label: str,
+    dataset_version: str,
+    dataset_checksum: Optional[str],
+    dataset_path: Optional[str],
+    split,
+    search_tools: list[str],
+    tools_cfg: Optional[dict[str, Any]],
+    memory_cfg: dict[str, Any],
+    eligibility_preflight: dict[str, Any],
+    cost_estimate: dict[str, Any],
+    live: bool = False,
+) -> dict[str, Any]:
+    """Assemble the manifest dict (pure given inputs; git is read locally)."""
+    live_cfg = cfg.get("live", {})
+    adapters = (tools_cfg or {}).get("adapters", {}) if tools_cfg else {}
+    provider_names = sorted(adapters.keys()) or list(search_tools)
+    provider_config = {
+        name: {"enabled": bool(a.get("enabled", False)),
+               "api_key_env": a.get("api_key_env", "")}   # NAME only, never value
+        for name, a in adapters.items()
+    }
+
+    return {
+        "run_id": run_id,
+        "live": live,
+        "git": git_provenance(),
+        "dataset": {
+            "name": dataset_label,
+            "version": dataset_version,
+            "checksum": dataset_checksum,
+            "path": dataset_path,
+        },
+        "split": {
+            "seed": split.salt,
+            "mode": split.mode,
+            "n_optimize": len(split.optimize_ids),
+            "n_confirm": len(split.confirm_ids),
+            "optimize_ids": list(split.optimize_ids),
+            "confirm_ids": list(split.confirm_ids),
+        },
+        "models": {
+            "answer_model": live_cfg.get("answer_model"),
+            "cheaper_answer_model": live_cfg.get("cheaper_answer_model"),
+            "embedder": live_cfg.get("embedder"),
+            "search_baseline": live_cfg.get("search_baseline"),
+        },
+        "prompts": prompts.registry_dict(),
+        "tools_enabled": list(search_tools),
+        "provider_names": provider_names,
+        "provider_config": provider_config,
+        "budgets": cfg.get("budgets", []),
+        "memory": {
+            "condition": "frozen_policy_memory",
+            "confirm_uses_frozen_snapshot": memory_cfg.get("confirm_uses_frozen_snapshot"),
+            "confirm_updates_memory": memory_cfg.get("confirm_updates_memory"),
+            "freezes_during_confirm": bool(
+                memory_cfg.get("confirm_uses_frozen_snapshot")
+                and not memory_cfg.get("confirm_updates_memory")
+            ),
+        },
+        "grader": "normalized_match" + (
+            "+llm_judge" if cfg.get("grading", {}).get("judge") == "llm" else ""
+        ),
+        "headline_eligibility_preflight": eligibility_preflight,
+        "cost_estimate": cost_estimate,
+    }
+
+
+def write_manifest(run_dir: str | Path, manifest: dict[str, Any]) -> Path:
+    import json
+    run_dir = Path(run_dir)
+    run_dir.mkdir(parents=True, exist_ok=True)
+    path = run_dir / "run_manifest.json"
+    path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    return path

@@ -77,7 +77,7 @@
   "condition_specs": {
     "no_memory_search": {
       "answer_model": "gpt-5.5",
-      "answer_prompt_version": "v0",
+      "answer_prompt_version": "answerer@v1#2d353040",
       "enabled_tools": [
         "brave_search",
         "generic_web_search",
@@ -95,7 +95,7 @@
     },
     "policy_memory": {
       "answer_model": "gpt-5.5",
-      "answer_prompt_version": "v0",
+      "answer_prompt_version": "answerer@v1#2d353040",
       "enabled_tools": [
         "brave_search",
         "generic_web_search",

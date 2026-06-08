@@ -15,7 +15,7 @@ real result is `docs/REAL_BENCHMARK_READINESS.md` + `docs/NEXT_LIVE_RUN.md`.
 
 | claim | evidence |
 | --- | --- |
-| The harness runs with no API keys and no network. | `python -m pytest -q` → 60 passing; `scripts/*` run offline; `scripts/run_synthetic_full.py` runs the whole pipeline offline. |
+| The harness runs with no API keys and no network. | `python -m pytest -q` → 68 passing; `scripts/*` run offline; `scripts/run_synthetic_full.py` runs the whole pipeline offline. |
 | The **real-benchmark adapter path** works on real-data-shaped inputs (no keys). | `tests/test_real_data_shape.py` (BrowseComp decode + LiveBrowseComp JSONL + split + report + leakage + replay on `fixtures/real_shaped/` placeholders). |
 | **Four baselines/controls** are distinguished: `closed_book`, `no_memory_search`, `random_memory`, `policy_memory`. | `scripts/run_synthetic_full.py` output + `results/demo/{report.json,budget_curve.csv}`; `tests/test_baselines_and_eligibility.py`. |
 | The **closed-book baseline makes no tool calls** and answers only intrinsic knowledge. | `tests/test_baselines_and_eligibility.py::test_closed_book_makes_no_tool_calls`. |
@@ -25,6 +25,12 @@ real result is `docs/REAL_BENCHMARK_READINESS.md` + `docs/NEXT_LIVE_RUN.md`.
 | The synthetic fixture exercises a **variety of failure regimes** (not cartoonishly perfect). | `tests/test_failure_regimes.py`; `dominant_regimes` on a baseline shows ≥4 regimes incl. route_miss + verification/stale/contradiction. |
 | Policy memory snapshots are **inspectable and answer-free**. | `scripts/inspect_memory_snapshot.py` (leakage scan PASS). |
 | Two runs can be **compared** (budget curves, deltas, McNemar). | `scripts/compare_runs.py`. |
+| A **first-live-run preflight** validates everything (split, conditions, eligibility, budgets, env-var names, cost) and writes a dry-run manifest **without calling any provider**. | `scripts/preflight_first_live_run.py`; 0 blockers on the synthetic default. |
+| **Call/cost is estimable** before any spend; dollar cost stays "unknown" unless prices are configured (no vendor prices hard-coded). | `eval/cost.py`, `scripts/estimate_live_cost.py`; `tests/test_live_readiness_scaffold.py`. |
+| A **run manifest** records git/dataset/split/models/prompts/tools/budgets/memory/eligibility/cost with **no secrets** (env-var names only). | `eval/manifest.py`; `results/demo/run_manifest.json`; `tests/test_live_readiness_scaffold.py`. |
+| **Prompts are version+hash pinned** and folded into the same-conditions fingerprint. | `agent/prompts.py`; `ConditionSpec.answer_prompt_version`; `tests/test_live_readiness_scaffold.py`. |
+| Run artifacts have a **hash ledger**; a **conservative claim generator** REFUSES performance claims when `headline_eligible=false`. | `scripts/hash_artifacts.py` (`results/demo/artifact_hashes.json`), `scripts/generate_claims.py` (`results/demo/claims_candidates.md`). |
+| Docs lint + no-overclaim check passes; no-key Make targets run. | `scripts/docs_check.py` (24 docs), `Makefile` (`make check`). |
 | The graph is a deterministic projection of the event log (replay passes). | `results/demo/replay_check.md` (`projection_matches: true`); `tests/test_fake_tool_replay.py`. |
 | Fake tool calls are replayable; replay detects divergence. | `tests/test_fake_tool_replay.py::test_recording_then_replay_reproduces_responses`, `::test_replay_divergence_is_detected`. |
 | The project also runs with the standard library + PyYAML only (no `activegraph`). | `EventLog` fallback in `activegraph_pack/behaviors.py`; verified by blocking the import. |
@@ -37,6 +43,23 @@ real result is `docs/REAL_BENCHMARK_READINESS.md` + `docs/NEXT_LIVE_RUN.md`.
 | The synthetic result is **not** perfect — residual failures remain so diagnostics are meaningful. | `results/demo/summary.md` (policy accuracy 0.75 at budget 3, not 1.0); `per_question.csv` regime labels. |
 | The regimes loop detects regimes, proposes bounded updates, gates them, and records a promotion decision. | `tests/test_regimes_gates.py`; `results/regimes-demo/policy_updates.json`. |
 | Base model weights are unchanged by construction. | No training/fine-tuning code exists; the only learned state is the bandit/memory. |
+
+## Commands that pass with no keys/network
+
+```
+python -m pytest -q                              # 68 passed
+python scripts/run_synthetic_full.py --run-id demo
+python -m pytest -q tests/test_real_data_shape.py
+python scripts/run_ablations.py
+python scripts/validate_live_readiness.py        # 0 failures (warnings only)
+python scripts/preflight_first_live_run.py       # 0 blockers; writes dry-run manifest
+python scripts/estimate_live_cost.py --optimize 10 --confirm 20
+python scripts/inspect_memory_snapshot.py results/demo/memory_snapshot.json   # leakage PASS
+python scripts/hash_artifacts.py results/demo
+python scripts/generate_claims.py results/demo/report.json   # REFUSES perf claims
+python scripts/docs_check.py                      # 24 docs, no overclaim
+make check
+```
 
 ## ◑ Partially verified claims
 

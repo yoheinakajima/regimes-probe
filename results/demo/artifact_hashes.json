@@ -1,0 +1,18 @@
+{
+  "run_dir": "results/demo",
+  "sha256": {
+    "report.json": "3bfd310730793b1deb3408d9842838d00ace797cd9847aaae5e8b9ca4f9d62f2",
+    "summary.md": "a1e900e7fe964d6074110cc42e43274c8257433844a6daaa1fef20f6c7e5fba7",
+    "per_question.csv": "d717702de638f518369f761bf4f2ca373535ba0596d5cc45256fe27cd1cd9bfb",
+    "budget_curve.csv": "c5c86e74c4ad1cfaaf447115c46e784217888119e72b105450fbb492419d53cc",
+    "tool_rewards.csv": "95b7f030139c9a5750a9f0a7aaf4b5d7f0c3ef4683866a8455ff4bece11e1667",
+    "query_rewards.csv": "86f65bb7efb5b6b74ca6162b5c194c9e49a208f85989a4a8b9f3d84f05006266",
+    "stop_verify_rewards.csv": "5665beb862c9ec037be38710d24102402976948114197cc4c17b50998c0a3dde",
+    "memory_snapshot.json": "d3a1a86f145919c07ba09fcb4713f8a799889230cdc495a8fc769dc8c574c9c8",
+    "policy_updates.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "run_manifest.json": "39614bf5a697776955cd95a1ffa7075c36782928226e357a79c6ecdb0230a847",
+    "replay_check.md": "21f6cc53f9aec05900bc410709f1b9f8770da289ad70b56b37623b2510a150bb",
+    "config_snapshot.yaml": "a80550fee57f8ab1280cfe8b44d366c843bcec14c524f013f3e27634485c5cdf"
+  },
+  "missing": []
+}

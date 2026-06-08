@@ -75,9 +75,11 @@ memory:
   nearest_k: 8
   optimize_allows_exploration: true
 policy:
+  allow_social_scrape: false
   enable_iterative_clue_resolution: false
   enable_query_decomposition: false
   query_mode: learned
+  scrape_fallback_to_page_fetch: true
   stop_mode: learned
 regimes_loop:
   confirm_max_regression: 0.0

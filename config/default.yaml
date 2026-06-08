@@ -64,6 +64,11 @@ policy:
   # Iterative clue resolution: staged search that chases intermediate entities
   # found in earlier results. Off by default; --enable-iterative-clue-resolution.
   enable_iterative_clue_resolution: false
+  # Level 3 evidence reading: if firecrawl_scrape fails (e.g. 402/quota), fall
+  # back to the basic page_fetch on the same URL. Social pages are not scraped
+  # unless allow_social_scrape is set.
+  scrape_fallback_to_page_fetch: true
+  allow_social_scrape: false
 
 router:
   cost_weight: 0.5

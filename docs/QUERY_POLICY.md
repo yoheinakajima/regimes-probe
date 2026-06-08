@@ -294,3 +294,47 @@ penalty, the selected candidate + role + reason, the rejected candidates +
 
 **Sequencing:** scrape/fetch still comes *after* candidate targeting improves —
 scraping the wrong page only yields richer wrong evidence.
+
+## Level 3: evidence reading (page_fetch vs firecrawl_scrape)
+
+After search (Level 2) and candidate targeting (Level 2c) select a URL, **Level 3
+reads the page**. Reading tools are URL-only follow-ups — never first-hop search
+arms (`tools/metadata.py`: `page_fetch`=fetch, `firecrawl_scrape`=scrape; both in
+`FOLLOWUP_FAMILIES`, so `first_hop_tools` excludes them). Reads count against the
+tool budget, are recorded/replayable/cached like any tool call, and surface
+provider failures (incl. Firecrawl **402/quota**) without crashing the run.
+
+**Tool selection** (`agent/reading_policy.py:select_reading_tool`, deterministic):
+- `page_fetch` — cheap basic-HTML fetch; the default and the fallback.
+- `firecrawl_scrape` — richer (and **paid / quota-limited**) extraction, preferred
+  for PDFs, pages with likely hidden/structured content (records/database/
+  directory/census/…), or authoritative pages whose search snippet is too short to
+  contain the answer / corroborated across providers. Gated behind
+  `--enable-scrape-tools` + `FIRECRAWL_API_KEY`.
+
+**When to read** a URL: it is from an authoritative / likely-evidence domain, the
+title/snippet matches an unresolved clue or answer-shape hint, or the same
+URL/domain appears across independent search providers — and it has not already
+been read. **Do not read**: contaminated (benchmark-mirroring) URLs, social-media
+pages (unless `allow_social_scrape`), generic pages with no target-relevant clue
+match, or domains/URLs that already produced no progress; and never scrape every
+top result blindly.
+
+**Fail closed + fallback**: if `firecrawl_scrape` errors (402/HTTP/quota), the call
+becomes a recorded failed observation (no crash) and — if
+`policy.scrape_fallback_to_page_fetch` (default true) — the **same URL is retried
+with `page_fetch`** on the next step (counted against budget). The failing domain
+is not re-scraped.
+
+Debug (`debug_questions.jsonl` `scrape` block; `scripts/debug_run_failures.py`)
+records per read: `read_tool`, `scrape_url`, `scrape_provider`,
+`scrape_selected_reason`, `scrape_success`, `scrape_chars`,
+`evidence_added_by_scrape`, `answer_shape_found_after_scrape`,
+`unresolved_clues_supported_after_scrape`, `scrape_failure_type`,
+`scrape_cost_estimate`, `fallback_to_page_fetch`. Metrics: `scrape_call_count`,
+`scrape_success_rate`, `evidence_added_by_scrape_rate`,
+`answer_shape_found_after_scrape_count`, `scrape_failure_counts`,
+`scrape_fallback_count`, `scrape_to_answer_rate`.
+
+**Sequencing:** scrape is **Level 3**, applied only after search and candidate
+targeting — scraping the wrong page just yields richer wrong evidence.

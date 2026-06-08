@@ -260,6 +260,9 @@ def main() -> int:
                             stop_mode=cfg["policy"]["stop_mode"],
                             enable_query_decomposition=decompose_enabled,
                             enable_iterative_clue_resolution=iterative_enabled,
+                            scrape_fallback_to_page_fetch=bool(
+                                cfg["policy"].get("scrape_fallback_to_page_fetch", True)),
+                            allow_social_scrape=bool(cfg["policy"].get("allow_social_scrape", False)),
                             as_of=cfg.get("run", {}).get("as_of", "2026-06-01"))
     search_agent = EpistemicAgent(agent_cfg,
                                   answerer=build_live_answerer("search", model=answer_model,

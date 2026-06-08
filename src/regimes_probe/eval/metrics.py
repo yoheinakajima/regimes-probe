@@ -48,6 +48,8 @@ class AttemptOutcome:
     stage_depth_used: int = 1
     # candidate-hypothesis policy (per-attempt aggregables)
     iterative: dict = field(default_factory=dict)
+    # Level 3 evidence reading (page_fetch vs firecrawl_scrape)
+    scrape: dict = field(default_factory=dict)
 
     def to_row(self) -> dict[str, Any]:
         return {
@@ -117,6 +119,38 @@ def _iterative_metrics(stats: list[dict]) -> dict[str, Any]:
     }
 
 
+def _scrape_metrics(outcomes: list["AttemptOutcome"]) -> dict[str, Any]:
+    """Aggregate Level 3 reading/scrape stats across a cell's attempts."""
+    from collections import Counter
+    failure_counts: Counter = Counter()
+    scrape_calls = success = evidence_added = shape_found = fallback = 0
+    scraped_attempts = scraped_correct = 0
+    for o in outcomes:
+        s = o.scrape or {}
+        if not s:
+            continue
+        scrape_calls += s.get("scrape_calls", 0)
+        success += s.get("scrape_success", 0)
+        evidence_added += s.get("evidence_added", 0)
+        shape_found += s.get("answer_shape_found", 0)
+        fallback += s.get("fallback", 0)
+        failure_counts.update(s.get("failure_types", []))
+        if s.get("scrape_calls", 0) > 0:
+            scraped_attempts += 1
+            if o.correct:
+                scraped_correct += 1
+    return {
+        "scrape_call_count": scrape_calls,
+        "scrape_success_count": success,
+        "scrape_success_rate": _safe_div(success, scrape_calls),
+        "evidence_added_by_scrape_rate": _safe_div(evidence_added, scrape_calls),
+        "answer_shape_found_after_scrape_count": shape_found,
+        "scrape_failure_counts": dict(failure_counts),
+        "scrape_fallback_count": fallback,
+        "scrape_to_answer_rate": _safe_div(scraped_correct, scraped_attempts),
+    }
+
+
 def compute_metrics(outcomes: list[AttemptOutcome]) -> dict[str, Any]:
     """Aggregate metrics for one condition+budget cell."""
     n = len(outcomes)
@@ -162,6 +196,8 @@ def compute_metrics(outcomes: list[AttemptOutcome]) -> dict[str, Any]:
             sum(1 for o in outcomes if o.answer_found_after_stage)),
         # candidate-hypothesis policy aggregates
         **_iterative_metrics([o.iterative for o in outcomes]),
+        # Level 3 scrape/read aggregates
+        **_scrape_metrics(outcomes),
         "correct_per_tool_call": _safe_div(correct, calls),
         "correct_per_dollar": _safe_div(correct, cost) if cost else 0.0,
         "correct_per_second": _safe_div(correct, latency) if latency else 0.0,

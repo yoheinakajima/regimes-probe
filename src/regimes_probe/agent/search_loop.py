@@ -47,6 +47,27 @@ def _dedupe_keep(seq: list[str]) -> list[str]:
     return out
 
 
+def _best_read_target(observations, scraped_urls, no_progress_domains):
+    """Pick the best unread, non-contaminated, non-failed evidence page to read."""
+    from urllib.parse import urlparse
+    from regimes_probe.agent.reading_policy import normalize_url, _is_social
+    best, best_key = None, (-1.0, 0)
+    for o in observations:
+        url = getattr(o, "url", "") or ""
+        if (getattr(o, "failed", False) or not url
+                or getattr(o, "benchmark_contaminated", False)):
+            continue
+        host = (urlparse(url).hostname or "").lower()
+        if not host or _is_social(host) or host in no_progress_domains:
+            continue
+        if normalize_url(url) in scraped_urls:
+            continue
+        key = (float(getattr(o, "source_authority", 0.0)), 1 if o.supports else 0)
+        if key > best_key:
+            best, best_key = o, key
+    return best
+
+
 class ToolInvoker(Protocol):
     """How the loop calls a tool. Implementations may record events."""
 
@@ -117,6 +138,8 @@ class CallRecord:
     rejected_candidates: list[dict[str, Any]] = field(default_factory=list)
     sticky_penalty: float = 0.0
     no_progress: bool = False
+    # Level 3 evidence reading (page_fetch vs firecrawl_scrape)
+    scrape: dict[str, Any] = field(default_factory=dict)
 
     @property
     def contaminated_results(self) -> int:
@@ -146,6 +169,7 @@ class CallRecord:
             "rejected_candidates": self.rejected_candidates,
             "sticky_penalty": round(float(self.sticky_penalty), 3),
             "no_progress": self.no_progress,
+            "scrape": self.scrape,
             "cost": self.cost,
             "latency": self.latency,
             "stop_arm": self.stop_arm,
@@ -202,6 +226,8 @@ class SearchLoopConfig:
     verification: VerificationConfig = field(default_factory=VerificationConfig)
     enable_query_decomposition: bool = False
     enable_iterative_clue_resolution: bool = False
+    scrape_fallback_to_page_fetch: bool = True
+    allow_social_scrape: bool = False
 
 
 class SearchLoop:
@@ -250,10 +276,20 @@ class SearchLoop:
         )
         rec.on_routing_plan(routing_plan.to_dict())
         tool_seq = routing_plan.sequence or list(first_hop)
-        # The follow-up tool used by the fetch_page mechanism (prefer page_fetch).
-        fetch_tool = ("page_fetch" if "page_fetch" in followup
-                      else (followup[0] if followup else None))
-        fetch_available = fetch_tool is not None
+        # Level 3 reading tools (URL-only follow-up): page_fetch (cheap) and
+        # firecrawl_scrape (richer/paid). Neither is a first-hop arm.
+        page_fetch_available = "page_fetch" in providers
+        scrape_available = "firecrawl_scrape" in providers
+        reading_tools = [t for t in ("page_fetch", "firecrawl_scrape") if t in providers]
+        fallback_tool = ("page_fetch" if page_fetch_available
+                         else (followup[0] if followup else None))
+        fetch_available = bool(reading_tools) or fallback_tool is not None
+        # cross-provider corroboration: host -> set of first-hop tools that returned it
+        domain_providers: dict[str, set] = {}
+        scraped_urls: set[str] = set()
+        no_progress_domains: set[str] = set()
+        pending_read = None          # an EvidenceObservation to read next
+        force_page_fetch = False     # set after a firecrawl_scrape failure (fallback)
         known_domain = item.meta.get("known_domain")
         freshness_sensitive = bool(signature.features.get("freshness_sensitive"))
 
@@ -286,20 +322,62 @@ class SearchLoop:
         observations: list[EvidenceObservation] = []
         candidate = CandidateAnswer(None, 0, 0.0, [])
         vstate = VerificationState()
-        pending_fetch_url: Optional[str] = None
         step = 0
 
         while len(calls) < config.budget:
             query_text_hash, clue_ids = "", []
             stage_info: dict[str, Any] = {}
+            scrape_info: dict[str, Any] = {}
             current_selected_norm = None
+            # Decide whether/how to READ a pending URL (Level 3) before anything else.
+            # The reading policy (tool choice + gating/dedup) engages only when a
+            # scrape tool is available or in iterative mode; otherwise the legacy
+            # page_fetch-only follow-up is preserved unchanged.
+            read_dec = None
+            legacy_read = False
+            if pending_read is not None and reading_tools and not (scrape_available or iterative):
+                legacy_read = page_fetch_available or bool(reading_tools)
+            elif pending_read is not None and reading_tools:
+                from regimes_probe.agent.reading_policy import select_reading_tool
+                read_dec = select_reading_tool(
+                    url=pending_read.url, title=getattr(pending_read, "title", ""),
+                    snippet=pending_read.snippet,
+                    source_authority=float(getattr(pending_read, "source_authority", 0.0)),
+                    contaminated=bool(getattr(pending_read, "benchmark_contaminated", False)),
+                    unresolved_clue_terms=clue_terms,
+                    answer_shape=answer_shape if iterative else [],
+                    cross_provider_domains={d for d, ts in domain_providers.items()
+                                            if len(ts) >= 2},
+                    page_fetch_available=page_fetch_available,
+                    scrape_available=scrape_available, scraped_urls=scraped_urls,
+                    no_progress_domains=no_progress_domains,
+                    allow_social=config.allow_social_scrape,
+                    prefer_page_fetch=force_page_fetch,
+                    force_read=bool(getattr(pending_read, "fetchable", False)))
+                if read_dec.tool is None:                    # gated out -> do not read
+                    pending_read = None
+                    read_dec = None
             beam_sel = beam.select() if (iterative and beam is not None and calls) else None
-            if pending_fetch_url is not None and fetch_available:
-                tool = fetch_tool
-                query = pending_fetch_url
+            read_target_obs = None
+            if read_dec is not None:
+                tool = read_dec.tool
+                query = pending_read.url
+                query_arm = read_dec.query_arm
+                opts = {}
+                scrape_info = {"read_tool": tool, "scrape_url": query,
+                               "scrape_provider": tool,
+                               "scrape_selected_reason": read_dec.reason,
+                               "is_scrape": read_dec.is_scrape}
+                read_target_obs = pending_read
+                pending_read = None
+                force_page_fetch = False
+            elif legacy_read:
+                # Legacy page_fetch-only follow-up (no gating/dedup/scrape stats).
+                tool = "page_fetch" if page_fetch_available else followup[0]
+                query = pending_read.url
                 query_arm = "fetch"
-                opts: dict[str, Any] = {}
-                pending_fetch_url = None
+                opts = {}
+                pending_read = None
             elif beam_sel is not None:
                 # Stage >= 2: carry the best ROLE-COMPATIBLE candidate hypothesis
                 # forward (beam handles anti-sticky / forced exploration).
@@ -364,6 +442,14 @@ class SearchLoop:
             supported = any(o.supports for o in obs)
             rec.on_evidence(step, obs)
 
+            # Cross-provider corroboration: which first-hop tools surfaced each host.
+            if read_dec is None and not call_failed:
+                from urllib.parse import urlparse as _urlparse
+                for o in obs:
+                    h = (_urlparse(o.url or "").hostname or "").lower()
+                    if h:
+                        domain_providers.setdefault(h, set()).add(tool)
+
             candidate = self.answerer.answer(observations, item=item)
             rec.on_candidate(step, candidate)
             vstate = verify(
@@ -374,12 +460,17 @@ class SearchLoop:
             )
             rec.on_verification(step, vstate)
 
+            # A read is possible if there is a known multihop target (fetchable) or
+            # — in iterative mode — any readable URL from evidence so far.
+            readable = any(getattr(o, "fetchable", False) for o in observations) or (
+                iterative and any(getattr(o, "url", "") and not getattr(o, "failed", False)
+                                  for o in observations))
             decision = self.stopping_policy.decide(
                 signature.cluster_key,
                 vstate,
                 calls_used=ci + 1,
                 budget=config.budget,
-                fetch_available=fetch_available and any(o.fetchable for o in observations),
+                fetch_available=fetch_available and readable,
                 bandit=memory.bandits["stop"],
                 neighbor=memory.estimate("stop", signature.embedding),
                 explore=config.explore,
@@ -393,6 +484,38 @@ class SearchLoop:
                                      or (supported and not any(c.supported for c in calls)))
             prev_vscore = max(prev_vscore, vstate.score)
             no_progress_flag = False
+
+            # Level 3 read outcome + fail-closed fallback to page_fetch.
+            if scrape_info:
+                from urllib.parse import urlparse as _urlparse
+                from regimes_probe.agent.reading_policy import normalize_url
+                read_obs = next((o for o in obs if not getattr(o, "failed", False)), None)
+                text_l = (read_obs.snippet.lower() if read_obs else "")
+                host = (_urlparse(query or "").hostname or "").lower()
+                scrape_info.update({
+                    "scrape_success": (not call_failed),
+                    "scrape_chars": len(read_obs.snippet) if read_obs else 0,
+                    "evidence_added_by_scrape": bool(not call_failed and (evidence_improved or supported)),
+                    "answer_shape_found_after_scrape": bool(
+                        read_obs and answer_shape and any(s.lower() in text_l for s in answer_shape)),
+                    "unresolved_clues_supported_after_scrape": (
+                        sum(1 for s in clue_spans if s.lower() in text_l) if read_obs else 0),
+                    "scrape_failure_type": ((response.error_meta or {}).get("error_type")
+                                            if call_failed else None),
+                    "scrape_cost_estimate": float(response.cost),
+                })
+                if call_failed and scrape_info.get("is_scrape") and \
+                        config.scrape_fallback_to_page_fetch and page_fetch_available:
+                    # fail closed: retry the SAME url with the basic fetch next step.
+                    # Do NOT mark it read yet, so the page_fetch retry is allowed.
+                    pending_read = read_target_obs
+                    force_page_fetch = True
+                    scrape_info["fallback_to_page_fetch"] = True
+                else:
+                    scraped_urls.add(normalize_url(query))
+                    if (call_failed or not evidence_improved) and host:
+                        no_progress_domains.add(host)
+
             if iterative and beam is not None:
                 from regimes_probe.agent.clue_resolution import build_hypotheses
                 if current_selected_norm is not None:
@@ -434,15 +557,20 @@ class SearchLoop:
                     rejected_candidates=stage_info.get("rejected_candidates", []),
                     sticky_penalty=stage_info.get("sticky_penalty", 0.0),
                     no_progress=no_progress_flag,
+                    scrape=scrape_info,
                 )
             )
 
             if decision.stop:
                 break
-            if decision.arm == "fetch_page":
-                fetch_targets = [o for o in observations if o.fetchable]
-                if fetch_targets:
-                    pending_fetch_url = fetch_targets[0].url
+            if decision.arm == "fetch_page" and reading_tools:
+                # Choose a URL to read: a known multihop target first, else (in
+                # iterative mode) the best unread, non-contaminated evidence page.
+                target = next((o for o in observations if getattr(o, "fetchable", False)), None)
+                if target is None and iterative:
+                    target = _best_read_target(observations, scraped_urls, no_progress_domains)
+                if target is not None:
+                    pending_read = target
             step += 1
 
         # Recompute once after the loop so a zero-budget (closed-book) attempt,

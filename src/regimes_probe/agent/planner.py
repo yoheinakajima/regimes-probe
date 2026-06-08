@@ -35,6 +35,8 @@ class AgentConfig:
     stop_mode: str = "learned"           # always_full | first_candidate | learned
     enable_query_decomposition: bool = False  # Level 2 multi-query decomposition
     enable_iterative_clue_resolution: bool = False  # staged candidate-entity resolution
+    scrape_fallback_to_page_fetch: bool = True  # firecrawl_scrape fail -> page_fetch
+    allow_social_scrape: bool = False
     as_of: str = "2026-06-01"
     router: RouterConfig = field(default_factory=RouterConfig)
     stop: StopConfig = field(default_factory=StopConfig)
@@ -79,6 +81,8 @@ class EpistemicAgent:
             verification=self.config.verification,
             enable_query_decomposition=self.config.enable_query_decomposition,
             enable_iterative_clue_resolution=self.config.enable_iterative_clue_resolution,
+            scrape_fallback_to_page_fetch=self.config.scrape_fallback_to_page_fetch,
+            allow_social_scrape=self.config.allow_social_scrape,
         )
         return self.loop.run(
             item, sig, memory, invoker, providers, loop_cfg,

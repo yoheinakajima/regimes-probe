@@ -203,3 +203,13 @@ set — and the risk surface. Keep the experiment honest:
   high), `sticky_candidate_count` / `no_progress_followup_count` (should be low),
   and `repeated_candidate_query_count` (should be ~0). This is a generic multi-step
   search rule, not BrowseComp tuning.
+- **Scrape reads wrong pages → richer wrong evidence.** Firecrawl scrape produces
+  much more text than a snippet, which can *look* authoritative while being the
+  wrong page. It is therefore Level 3 (after search + candidate targeting), URL-only
+  (never a first-hop arm), and gated: contaminated/social/no-progress/no-clue-match
+  URLs are not scraped, and every read counts against budget. Firecrawl is also
+  **paid / quota-limited**: 402/quota/HTTP errors are captured as provider failures
+  (not crashes) and fall back to the cheap `page_fetch`. Watch `scrape_to_answer_rate`
+  and `evidence_added_by_scrape_rate` — if scraping does not raise answer rate, it is
+  just adding cost. Compare scrape on/off as an explicit ablation (same tool set
+  otherwise), since richer extraction can change correctness independent of policy.

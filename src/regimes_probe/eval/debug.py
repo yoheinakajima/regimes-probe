@@ -166,6 +166,8 @@ def build_debug_record(*, item, trace, grade, reward, condition: str, budget: in
             "sticky_penalty": round(float(getattr(c, "sticky_penalty", 0.0)), 3),
             "no_progress": bool(getattr(c, "no_progress", False)),
             "evidence_improved": bool(getattr(c, "evidence_improved", False)),
+            # Level 3 reading (page_fetch vs firecrawl_scrape); bounded counts only
+            "scrape": dict(getattr(c, "scrape", {})),
             "n_results": n_ok, "contaminated_results": c_cont,
             "failed": bool(getattr(c, "failed", False)),
             "error_type": getattr(c, "error_type", None),

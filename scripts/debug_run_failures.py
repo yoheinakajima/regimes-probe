@@ -75,6 +75,16 @@ def main() -> int:
                   + (f", q={c.get('query_quality')}" if c.get('query_quality') else "")
                   + (f", no_progress" if c.get('no_progress') else "")
                   + (f", sticky={c.get('sticky_penalty')}" if c.get('sticky_penalty') else ""))
+            sc = c.get("scrape") or {}
+            if sc.get("read_tool"):
+                print(f"        read [{sc.get('read_tool')}]: {sc.get('scrape_url','')}  "
+                      f"reason={sc.get('scrape_selected_reason')} "
+                      f"success={sc.get('scrape_success')} "
+                      f"chars={sc.get('scrape_chars')} "
+                      f"evidence_added={sc.get('evidence_added_by_scrape')}"
+                      + (f" FAILURE={sc.get('scrape_failure_type')}"
+                         if sc.get('scrape_failure_type') else "")
+                      + (" (fellback to page_fetch)" if sc.get('fallback_to_page_fetch') else ""))
             if c.get("selected_candidate"):
                 print(f"        → selected: {c['selected_candidate']} "
                       f"[{c.get('selected_role')}]  {c.get('selection_reason', '')}")

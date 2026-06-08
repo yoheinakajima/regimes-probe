@@ -182,3 +182,24 @@ writes a full artifact set marked `offline_fork=true`/`parent_run_id`, and is
 never headline-eligible. Fork the memory variant (`policy_memory`); read the
 fixed `no_memory_search` baseline from the parent report. See
 **[OFFLINE_FORK_ABLATIONS.md](./OFFLINE_FORK_ABLATIONS.md)**.
+
+## Step 7 — Level 3 evidence reading (page_fetch + firecrawl_scrape)
+
+`--enable-scrape-tools` adds `firecrawl_scrape` (needs `FIRECRAWL_API_KEY`) as a
+**follow-up reading tool alongside `page_fetch`** — never a first-hop search arm.
+The reading policy picks `firecrawl_scrape` for PDFs / structured / authoritative-
+but-thin pages and `page_fetch` for simple pages or as the fallback. Reads count
+against budget, are cached/replayable, and Firecrawl 402/quota errors fail closed
+to `page_fetch`. Evaluate scrape **after** search + candidate targeting work
+(do not add it first):
+
+```bash
+python scripts/run_live.py --dataset livebrowsecomp --dataset-path PATH \
+    --optimize 10 --confirm 20 --budgets 1,3 --search-provider-mode diverse \
+    --enable-query-decomposition --enable-iterative-clue-resolution \
+    --enable-scrape-tools \
+    --recording-cache results/live/cache.json --execute
+```
+
+See **[QUERY_POLICY.md](./QUERY_POLICY.md)** (Level 3) and watch
+`scrape_to_answer_rate` / `scrape_failure_counts` in the report.

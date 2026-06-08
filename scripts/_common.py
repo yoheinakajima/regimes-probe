@@ -56,6 +56,8 @@ def build_agent(cfg: dict[str, Any], tools: list[str]) -> EpistemicAgent:
         stop_mode=pol.get("stop_mode", "learned"),
         enable_query_decomposition=bool(pol.get("enable_query_decomposition", False)),
         enable_iterative_clue_resolution=bool(pol.get("enable_iterative_clue_resolution", False)),
+        scrape_fallback_to_page_fetch=bool(pol.get("scrape_fallback_to_page_fetch", True)),
+        allow_social_scrape=bool(pol.get("allow_social_scrape", False)),
         as_of=cfg.get("run", {}).get("as_of", "2026-06-01"),
         router=RouterConfig(**cfg.get("router", {})) if cfg.get("router") else RouterConfig(),
         stop=StopConfig(**cfg.get("stopping", {})) if cfg.get("stopping") else StopConfig(),

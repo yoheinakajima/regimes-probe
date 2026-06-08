@@ -78,7 +78,25 @@ def _outcome(trace, grade, reward, *, condition: str, budget: int) -> AttemptOut
             (getattr(c, "stage", 1) for c in trace.calls if c.supported), 0),
         stage_depth_used=max((getattr(c, "stage", 1) for c in trace.calls), default=0),
         iterative=_iterative_stats(trace),
+        scrape=_scrape_stats(trace),
     )
+
+
+def _scrape_stats(trace) -> dict:
+    """Per-attempt Level 3 reading/scrape stats (aggregated by compute_metrics)."""
+    scrapes = [getattr(c, "scrape", {}) for c in trace.calls if getattr(c, "scrape", {})]
+    scrapes = [s for s in scrapes if s.get("is_scrape")]
+    if not scrapes:
+        return {}
+    return {
+        "scrape_calls": len(scrapes),
+        "scrape_success": sum(1 for s in scrapes if s.get("scrape_success")),
+        "evidence_added": sum(1 for s in scrapes if s.get("evidence_added_by_scrape")),
+        "answer_shape_found": sum(1 for s in scrapes if s.get("answer_shape_found_after_scrape")),
+        "fallback": sum(1 for s in scrapes if s.get("fallback_to_page_fetch")),
+        "failure_types": [s.get("scrape_failure_type") for s in scrapes
+                          if s.get("scrape_failure_type")],
+    }
 
 
 def _iterative_stats(trace) -> dict:

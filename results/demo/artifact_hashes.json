@@ -10,10 +10,10 @@
     "stop_verify_rewards.csv": "de7bf88b1d4ad70a73120499e3b4903f8e52c55dcf7c30bc442fdde9d7626d4f",
     "memory_snapshot.json": "955a26b8e284b9b9c136eb0711313b5227c4a66e1b02f6233a0d670ad267a79e",
     "policy_updates.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-    "run_manifest.json": "e22e712225fdffda99409ece80a9b84b8f6b6f0b7f7e1af8986ba400ba2ce2b8",
+    "run_manifest.json": "527f0e66000d9ca433e4520d1a4970ad87c865adf267e35785ef658cbfecb708",
     "replay_check.md": "a67759c17be90dff137bbba7680bdf2f60101479dccf334b6459fa60b3198b2f",
     "config_snapshot.yaml": "c9a7df80cf8589933cbe1d24146d2633ed64e8fe9f3efdbf2762809890a9b50d",
-    "debug_questions.jsonl": "c6e1d450173baf87211f83f710203a1e1ba0ee7b235de37b786b190143745c5d",
+    "debug_questions.jsonl": "b89f6d6ade230141e3d8c276eb9667c97f39da1415f48c8891f4d942f9cb8c7a",
     "graph_projection.json": "c774a11e08ecf70d5507be5724f1832815d3f39784e81d4d5d4b08a808247c4c"
   },
   "missing": []

@@ -66,7 +66,16 @@ def main() -> int:
                   f"{c.get('query_preview', '')!r}  "
                   f"(n_results={c.get('n_results', 0)}, "
                   f"contaminated={c.get('contaminated_results', 0)}"
+                  + (f", q={c.get('query_quality')}" if c.get('query_quality') else "")
                   + (f", clues={c.get('clue_ids')}" if c.get('clue_ids') else "") + ")")
+            cands = c.get("query_candidates", [])
+            if cands:
+                print(f"      candidates ({c.get('n_query_candidates', len(cands))}, "
+                      f"{c.get('n_query_candidates_dropped', 0)} dropped):")
+                for q in cands:
+                    sel = "→" if q.get("arm") == c.get("query_arm") else " "
+                    print(f"        {sel} {q.get('arm')}: {q.get('query_preview','')!r} "
+                          f"(q={q.get('expected_search_quality')})")
         for e in r.get("failed_tool_errors", []):
             print(f"  ⚠ tool error [{e['tool']}]: {e.get('error_type')} "
                   f"{e.get('status_code')} — {e.get('message_preview')}")

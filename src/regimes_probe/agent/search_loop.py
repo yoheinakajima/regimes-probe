@@ -89,6 +89,10 @@ class CallRecord:
     status_code: Optional[int] = None
     query_text_hash: str = ""
     clue_ids: list[str] = field(default_factory=list)
+    query_quality: float = 0.0
+    n_query_candidates: int = 0
+    n_query_candidates_dropped: int = 0
+    query_candidates: list[dict[str, Any]] = field(default_factory=list)
 
     @property
     def contaminated_results(self) -> int:
@@ -103,6 +107,10 @@ class CallRecord:
             "query": self.query,
             "query_text_hash": self.query_text_hash,
             "clue_ids": list(self.clue_ids),
+            "query_quality": self.query_quality,
+            "n_query_candidates": self.n_query_candidates,
+            "n_query_candidates_dropped": self.n_query_candidates_dropped,
+            "query_candidates": self.query_candidates,
             "cost": self.cost,
             "latency": self.latency,
             "stop_arm": self.stop_arm,
@@ -222,6 +230,7 @@ class SearchLoop:
 
         while len(calls) < config.budget:
             query_text_hash, clue_ids = "", []
+            q_quality, n_cand, n_dropped, q_cands = 0.0, 0, 0, []
             if pending_fetch_url is not None and fetch_available:
                 tool = fetch_tool
                 query = pending_fetch_url
@@ -242,6 +251,12 @@ class SearchLoop:
                 )
                 query, query_arm, opts = qplan.query, qplan.arm, qplan.opts
                 query_text_hash, clue_ids = qplan.query_text_hash, qplan.clue_ids
+                ex = qplan.explanation
+                if ex.get("decompose") is True:
+                    q_quality = ex.get("selected_query_quality", 0.0)
+                    q_cands = ex.get("candidate_queries", [])
+                    n_cand = len(q_cands)
+                    n_dropped = ex.get("dropped_count", 0)
                 rec.on_query_plan(step, qplan.to_dict())
 
             response = invoker.call(tool, query, limit=5, **opts)
@@ -301,6 +316,10 @@ class SearchLoop:
                     status_code=(response.error_meta or {}).get("status_code") if call_failed else None,
                     query_text_hash=query_text_hash,
                     clue_ids=clue_ids,
+                    query_quality=q_quality,
+                    n_query_candidates=n_cand,
+                    n_query_candidates_dropped=n_dropped,
+                    query_candidates=q_cands,
                 )
             )
 

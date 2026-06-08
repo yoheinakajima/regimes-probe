@@ -134,28 +134,46 @@ produced **no accuracy gain** on BrowseComp: the dominant failure seam was
 query surfaced spam / benchmark-mirroring pages rather than the evidence page that
 carries the answer. The bottleneck was **query formulation**, not tool choice.
 
-`policy/query_decomposition.py` (deterministic v0; no model, no network) turns one
-long question into 3–6 **targeted candidate queries**, one per arm:
+**v0 → v1.** v0 fixed the whole-prompt problem and **reduced contamination**, but a
+second clean run showed it then produced *weak* clue queries: it extracted single
+capitalized tokens, yielding `African One`, `Mexican`, `Name December 2023`,
+`Between Asia 1945-1955`, `Early One first decade…`. Accuracy stayed 0
+(`exact_answer_missing`). **v1 extracts clue SPANS and scores query quality.**
 
-| arm | what it sends |
+`policy/query_decomposition.py` (deterministic v1; no model, no network) splits the
+question into clauses, extracts **clue spans** per clause, and composes 3–6
+targeted candidate queries, one per arm:
+
+| arm | what it sends (v1: spans, not single tokens) |
 |---|---|
-| `exact_phrase_clue` | quoted phrases, as exact phrases |
+| `exact_phrase_clue` | quoted phrases, else the most distinctive multiword span, quoted |
+| `entity_clue` | multiword entities / top phrase spans (never a single generic word) + an inferred answer-shape term |
+| `relation_clue` | core spans from **different clauses** (predicate + object) + a title word |
+| `rare_terms_clue` | 4–8 rare terms drawn from across clauses + the top span |
+| `date_range_clue` | a date/range **attached to a nearby noun phrase** (never a bare date) |
+| `location_constraint_clue` | a location entity + the object-type span (e.g. `New Mexico` + `Mexican restaurant`) |
+| `source_type_query` | entity/span + a source hint (paper/patent/documentary/…) when obvious |
 | `quoted_anchor_terms` | the 2–3 strongest entities/quotes, quoted |
-| `entity_clue` | the proper-noun entities |
-| `relation_clue` | two entities + the title/relation words connecting them |
-| `rare_terms_clue` | the rarest / most unusual content terms |
-| `date_range_clue` | entities + a year or year-range |
-| `source_type_query` | entities + a source hint (paper/patent/filing/…) when obvious |
-| `negative_noise_removed` | the question minus stop/meta-instruction words |
-| `full_question_compressed` | the whole question, compressed — **fallback only** |
+| `negative_noise_removed` / `full_question_compressed` | the question minus noise — **fallback only** |
 
-Clue extraction pulls quoted phrases, proper-noun entities (sentence-initial
-question words like *What* are filtered out), years/date ranges, rare terms,
-title/occupation and institution phrases, and source-type hints. Every query is
-**length-capped** (≤ `MAX_QUERY_TOKENS` tokens / `MAX_QUERY_CHARS` chars) so the
-whole prompt is never sent unless the `full_question_compressed` arm is explicitly
-selected. The fallback arms are always **last**, so the long arm is never the
-cold-start default.
+Clue-span extraction keeps quoted phrases, multiword capitalized entities,
+noun-phrase spans around distinctive predicates (e.g. `road accident`,
+`private university`, `food festival`, `elementary school`), date+noun phrases
+(`19th century monument`), institution/source names, and rare terms (`ironworks`,
+`manga`). It **avoids** single generic capitalized words (`African`, `Mexican`,
+`Name`, `Early`, `One`, `Between`), pure-date queries, question boilerplate, and
+over-short (<3 meaningful-token) queries unless quoted or a named entity. Queries
+are length-capped; the long fallback arms are always **last**.
+
+### Query-quality scoring
+
+Each candidate is scored (`score_query`): `meaningful_token_count`,
+`rare_token_count`, `generic_token_penalty`, `span_length_score`,
+`clue_specificity_score`, and a composite `expected_search_quality`. Candidates
+below `QUALITY_THRESHOLD` — or with no noun-like head, or too short — are
+**dropped** (with a recorded reason). The kept arms are chosen by an arm-priority
+order so concise distinctive forms (exact phrase, entity, date+noun) survive the
+cap rather than long bag-of-words queries.
 
 ### Query forms as bandit arms (tool × query_arm)
 
@@ -170,8 +188,16 @@ attributes back to the chosen `(tool, query_arm)` pair.
 Off by default (preserves prior behavior). Enable with
 `--enable-query-decomposition` (or `policy.enable_query_decomposition: true`). The
 dry-run print, `run_manifest.json`, and `report.json` all record
-`query_decomposition_enabled`, and `debug_questions.jsonl` includes
-`query_text_preview` + `query_arm` per call.
+`query_decomposition_enabled`. Per tool call, `debug_questions.jsonl` includes the
+selected `query_text_preview` + `query_arm`, the **candidate query list before
+selection** with each candidate's `expected_search_quality`, the selected
+`query_quality`, and the **dropped-candidate count** (with reasons in the query
+plan). `scripts/debug_run_failures.py` prints the candidate list and marks the
+selected query.
+
+**Sequencing:** evaluate Firecrawl **scrape/fetch only after query quality
+improves** — scraping a page that better targeting would not have surfaced just
+adds cost. Query decomposition (v1) comes first.
 
 ### Optional LLM decomposition (future)
 

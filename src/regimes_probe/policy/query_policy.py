@@ -160,8 +160,9 @@ class QueryPolicy:
         return plan
 
     def _formulate_decomposed(self, sig, *, bandit, neighbor, explore, tool, salt) -> QueryPlan:
-        from regimes_probe.policy.query_decomposition import decompose_queries
-        candidates = decompose_queries(sig.question)
+        from regimes_probe.policy.query_decomposition import decompose
+        result = decompose(sig.question)
+        candidates = result.candidates
         if not candidates:                       # nothing to decompose -> compressed
             plan = apply_query_arm("keyword_compressed", sig)
             plan.explanation["decompose"] = "no_candidates"
@@ -179,9 +180,15 @@ class QueryPolicy:
             chosen = ranked[0].arm if ranked else arm_list[0]
             ranked_dump = [s.to_dict() for s in ranked]
         cand = by_arm[chosen]
+        dbg = result.to_debug()
         return QueryPlan(
             arm=cand.arm, query=cand.query, opts={},
             clue_ids=list(cand.clue_ids), query_text_hash=cand.query_text_hash,
             explanation={"decompose": True, "context": ctx, "tool": tool,
                          "n_candidates": len(candidates),
-                         "candidate_arms": arm_list, "ranked": ranked_dump})
+                         "candidate_arms": arm_list, "ranked": ranked_dump,
+                         "selected_arm": cand.arm,
+                         "selected_query_quality": round(cand.quality, 3),
+                         "dropped_count": dbg["dropped_count"],
+                         "dropped": dbg["dropped"],
+                         "candidate_queries": dbg["candidate_queries"]})

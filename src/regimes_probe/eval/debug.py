@@ -125,11 +125,19 @@ def build_debug_record(*, item, trace, grade, reward, condition: str, budget: in
         n_results += n_ok
         c_cont = sum(1 for o in c.observations if getattr(o, "benchmark_contaminated", False))
         contaminated_results += c_cont
+        # Bounded candidate-query previews (query decomposition v1 debug).
+        cand_prev = [{"arm": q.get("arm"), "query_preview": _prev(q.get("query", ""), preview),
+                      "expected_search_quality": q.get("expected_search_quality")}
+                     for q in getattr(c, "query_candidates", [])[:6]]
         calls_info.append({
             "call_index": c.call_index, "tool": c.tool, "query_arm": c.query_arm,
             "query_preview": _prev(c.query, preview),
             "query_text_hash": getattr(c, "query_text_hash", ""),
             "clue_ids": list(getattr(c, "clue_ids", [])),
+            "query_quality": round(float(getattr(c, "query_quality", 0.0)), 3),
+            "n_query_candidates": getattr(c, "n_query_candidates", 0),
+            "n_query_candidates_dropped": getattr(c, "n_query_candidates_dropped", 0),
+            "query_candidates": cand_prev,
             "n_results": n_ok, "contaminated_results": c_cont,
             "failed": bool(getattr(c, "failed", False)),
             "error_type": getattr(c, "error_type", None),

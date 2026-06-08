@@ -489,4 +489,66 @@ most-discriminative constraint(s) are resolved (not unresolved); no constraint o
 bound slot is contradicted; and the hypothesis carries ≥2 supported constraints.
 This closes the earlier bug where a bound slot alone reported `answer_supported=True`
 with no correct answer. When the gate fails, `missing_support_reasons` lists exactly
-which checks failed.
+which checks failed. The blocking check now consumes the **affordance** model below:
+a constraint with `can_block_answer` (or `blocks_answer_if_unresolved`) on a bound
+slot must be resolved before answering — falling back to the most-discriminative
+target constraint only when the frame declares no explicit blocking constraint.
+
+### Level 4c: open-world semantic constraints + operational affordances
+
+**Why.** The first wired LLM-parser run fell back constantly because the schema
+required a narrow `constraint_type` enum, while the model produced rich, *defensible*
+labels — `employment_relation`, `authorship + educational background`,
+`distance_and_temporal_attribute`, `source_reference`. Rejecting those is both wrong
+(the labels are useful) and a path to **overfitting to BrowseComp** (we would be
+hand-maintaining an enum that chases one benchmark's phrasing). The real need is not
+a fixed vocabulary; it is that every parsed object be *operationally usable*.
+
+**The split (raw semantics vs. derived affordances).** Constraints are now
+**open-world**: `semantic_label` is free-form, `semantic_facets` is an open list
+(common ones — identity/attribute/relation/temporal/spatial/quantitative/authorship/
+source/membership/biographical/title_or_work/comparison/distance/answer_shape — are
+lightly standardized but a *new* facet is preserved, never rejected). What the
+planner branches on is a small **closed** set of **operational affordances**
+(`agent/affordances.py`): `can_search`, `can_verify`, `can_read`, `can_compare`,
+`can_bind_slot`, `can_support_answer`, `can_block_answer`. Affordances are emitted by
+the parser and/or derived by generic heuristics from facets + slot roles + fields —
+e.g. `employment_relation` → search/verify/bind/support; `distance_and_temporal_*`
+→ + compare; `source_reference` → + read. Each constraint also carries
+`required`, `priority`, `testable_claim`, `evidence_needed`, `how_to_test`,
+`suggested_query_templates`, `supports_answer_slot_ids`, `blocks_answer_if_unresolved`,
+`parser_confidence`, plus `raw_parser_output` / `planner_interpretation` /
+`validation_warnings` (raw and derived are kept side by side, never collapsed).
+
+**Validation is now open-world.** `validate_payload` checks *usability + safety*,
+not vocabulary: JSON well-formed; `applies_to` (scalar normalized to a list)
+references real slots; `required` constraints have a `testable_claim` plus
+`evidence_needed`/`how_to_test` and apply to a target/intermediate slot; no
+gold/answer text. An unfamiliar `semantic_label`, facet, or slot role is **never** a
+hard rejection — it becomes a `parser_warning` (unknown slot roles coerce to
+`unknown`; unknown affordances are dropped; novel facets are flagged but kept). The
+deterministic parser enriches its constraints through the **same** path, so both
+parsers expose identical operational fields.
+
+**The planner branches on affordances, not labels** (`ActionPlanner.plan`): it orders
+unresolved constraints by `(blocks, supports, priority, specificity)` and picks an
+action by affordance — `search_to_bind_slot` (`can_bind_slot`),
+`search_to_test_constraint` (`can_verify` on a bound target), `compare_candidates`
+(`can_compare` with competing candidates), `read_to_verify_constraint` (the
+frame-grounded read gate), `answer_if_supported`, `abstain_if_blocked`. It never
+switches on a free-form label, so a new label/facet needs **no planner change**.
+
+### Level 4d: epistemic escalation controller (front door)
+
+Running the constraint-graph machinery on every question is wasteful. A lightweight
+controller (`agent/epistemic_mode.py`, deterministic, gold-free) reads cheap signals
+— clause count (hops), entity density, multi-hop connectives, recency cues, budget —
+and picks the cheapest sufficient mode: `direct_answer_possible` → `simple_lookup` →
+`decomposed_search` → `iterative_research` → `task_frame_required`. Easy factual
+questions ("capital of France") route to direct/simple; clue-dense multi-hop
+questions (most BrowseComp items, *emergently* not by hard-coding) route to
+`task_frame_required`. Flags: `--auto-epistemic-mode` (let it decide per question;
+default off so the benchmark uses explicit flags), `--force-task-frame`,
+`--disable-direct-answer`. The decision (`selected_epistemic_mode`,
+`escalation_reason`, `skipped_heavy_parser_reason`, `estimated_effort`, `signals`) is
+recorded on every attempt for audit.

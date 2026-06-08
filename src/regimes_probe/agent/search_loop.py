@@ -203,6 +203,7 @@ class AttemptTrace:
     hypothesis_summary: dict[str, Any] = field(default_factory=dict)
     frame_coverage: dict[str, Any] = field(default_factory=dict)
     task_frame_parse: dict[str, Any] = field(default_factory=dict)
+    epistemic_mode: dict[str, Any] = field(default_factory=dict)
 
     @property
     def tool_calls(self) -> int:
@@ -237,6 +238,9 @@ class SearchLoopConfig:
     enable_iterative_clue_resolution: bool = False
     enable_task_frame: bool = False
     enable_llm_task_frame_parser: bool = False
+    auto_epistemic_mode: bool = False
+    force_task_frame: bool = False
+    disable_direct_answer: bool = False
     scrape_fallback_to_page_fetch: bool = True
     allow_social_scrape: bool = False
 
@@ -306,9 +310,32 @@ class SearchLoop:
         known_domain = item.meta.get("known_domain")
         freshness_sensitive = bool(signature.features.get("freshness_sensitive"))
 
+        # Epistemic escalation controller: decide how much machinery this question
+        # warrants. When --auto-epistemic-mode is OFF the explicit flags win (and the
+        # decision is recorded for audit only); when ON, the decision sets the
+        # effective task-frame / iterative / decomposition flags for THIS item.
+        from regimes_probe.agent.epistemic_mode import (
+            decide_epistemic_mode, explicit_mode_decision)
+        if config.auto_epistemic_mode:
+            epistemic_decision = decide_epistemic_mode(
+                item.question, budget=config.budget,
+                force_task_frame=config.force_task_frame,
+                disable_direct_answer=config.disable_direct_answer)
+            epistemic_decision.applied = True
+            eff_task_frame = epistemic_decision.use_task_frame or config.force_task_frame
+            eff_iterative = epistemic_decision.use_iterative or config.enable_iterative_clue_resolution
+            eff_decompose = (epistemic_decision.use_decomposition
+                             or config.enable_query_decomposition)
+        else:
+            eff_task_frame = config.enable_task_frame or config.force_task_frame
+            eff_iterative = config.enable_iterative_clue_resolution
+            eff_decompose = config.enable_query_decomposition
+            epistemic_decision = explicit_mode_decision(
+                task_frame=eff_task_frame, iterative=eff_iterative, decomposition=eff_decompose)
+
         # Iterative clue resolution (staged search): clue spans + answer-shape to
         # chase intermediate entities found in earlier results.
-        iterative = config.enable_iterative_clue_resolution
+        iterative = eff_iterative
         clue_spans: list[str] = []
         answer_shape: list[str] = []
         clue_terms: list[str] = []
@@ -334,7 +361,7 @@ class SearchLoop:
         # Level 4 task frame: constraint-satisfaction state over latent slots. When
         # enabled it drives query/read/stop via an action planner (supersedes the
         # iterative beam). Clue terms feed the answer/read gating.
-        task_frame = config.enable_task_frame
+        task_frame = eff_task_frame
         frame = htable = planner = None
         frame_parse_meta: dict[str, Any] = {}
         if task_frame:
@@ -448,7 +475,8 @@ class SearchLoop:
                                           reading_available=bool(reading_tools))
                     task_action_info = action.to_dict()
                     task_actions.append(task_action_info)
-                    if action.kind in ("answer_if_supported", "abstain_if_no_path"):
+                    if action.kind in ("answer_if_supported", "abstain_if_no_path",
+                                       "abstain_if_blocked"):
                         terminal_action = task_action_info
                         break
                     tool = tool_seq[step] if step < len(tool_seq) else tool_seq[-1]
@@ -505,7 +533,7 @@ class SearchLoop:
                     explore=config.explore,
                     known_domain=known_domain,
                     salt=f"{attempt_id}:q{step}",
-                    decompose=config.enable_query_decomposition,
+                    decompose=eff_decompose,
                     tool=tool,
                 )
                 query, query_arm, opts = qplan.query, qplan.arm, qplan.opts
@@ -721,4 +749,5 @@ class SearchLoop:
             hypothesis_summary=(htable.to_debug() if task_frame and htable is not None else {}),
             frame_coverage=frame_coverage,
             task_frame_parse=(frame_parse_meta if task_frame else {}),
+            epistemic_mode=epistemic_decision.to_dict(),
         )

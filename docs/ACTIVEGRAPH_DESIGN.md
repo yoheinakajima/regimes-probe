@@ -151,6 +151,22 @@ on the attempt's `frame_coverage` (`answer_support_gate` + `missing_support_reas
 from the strict `evaluate_answer_support` gate — so an `answer_supported_by_hypothesis`
 edge reflects supported evidence, not a merely-bound slot.
 
+**Open-world semantics + affordances in the graph (Level 4c/4d).** Constraints
+project as `semantic_constraint` nodes carrying BOTH the raw free-form
+`semantic_label`/`semantic_facets` AND the derived closed-set `affordances` — kept
+side by side, never collapsed. Each gets `constraint_has_facet` edges to
+`constraint_facet` nodes and `constraint_has_affordance` edges to
+`operational_affordance` nodes; an unresolved blocking constraint gets an
+`unresolved_constraint_blocks_answer` edge. The escalation decision projects as an
+`epistemic_mode_decision` node (`epistemic_mode_for_attempt`), and a supported answer
+projects an explicit `answer_support_path` node (`answer_supported_by_path`) capturing
+the answer → hypothesis → slot → evidence → constraint chain; hypotheses also get
+`hypothesis_assigns_slot` edges. This is deliberate: by recording **raw semantics,
+derived affordances, the actions taken, and the outcome** together, the ontology can
+**evolve from traces** — future learning can ask which affordances actually paid off,
+which facets needed which tools, and which epistemic modes avoided wasted work,
+without freezing a constraint enum up front.
+
 **Bounding / safety.** Every attempt gets compact `question_attempt`/
 `answer_attempt`/`grade_result`/`reward_assignment` (+ `failure_regime` when it
 failed) nodes; heavy sub-nodes (`query_plan`/`tool_call`/`tool_response`/

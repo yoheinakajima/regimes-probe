@@ -252,3 +252,25 @@ Audit `missing_support_reasons` to see why an attempt did not earn a supported
 answer; a run whose `answer_support_gate` rate is high but accuracy is low indicates
 the gate is being satisfied by the wrong hypothesis (re-check parse quality and
 constraint resolution), not that the gate is too lax.
+
+### Level 4c/4d: open-world constraints + escalation controller
+
+The parser contract is now **open-world** (`QUERY_POLICY.md` Level 4c): constraints
+carry free-form `semantic_label`/`semantic_facets` plus a closed set of operational
+`affordances`. Evaluate the change by its intended effect — **the LLM-parser
+fallback rate should drop sharply** (rich labels like `employment_relation` no longer
+force a fallback) **without** loosening the safety checks. Read
+`deterministic_fallback_rate`, `parser_validation_failure_counts` (should no longer
+contain label/facet rejections), and the per-constraint `affordances` /
+`validation_warnings` in `debug_questions.jsonl`. A correctness gain is only credible
+if it comes from *better-grounded actions* (affordance-driven), not from the gate or
+parser being more permissive.
+
+The **epistemic escalation controller** (Level 4d, `--auto-epistemic-mode`) is an
+ablation in its own right: with it on, easy questions should consume far less budget
+(direct/simple modes, `parser_model_calls` near zero on those items) while hard
+multi-hop items still escalate to `task_frame_required`. Compare wall-clock/cost and
+accuracy with the controller on vs. off; the win is "same accuracy, less wasted
+work" on the easy tail, not a headline accuracy change. The default benchmark run
+keeps explicit flags so conditions stay comparable; the controller is for the
+generic-agent setting and is recorded per attempt (`selected_epistemic_mode`).

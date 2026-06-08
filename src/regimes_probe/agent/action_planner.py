@@ -17,10 +17,11 @@ from urllib.parse import urlparse
 from regimes_probe.policy.query_decomposition import (
     _cap, _tokens, _is_rare, extract_clues, MAX_QUERY_CHARS, MAX_QUERY_TOKENS)
 
-ACTION_TYPES = ("search_for_slot", "verify_constraint",
-                "search_with_candidate_and_constraint", "read_url_for_constraint",
-                "extract_candidate_from_evidence", "answer_if_supported",
-                "abstain_if_no_path")
+#: Affordance-driven action kinds the planner emits (plus read_url_for_constraint,
+#: emitted by the search loop's frame-grounded read stage).
+ACTION_TYPES = ("search_to_bind_slot", "search_to_test_constraint",
+                "compare_candidates", "read_to_verify_constraint",
+                "read_url_for_constraint", "answer_if_supported", "abstain_if_blocked")
 #: A target hypothesis needs at least this much constraint support to answer.
 _MIN_SUPPORT_TO_ANSWER = 2
 
@@ -103,18 +104,26 @@ def evaluate_answer_support(frame, table, best=None) -> AnswerSupportResult:
     if not clean:
         reasons.append("no_clean_evidence_supports_target_or_answer_shape")
 
-    # (2) the target's most-discriminative constraint(s) must be resolved.
-    tgt_cons = [c for c in frame.constraints
-                if tgt.slot_id in c.applies_to and c.constraint_type != "answer_shape"]
-    if tgt_cons:
-        top = max(c.discriminative_score for c in tgt_cons)
-        high = [c for c in tgt_cons if c.discriminative_score >= top - 1e-9]
-        unresolved_high = [c.constraint_id for c in high if c.status != "resolved"]
-        if unresolved_high:
-            reasons.append("high_priority_constraint_unresolved:" + ",".join(unresolved_high))
+    bound = set(best.slot_assignments) | {tgt.slot_id}
+    # (2) required BLOCKING constraints (affordance/flag) on a bound slot must be
+    #     resolved. Falls back to the most-discriminative target constraint when the
+    #     frame declares no explicit blocking constraints.
+    def _blocks(c) -> bool:
+        return (getattr(c, "blocks_answer_if_unresolved", False)
+                or "can_block_answer" in getattr(c, "affordances", []))
+    blocking = [c for c in frame.constraints
+                if _blocks(c) and (set(c.applies_to) & bound)]
+    if not blocking:
+        tgt_cons = [c for c in frame.constraints
+                    if tgt.slot_id in c.applies_to and c.constraint_type != "answer_shape"]
+        if tgt_cons:
+            top = max(c.discriminative_score for c in tgt_cons)
+            blocking = [c for c in tgt_cons if c.discriminative_score >= top - 1e-9]
+    unresolved_blocking = [c.constraint_id for c in blocking if c.status != "resolved"]
+    if unresolved_blocking:
+        reasons.append("required_blocking_constraint_unresolved:" + ",".join(unresolved_blocking))
 
     # (3) no constraint on a bound slot is contradicted.
-    bound = set(best.slot_assignments) | {tgt.slot_id}
     contradicted = [c.constraint_id for c in frame.constraints
                     if c.status == "contradicted" and (set(c.applies_to) & bound)]
     if contradicted:
@@ -242,13 +251,25 @@ class ActionPlanner:
         self._query_hashes.add(h)
         return q, repeat
 
+    def _constraint_priority_key(self, con) -> tuple:
+        """Order constraints by expected information gain for the planner.
+
+        Unresolved high-priority BLOCKING constraints first; then constraints that
+        support the answer; then by declared priority and specificity. The planner
+        branches on these *affordances*, not on the free-form semantic label.
+        """
+        pr = {"high": 2, "medium": 1, "low": 0}.get(getattr(con, "priority", "medium"), 1)
+        blocks = 1 if ("can_block_answer" in getattr(con, "affordances", [])
+                       or getattr(con, "blocks_answer_if_unresolved", False)) else 0
+        supports = 1 if "can_support_answer" in getattr(con, "affordances", []) else 0
+        return (blocks, supports, pr, con.specificity_score)
+
     def plan(self, *, budget_remaining: int, reading_available: bool) -> EpistemicAction:
         f, t = self.frame, self.table
         best = t.best_hypothesis()
         tgt_slot = f.target_answer_slots[0] if f.target_answer_slots else None
 
-        # 1. Answer only when the strict support gate passes (supported evidence
-        #    tied to the hypothesis — not merely a bound slot).
+        # 1. Answer only when the strict support gate passes.
         supp = evaluate_answer_support(f, t, best)
         self.last_answer_support = supp
         if supp.supported and tgt_slot:
@@ -256,53 +277,80 @@ class ActionPlanner:
                                    target_slot_id=tgt_slot.slot_id,
                                    hypothesis_id=best.hypothesis_id if best else None,
                                    rationale="target bound + evidence supports target/constraints")
-        # 2. Abstain when out of budget and no supported path exists.
-        if budget_remaining <= 0 or (not f.unresolved_constraints and not best
-                                     and not f.all_slots):
-            return EpistemicAction(self._next_id(), "abstain_if_no_path",
-                                   rationale="no supported hypothesis / budget exhausted")
+        # 2. Abstain when out of budget or there is no actionable path.
+        if budget_remaining <= 0 or (not f.unresolved_constraints and not f.all_slots):
+            return self._abstain(supp)
 
-        # 3. Verify a target candidate against the most specific unresolved constraint.
-        if best and tgt_slot and tgt_slot.slot_id in best.slot_assignments:
-            cand = t.candidate_text(best.slot_assignments[tgt_slot.slot_id])
-            uncon = sorted([c for c in f.unresolved_constraints if c.constraint_type != "answer_shape"],
-                           key=lambda c: -c.specificity_score)
-            if uncon:
-                con = uncon[0]
+        unbound_ids = {s.slot_id for s in self._unbound_slots()}
+        # Candidate constraints to act on, ordered by expected information gain.
+        actionable = [c for c in f.unresolved_constraints
+                      if c.constraint_type != "answer_shape"
+                      and ("can_verify" in c.affordances or "can_search" in c.affordances
+                           or "can_bind_slot" in c.affordances)]
+        actionable.sort(key=self._constraint_priority_key, reverse=True)
+
+        for con in actionable:
+            aff = con.affordances
+            tgt_bound = bool(best and tgt_slot and tgt_slot.slot_id in best.slot_assignments)
+
+            # 3a. compare candidates when the constraint is comparative and the slot it
+            #     applies to has competing candidates to disambiguate.
+            if "can_compare" in aff:
+                sid = next((s for s in con.applies_to), None)
+                if sid and self.table_has_multiple_candidates(sid):
+                    cand = t.candidate_text(best.slot_assignments.get(sid, "")) if best else ""
+                    phrase = _distinctive_phrase(con)
+                    q, repeat = self._query(f'"{phrase}" {cand}'.strip())
+                    if not repeat and q:
+                        return EpistemicAction(
+                            self._next_id(), "compare_candidates", target_slot_id=sid,
+                            tested_constraint_ids=[con.constraint_id],
+                            hypothesis_id=(best.hypothesis_id if best else None), query=q,
+                            query_arm="compare", expected_information_gain=con.discriminative_score + 0.5,
+                            rationale=f"compare candidates for slot {sid} via {con.constraint_id}")
+
+            # 3b. test a bound target candidate against this constraint.
+            if tgt_bound and ("can_verify" in aff) and (tgt_slot.slot_id in con.applies_to
+                                                        or "can_support_answer" in aff):
+                cand = t.candidate_text(best.slot_assignments[tgt_slot.slot_id])
                 phrase = _distinctive_phrase(con)
                 q, repeat = self._query(f'"{cand}" {phrase}')
-                if not repeat:
+                if not repeat and q:
                     return EpistemicAction(
-                        self._next_id(), "search_with_candidate_and_constraint",
+                        self._next_id(), "search_to_test_constraint",
                         target_slot_id=tgt_slot.slot_id, tested_constraint_ids=[con.constraint_id],
-                        hypothesis_id=best.hypothesis_id, query=q,
-                        query_arm="candidate_constraint",
-                        expected_information_gain=con.specificity_score + 1.0,
-                        rationale=f"verify candidate '{cand}' against constraint {con.constraint_id}")
+                        hypothesis_id=best.hypothesis_id, query=q, query_arm="candidate_constraint",
+                        expected_information_gain=con.discriminative_score + 1.0,
+                        rationale=f"verify candidate '{cand}' against {con.constraint_id}")
 
-        # 4. Slot-seeking: the highest-specificity unresolved constraint for an
-        #    unbound slot — search the distinctive phrase + the slot's object type.
-        unbound_ids = {s.slot_id for s in self._unbound_slots()}
-        cons = sorted(f.unresolved_constraints, key=lambda c: -c.specificity_score)
-        for con in cons:
-            if con.constraint_type == "answer_shape":
-                continue
-            slot = next((f.slot(sid) for sid in con.applies_to if sid in unbound_ids), None)
-            slot = slot or (tgt_slot if tgt_slot and tgt_slot.slot_id in unbound_ids else None)
-            phrase = _distinctive_phrase(con)
-            obj = slot.slot_name if slot else (tgt_slot.slot_name if tgt_slot else "")
-            q, repeat = self._query(f'"{phrase}" {obj}' if phrase else obj)
-            if repeat or not q:
-                continue
-            self._slot_attempts[slot.slot_id if slot else "?"] = \
-                self._slot_attempts.get(slot.slot_id if slot else "?", 0) + 1
-            return EpistemicAction(
-                self._next_id(), "search_for_slot",
-                target_slot_id=(slot.slot_id if slot else None),
-                tested_constraint_ids=[con.constraint_id], query=q, query_arm="slot_seeking",
-                expected_information_gain=con.specificity_score,
-                rationale=f"bind slot via constraint {con.constraint_id}")
+            # 3c. search to bind an unbound slot this constraint identifies.
+            if "can_bind_slot" in aff:
+                slot = next((f.slot(sid) for sid in con.applies_to if sid in unbound_ids), None)
+                slot = slot or (tgt_slot if tgt_slot and tgt_slot.slot_id in unbound_ids else None)
+                phrase = _distinctive_phrase(con)
+                obj = slot.slot_name if slot else (tgt_slot.slot_name if tgt_slot else "")
+                q, repeat = self._query(f'"{phrase}" {obj}' if phrase else obj)
+                if not repeat and q:
+                    sid = slot.slot_id if slot else "?"
+                    self._slot_attempts[sid] = self._slot_attempts.get(sid, 0) + 1
+                    return EpistemicAction(
+                        self._next_id(), "search_to_bind_slot",
+                        target_slot_id=(slot.slot_id if slot else None),
+                        tested_constraint_ids=[con.constraint_id], query=q, query_arm="slot_seeking",
+                        expected_information_gain=con.specificity_score,
+                        rationale=f"bind slot via constraint {con.constraint_id}")
 
-        # 5. Nothing distinguishing left to try.
-        return EpistemicAction(self._next_id(), "abstain_if_no_path",
-                               rationale="no unresolved distinguishing constraint remains")
+        # 4. Nothing distinguishing left to try → abstain (blocked).
+        return self._abstain(supp)
+
+    def table_has_multiple_candidates(self, slot_id: str) -> int:
+        return sum(1 for c in self.table.candidates.values()
+                   if not getattr(c, "rejected", False)
+                   and slot_id in getattr(c, "support_for_slot_ids", []))
+
+    def _abstain(self, supp) -> EpistemicAction:
+        reasons = supp.missing_support_reasons if supp else []
+        return EpistemicAction(
+            self._next_id(), "abstain_if_blocked",
+            rationale=("blocked: " + "; ".join(reasons[:3])) if reasons
+            else "no unresolved distinguishing constraint remains")

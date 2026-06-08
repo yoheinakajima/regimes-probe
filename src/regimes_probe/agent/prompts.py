@@ -125,6 +125,58 @@ _TASK_FRAME_PARSER_V1 = (
     "number, unknown. Return ONLY the JSON object, no prose."
 )
 
+_TASK_FRAME_PARSER_V2 = (
+    "You parse a research question into an OPEN-WORLD, OPERATIONAL task frame. "
+    "These questions are constraint-satisfaction problems over latent (hidden) "
+    "variables: a target answer plus intermediate variables, linked by constraints. "
+    "Your job is to expose what must be FOUND and how each piece can be TESTED — not "
+    "to answer.\n"
+    "\n"
+    "PRINCIPLES:\n"
+    "- Do NOT answer or solve the question. Do NOT guess any entity, name, date, or "
+    "value. Parse only.\n"
+    "- Parse into variables (slots), constraints, and TESTABLE CLAIMS.\n"
+    "- Use NATURAL semantic labels freely (e.g. 'employment_relation', 'authorship + "
+    "educational background', 'distance_and_temporal_attribute'). There is NO fixed "
+    "label list — pick the most descriptive label and add semantic_facets.\n"
+    "- For EACH constraint also give OPERATIONAL AFFORDANCES: how it can be tested — "
+    "what evidence would support/refute it, what action tests it, and suggested "
+    "search query templates.\n"
+    "- Distinguish KNOWN CONTEXT (given in the question) from UNKNOWN VARIABLES "
+    "(what must be found). Never promote a given source/org to a target slot unless "
+    "the question explicitly asks for it.\n"
+    "- The TARGET slot is the single thing being ASKED FOR (the interrogative head). "
+    "Intermediate slots are things that must be found before the answer.\n"
+    "- Mark which constraints BLOCK answer support if unresolved (required + high "
+    "priority), and which answer slot ids each constraint supports.\n"
+    "- Preserve multi-hop dependencies in dependency_edges (intermediate -> target). "
+    "Never put a concrete answer (a value absent from the question) into any field.\n"
+    "\n"
+    "OUTPUT: one JSON object with keys target_answer_slots, latent_slots, "
+    "constraints, dependency_edges, known_context_terms, unresolved_slots, "
+    "answer_shape_hints, source_requirements, parse_quality.\n"
+    "Each slot: slot_id, slot_name, slot_role (person/organization/location/"
+    "title_or_work/publication_or_source/event/concept/date_or_time/number/unknown), "
+    "is_target_answer_slot, is_intermediate_slot, depends_on, expected_evidence_type.\n"
+    "Each constraint: constraint_id, text_span, semantic_label (free-form), "
+    "semantic_facets (list, free-form; common ones: identity, attribute, relation, "
+    "temporal, spatial, quantitative, authorship, source, membership, biographical, "
+    "title_or_work, comparison, distance, answer_shape), applies_to (slot ids), "
+    "required (bool), priority (high/medium/low), testable_claim, evidence_needed, "
+    "how_to_test, suggested_query_templates (list), supports_answer_slot_ids (list), "
+    "blocks_answer_if_unresolved (bool), source_quote_or_span, parser_confidence, "
+    "and OPTIONALLY affordances (subset of: can_search, can_verify, can_read, "
+    "can_compare, can_bind_slot, can_support_answer, can_block_answer).\n"
+    "GENERIC SHAPES (do not copy, do not answer): 'which TV series starred an actor "
+    "born in X' -> target=series, intermediate=actor; 'a restaurant near a hotel/"
+    "museum, founder born in which year' -> target=birth year, intermediate="
+    "restaurant/hotel/museum/founder; 'report by ORG, foreword by P1, introduction "
+    "by P2 — who wrote the introduction' -> known context=ORG, intermediate=report/"
+    "P1, target=P2; 'a paper using a census sample — which journal published it' -> "
+    "target=journal, intermediate=paper/authors, census/sample as constraints.\n"
+    "Return ONLY the JSON object, no prose."
+)
+
 PROMPTS: dict[str, Prompt] = {
     "answerer": Prompt(
         name="answerer", version="v1", content=_ANSWERER_V1,
@@ -147,8 +199,8 @@ PROMPTS: dict[str, Prompt] = {
         allowed_to_vary=True,
     ),
     "task_frame_parser": Prompt(
-        name="task_frame_parser", version="v1", content=_TASK_FRAME_PARSER_V1,
-        intended_use="LLM task-frame parsing (Level 4; produces task state, never answers)",
+        name="task_frame_parser", version="v2", content=_TASK_FRAME_PARSER_V2,
+        intended_use="open-world operational task-frame parsing (Level 4b; never answers)",
         allowed_to_vary=True,
     ),
 }

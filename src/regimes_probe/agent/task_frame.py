@@ -125,13 +125,32 @@ class Constraint:
     constraint_id: str
     text_span: str
     normalized_terms: list[str]
-    constraint_type: str
+    constraint_type: str = "attribute"   # LEGACY primary facet (kept for back-compat)
     applies_to: list[str] = field(default_factory=list)        # slot ids
     specificity_score: float = 0.0
     discriminative_score: float = 0.0
     status: str = "unresolved"           # resolved | unresolved | contradicted
     supporting_evidence_ids: list[str] = field(default_factory=list)
     contradicting_evidence_ids: list[str] = field(default_factory=list)
+    # --- open-world semantics (free-form; never rejected for being unfamiliar) ---
+    semantic_label: str = ""             # natural-language label (raw, preserved)
+    semantic_facets: list[str] = field(default_factory=list)   # open-ended facets
+    required: bool = False
+    priority: str = "medium"             # high | medium | low
+    testable_claim: str = ""
+    evidence_needed: str = ""
+    how_to_test: str = ""
+    suggested_query_templates: list[str] = field(default_factory=list)
+    supports_answer_slot_ids: list[str] = field(default_factory=list)
+    blocks_answer_if_unresolved: bool = False
+    source_quote_or_span: str = ""
+    parser_confidence: float = 0.0
+    # --- derived (planner consumes these, NOT the free-form label) ---
+    affordances: list[str] = field(default_factory=list)
+    # --- provenance (raw semantics kept separate from derived affordances) ---
+    raw_parser_output: dict = field(default_factory=dict)
+    planner_interpretation: dict = field(default_factory=dict)
+    validation_warnings: list[str] = field(default_factory=list)
 
     def to_dict(self, *, preview: int = 160) -> dict[str, Any]:
         span = self.text_span if len(self.text_span) <= preview else self.text_span[:preview - 1] + "…"
@@ -141,6 +160,18 @@ class Constraint:
                 "specificity_score": round(self.specificity_score, 3),
                 "discriminative_score": round(self.discriminative_score, 3),
                 "status": self.status,
+                "semantic_label": self.semantic_label,
+                "semantic_facets": list(self.semantic_facets)[:10],
+                "affordances": list(self.affordances),
+                "required": self.required, "priority": self.priority,
+                "blocks_answer_if_unresolved": self.blocks_answer_if_unresolved,
+                "testable_claim": self.testable_claim[:preview],
+                "evidence_needed": self.evidence_needed[:preview],
+                "how_to_test": self.how_to_test[:preview],
+                "supports_answer_slot_ids": list(self.supports_answer_slot_ids),
+                "suggested_query_templates": list(self.suggested_query_templates)[:4],
+                "parser_confidence": round(self.parser_confidence, 3),
+                "validation_warnings": list(self.validation_warnings)[:8],
                 "supporting_evidence_ids": list(self.supporting_evidence_ids)[:8],
                 "contradicting_evidence_ids": list(self.contradicting_evidence_ids)[:8]}
 
@@ -156,6 +187,7 @@ class TaskFrame:
     answer_shape_hints: list[str] = field(default_factory=list)
     source_requirements: list[str] = field(default_factory=list)
     parse_quality: float = 0.0
+    validation_warnings: list[str] = field(default_factory=list)
 
     @property
     def all_slots(self) -> list[Slot]:
@@ -179,6 +211,7 @@ class TaskFrame:
             "answer_shape_hints": list(self.answer_shape_hints),
             "source_requirements": list(self.source_requirements),
             "parse_quality": round(self.parse_quality, 3),
+            "validation_warnings": list(self.validation_warnings)[:12],
         }
 
 
@@ -211,6 +244,41 @@ def _specificity(terms: list[str], clause: str) -> float:
     caps = len(re.findall(r"\b[A-Z][a-zA-Z]+\b", clause))
     quoted = clause.count('"') // 2
     return float(rare * 1.0 + caps * 0.5 + quoted * 1.0 + (0.5 if len(terms) >= 3 else 0.0))
+
+
+def enrich_constraint(con: "Constraint", target_ids: set[str], inter_ids: set[str]) -> None:
+    """Fill the open-world semantic + affordance fields on a Constraint in place.
+
+    Used by BOTH parsers so every frame exposes the operational fields the planner
+    consumes. Preserves any free-form semantics the caller already set; derives the
+    rest from the legacy ``constraint_type`` + scores when absent.
+    """
+    from regimes_probe.agent.affordances import derive_affordances, normalize_facets
+    if not con.semantic_label:
+        con.semantic_label = con.constraint_type
+    con.semantic_facets = normalize_facets(con.semantic_label, con.semantic_facets
+                                           or [con.constraint_type])
+    if not con.testable_claim:
+        con.testable_claim = con.text_span
+    # priority/required/blocking from specificity + whether it touches the target.
+    touches_target = bool(set(con.applies_to) & target_ids)
+    if con.priority == "medium":
+        con.priority = ("high" if (con.specificity_score >= 1.0 and touches_target)
+                        else ("low" if con.constraint_type == "answer_shape" else "medium"))
+    if not con.supports_answer_slot_ids and touches_target:
+        con.supports_answer_slot_ids = [s for s in con.applies_to if s in target_ids]
+    if con.priority == "high" and touches_target:
+        con.required = con.required or True
+        con.blocks_answer_if_unresolved = con.blocks_answer_if_unresolved or True
+    con.affordances = derive_affordances(
+        facets=con.semantic_facets, semantic_label=con.semantic_label,
+        applies_to=con.applies_to, target_slot_ids=target_ids,
+        intermediate_slot_ids=inter_ids,
+        supports_answer_slot_ids=con.supports_answer_slot_ids,
+        required=con.required, priority=con.priority,
+        blocks_answer_if_unresolved=con.blocks_answer_if_unresolved,
+        testable_claim=con.testable_claim, evidence_needed=con.evidence_needed,
+        how_to_test=con.how_to_test, has_terms=bool(con.normalized_terms))
 
 
 def parse_task_frame(item_id: str, question: str) -> TaskFrame:
@@ -262,6 +330,8 @@ def parse_task_frame(item_id: str, question: str) -> TaskFrame:
     frame.source_requirements = list(clues.source_hints)
 
     # Constraints: one per clause, attached to the best-matching slot.
+    target_ids = {s.slot_id for s in frame.target_answer_slots}
+    inter_ids = {s.slot_id for s in frame.latent_slots}
     cid = 0
     for clause in split_clauses(question):
         terms = [t for t in _tokens(clause) if len(t) >= 3][:10]
@@ -276,10 +346,13 @@ def parse_task_frame(item_id: str, question: str) -> TaskFrame:
         if not applies and frame.target_answer_slots:
             applies = [frame.target_answer_slots[0].slot_id]
         spec = _specificity(terms, clause)
-        frame.constraints.append(Constraint(
+        con = Constraint(
             constraint_id=f"c{cid}", text_span=clause.strip(), normalized_terms=terms,
             constraint_type=ctype, applies_to=applies,
-            specificity_score=spec, discriminative_score=spec))
+            specificity_score=spec, discriminative_score=spec)
+        # Enrich into the open-world schema so deterministic + LLM frames are uniform.
+        enrich_constraint(con, target_ids, inter_ids)
+        frame.constraints.append(con)
         cid += 1
 
     # Dependency edges: intermediate slots feed the target (generic chain).

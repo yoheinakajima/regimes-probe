@@ -41,6 +41,13 @@ class Relations:
     ANSWER_SUPPORTED_BY_HYPOTHESIS = "answer_supported_by_hypothesis"
     FRAME_FOR_ATTEMPT = "frame_for_attempt"
     SLOT_IN_FRAME = "slot_in_frame"
+    # Open-world semantic / affordance + escalation relations (Level 4c)
+    CONSTRAINT_HAS_FACET = "constraint_has_facet"
+    CONSTRAINT_HAS_AFFORDANCE = "constraint_has_affordance"
+    HYPOTHESIS_ASSIGNS_SLOT = "hypothesis_assigns_slot"
+    ANSWER_SUPPORTED_BY_PATH = "answer_supported_by_path"
+    UNRESOLVED_CONSTRAINT_BLOCKS_ANSWER = "unresolved_constraint_blocks_answer"
+    EPISTEMIC_MODE_FOR_ATTEMPT = "epistemic_mode_for_attempt"
     UPDATE_FROM_REWARD = "update_from_reward"
     REGIME_FOR_FAILURE = "regime_for_failure"
     PROMOTION_FOR_UPDATE = "promotion_for_update"
@@ -92,4 +99,10 @@ PROJECTION_RELATIONS: tuple[str, ...] = (
     Relations.HYPOTHESIS_SUPPORTED_BY_EVIDENCE,
     Relations.HYPOTHESIS_REJECTED_BY_EVIDENCE,
     Relations.ANSWER_SUPPORTED_BY_HYPOTHESIS,
+    Relations.CONSTRAINT_HAS_FACET,
+    Relations.CONSTRAINT_HAS_AFFORDANCE,
+    Relations.HYPOTHESIS_ASSIGNS_SLOT,
+    Relations.ANSWER_SUPPORTED_BY_PATH,
+    Relations.UNRESOLVED_CONSTRAINT_BLOCKS_ANSWER,
+    Relations.EPISTEMIC_MODE_FOR_ATTEMPT,
 )

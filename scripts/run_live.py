@@ -122,6 +122,14 @@ def main() -> int:
     ap.add_argument("--task-frame-parser-model", default=None,
                     help="Model for the LLM task-frame parser (default: --answer-model). "
                          "Cached/replayable; only used with --enable-llm-task-frame-parser.")
+    ap.add_argument("--auto-epistemic-mode", action="store_true",
+                    help="Let the escalation controller pick the epistemic mode per "
+                         "question (direct/simple/decomposed/iterative/task_frame). "
+                         "Off by default; the benchmark uses explicit flags.")
+    ap.add_argument("--force-task-frame", action="store_true",
+                    help="Always escalate to task-frame mode (overrides the controller).")
+    ap.add_argument("--disable-direct-answer", action="store_true",
+                    help="Never use the direct-answer mode (always search at least once).")
     ap.add_argument("--judge-model", default=None,
                     help="(reserved) LLM judge; grading currently uses exact/normalized match")
     ap.add_argument("--split-seed", default=None)
@@ -189,6 +197,12 @@ def main() -> int:
     cfg.setdefault("policy", {})["enable_iterative_clue_resolution"] = iterative_enabled
     cfg.setdefault("policy", {})["enable_task_frame"] = task_frame_enabled
     cfg.setdefault("policy", {})["enable_llm_task_frame_parser"] = llm_parser_enabled
+    cfg["policy"]["auto_epistemic_mode"] = bool(
+        args.auto_epistemic_mode or cfg.get("policy", {}).get("auto_epistemic_mode", False))
+    cfg["policy"]["force_task_frame"] = bool(
+        args.force_task_frame or cfg.get("policy", {}).get("force_task_frame", False))
+    cfg["policy"]["disable_direct_answer"] = bool(
+        args.disable_direct_answer or cfg.get("policy", {}).get("disable_direct_answer", False))
     # Parser model defaults to the answer model unless explicitly overridden.
     task_frame_parser_model = (args.task_frame_parser_model
                                or cfg.get("policy", {}).get("task_frame_parser_model")
@@ -303,6 +317,9 @@ def main() -> int:
                             enable_iterative_clue_resolution=iterative_enabled,
                             enable_task_frame=task_frame_enabled,
                             enable_llm_task_frame_parser=llm_parser_enabled,
+                            auto_epistemic_mode=cfg["policy"]["auto_epistemic_mode"],
+                            force_task_frame=cfg["policy"]["force_task_frame"],
+                            disable_direct_answer=cfg["policy"]["disable_direct_answer"],
                             scrape_fallback_to_page_fetch=bool(
                                 cfg["policy"].get("scrape_fallback_to_page_fetch", True)),
                             allow_social_scrape=bool(cfg["policy"].get("allow_social_scrape", False)),

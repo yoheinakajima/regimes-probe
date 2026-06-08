@@ -191,6 +191,15 @@ def build_graph_projection(
                     "fallback_reason": pm.get("fallback_reason", ""),
                     "known_context_terms": tf.get("known_context_terms", [])[:8]})
                 g.rel(tf_node, a_node, Relations.FRAME_FOR_ATTEMPT)
+                # Epistemic escalation decision (front-door mode selection).
+                em = d.get("epistemic_mode") or {}
+                if em.get("selected_epistemic_mode"):
+                    em_node = g.obj(f"epistemic_mode_decision#{aid}", Objects.EPISTEMIC_MODE_DECISION, {
+                        "selected_epistemic_mode": em.get("selected_epistemic_mode"),
+                        "escalation_reason": em.get("escalation_reason"),
+                        "skipped_heavy_parser_reason": em.get("skipped_heavy_parser_reason"),
+                        "auto": em.get("auto"), "applied": em.get("applied")})
+                    g.rel(em_node, a_node, Relations.EPISTEMIC_MODE_FOR_ATTEMPT)
                 for s in (tf.get("target_answer_slots", []) + tf.get("latent_slots", [])):
                     s_node = g.obj(f"latent_slot#{aid}#{s['slot_id']}", Objects.LATENT_SLOT, {
                         "slot_name": s.get("slot_name"), "slot_role": s.get("slot_role"),
@@ -198,13 +207,34 @@ def build_graph_projection(
                         "is_intermediate_slot": s.get("is_intermediate_slot")})
                     g.rel(s_node, tf_node, Relations.SLOT_IN_FRAME)
                 for con in tf.get("constraints", []):
-                    c_node = g.obj(f"constraint#{aid}#{con['constraint_id']}", Objects.CONSTRAINT, {
+                    # Open-world SEMANTIC constraint: keep the raw label/facets AND the
+                    # derived affordances (the planner branches on the latter).
+                    c_node = g.obj(f"constraint#{aid}#{con['constraint_id']}",
+                                   Objects.SEMANTIC_CONSTRAINT, {
                         "constraint_type": con.get("constraint_type"),
+                        "semantic_label": con.get("semantic_label"),
+                        "semantic_facets": con.get("semantic_facets", []),
+                        "affordances": con.get("affordances", []),
+                        "required": con.get("required"), "priority": con.get("priority"),
+                        "blocks_answer_if_unresolved": con.get("blocks_answer_if_unresolved"),
                         "status": con.get("status"),
                         "specificity_score": con.get("specificity_score"),
                         "text_span": con.get("text_span", "")[:120]})
                     for sid in con.get("applies_to", []):
                         g.rel(c_node, f"latent_slot#{aid}#{sid}", Relations.CONSTRAINT_APPLIES_TO_SLOT)
+                    for facet in con.get("semantic_facets", [])[:8]:
+                        f_node = g.obj(f"constraint_facet#{aid}#{facet}", Objects.CONSTRAINT_FACET,
+                                       {"facet": facet})
+                        g.rel(c_node, f_node, Relations.CONSTRAINT_HAS_FACET)
+                    for aff in con.get("affordances", []):
+                        af_node = g.obj(f"operational_affordance#{aid}#{aff}",
+                                        Objects.OPERATIONAL_AFFORDANCE, {"affordance": aff})
+                        g.rel(c_node, af_node, Relations.CONSTRAINT_HAS_AFFORDANCE)
+                    # an unresolved blocking constraint blocks the answer.
+                    if (con.get("status") != "resolved"
+                            and (con.get("blocks_answer_if_unresolved")
+                                 or "can_block_answer" in con.get("affordances", []))):
+                        g.rel(c_node, tf_node, Relations.UNRESOLVED_CONSTRAINT_BLOCKS_ANSWER)
                 # epistemic actions + evidence records (per call)
                 for i, c in enumerate(d.get("calls", [])):
                     ta = c.get("task_action") or {}
@@ -245,10 +275,18 @@ def build_graph_projection(
                                         Objects.SLOT_ASSIGNMENT,
                                         {"slot_id": sid, "candidate_text": str(ctext)[:80]})
                         g.rel(h_node, sa_node, Relations.HYPOTHESIS_ASSIGNS_CANDIDATE)
+                        g.rel(h_node, f"latent_slot#{aid}#{sid}", Relations.HYPOTHESIS_ASSIGNS_SLOT)
                     if h.get("support_score", 0) > 0:
                         g.rel(h_node, tf_node, Relations.HYPOTHESIS_SUPPORTED_BY_EVIDENCE)
-                    if d.get("frame_coverage", {}).get("final_answer_supported_by_constraints"):
+                    cov = d.get("frame_coverage", {})
+                    if cov.get("final_answer_supported_by_constraints"):
                         g.rel(ans_node, h_node, Relations.ANSWER_SUPPORTED_BY_HYPOTHESIS)
+                        # an explicit answer→hypothesis→slot→evidence→constraint path.
+                        asp = g.obj(f"answer_support_path#{aid}", Objects.ANSWER_SUPPORT_PATH, {
+                            "hypothesis_id": h.get("hypothesis_id"),
+                            "answer_support_gate": cov.get("answer_support_gate"),
+                            "missing_support_reasons": cov.get("missing_support_reasons", [])})
+                        g.rel(ans_node, asp, Relations.ANSWER_SUPPORTED_BY_PATH)
                 for h in hs.get("rejected_hypotheses", []):
                     hr = g.obj(f"hypothesis#{aid}#{h['hypothesis_id']}", Objects.HYPOTHESIS,
                                {"active": False, "rejection_reason": h.get("rejection_reason")})

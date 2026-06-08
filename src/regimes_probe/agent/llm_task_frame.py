@@ -30,25 +30,30 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Optional
 
 from regimes_probe.agent import prompts
+from regimes_probe.agent.affordances import (
+    AFFORDANCES, COMMON_FACETS, derive_affordances, normalize_facets, novel_facets)
 from regimes_probe.agent.clue_resolution import ROLES, _norm
 from regimes_probe.agent.task_frame import (
     Constraint, Slot, TaskFrame, _interrogative_target_role, parse_task_frame)
 
-#: Valid slot roles (the frame vocabulary + the numeric role).
+#: Slot roles map to evidence types — a small standardized set. Unknown roles are
+#: coerced to "unknown" with a WARNING (never a hard rejection).
 VALID_ROLES: frozenset[str] = frozenset(ROLES) | {"number"}
-#: Valid constraint types.
-from regimes_probe.agent.task_frame import CONSTRAINT_TYPES as _CT
-VALID_CONSTRAINT_TYPES: frozenset[str] = frozenset(_CT)
 #: A parsed frame below this aggregate quality is rejected (deterministic fallback).
 MIN_LLM_PARSE_QUALITY: float = 0.5
 
-_REQUIRED_SLOT_FIELDS = ("slot_id", "slot_name", "slot_role", "is_target_answer_slot",
-                         "is_intermediate_slot", "depends_on", "expected_evidence_type")
-_REQUIRED_CONSTRAINT_FIELDS = ("constraint_id", "text_span", "normalized_terms",
-                               "constraint_type", "applies_to", "specificity_score",
-                               "discriminative_score", "status")
+#: Minimal required fields. Constraint SEMANTICS are open-world: we never require a
+#: particular constraint_type/facet, only that the object is operationally usable.
+_REQUIRED_SLOT_FIELDS = ("slot_id", "slot_name", "slot_role")
 _ANSWER_KEYS = ("answer", "final_answer", "solution", "gold", "gold_answer", "result")
 _WORD = re.compile(r"[A-Za-z0-9]+")
+
+
+def _as_list(v: Any) -> list:
+    """Normalize a scalar/None/list into a list (e.g. applies_to: 's0' -> ['s0'])."""
+    if v is None:
+        return []
+    return list(v) if isinstance(v, (list, tuple)) else [v]
 
 
 def _sha(s: str) -> str:
@@ -108,6 +113,7 @@ class ParseMeta:
     parse_quality: float = 0.0
     parse_quality_components: dict[str, float] = field(default_factory=dict)
     validation_errors: list[str] = field(default_factory=list)
+    validation_warnings: list[str] = field(default_factory=list)
     fallback_reason: str = ""
     cache_hit: bool = False
 
@@ -123,6 +129,7 @@ class ParseMeta:
             "parse_quality_components": {k: round(v, 3)
                                          for k, v in self.parse_quality_components.items()},
             "validation_errors": list(self.validation_errors)[:12],
+            "validation_warnings": list(self.validation_warnings)[:12],
             "fallback_reason": self.fallback_reason,
             "cache_hit": self.cache_hit,
         }
@@ -158,13 +165,23 @@ def _extract_json(raw: str) -> Optional[dict]:
 
 # --------------------------------------------------------------------------- validate
 def validate_payload(payload: Any, question: str) -> list[str]:
-    """Return a list of validation errors (empty == valid). Schema + safety checks."""
+    """Open-world validation: return hard ERRORS (empty == valid → accept the frame).
+
+    What is checked (operational usability + safety), NOT semantic vocabulary:
+    - JSON is a well-formed object with slot lists and a target slot.
+    - ``applies_to`` (scalar normalized to a list) references real slot ids.
+    - ``required`` constraints have a ``testable_claim`` and ``evidence_needed`` or
+      ``how_to_test``, and apply to a target/intermediate slot.
+    - No gold/final-answer text (forbidden keys; entity-named target slot).
+
+    A constraint is NEVER rejected for an unfamiliar ``semantic_label`` or facet, or
+    an unfamiliar ``slot_role`` — those become :func:`parser_warnings`.
+    """
     errors: list[str] = []
     if not isinstance(payload, dict):
         return ["payload_not_object"]
 
-    # forbid any answer-bearing top-level key (no gold-like text).
-    for k in payload:
+    for k in payload:                                   # no gold-like top-level key
         if str(k).lower() in _ANSWER_KEYS:
             errors.append(f"forbidden_answer_key:{k}")
 
@@ -181,6 +198,8 @@ def validate_payload(payload: Any, question: str) -> list[str]:
 
     all_slots = list(targets) + list(latents)
     slot_ids: set[str] = set()
+    target_ids: set[str] = set()
+    inter_ids: set[str] = set()
     qtok = _q_tokens(question)
 
     if not targets:
@@ -202,18 +221,15 @@ def validate_payload(payload: Any, question: str) -> list[str]:
             slot_ids.add(sid)
         if not str(s.get("slot_name", "")).strip():
             errors.append("slot_empty_name")
-        role = s.get("slot_role")
-        if role not in VALID_ROLES:
-            errors.append(f"unsupported_role:{role}")
+    for s in targets:
+        if isinstance(s, dict) and s.get("slot_id"):
+            target_ids.add(s["slot_id"])
+    for s in latents:
+        if isinstance(s, dict) and s.get("slot_id"):
+            inter_ids.add(s["slot_id"])
 
-    # target slot role should match the interrogative head where detectable.
-    head_role = _interrogative_target_role(question)
-    if head_role is not None and targets:
-        if not any(isinstance(s, dict) and s.get("slot_role") == head_role for s in targets):
-            errors.append(f"target_role_mismatch:expected_{head_role}")
-
-    # no gold-like answer text in a TARGET slot: every token of a target slot_name
-    # must be a question token or a generic role descriptor (not a novel entity).
+    # no gold-like answer text in a TARGET slot: a multiword capitalized name that
+    # introduces tokens absent from the question is almost certainly a guessed answer.
     role_words = VALID_ROLES | {"answer", "name", "value", "target", "the"}
     for s in targets:
         if not isinstance(s, dict):
@@ -221,42 +237,37 @@ def validate_payload(payload: Any, question: str) -> list[str]:
         name = str(s.get("slot_name", ""))
         novel = [t for t in _WORD.findall(name.lower())
                  if t not in qtok and t not in role_words and not t.isdigit()]
-        # a capitalized multiword name introducing tokens absent from the question
-        # is almost certainly a guessed answer, not a parse.
         if novel and re.search(r"[A-Z][a-z]+\s+[A-Z][a-z]+", name):
             errors.append("possible_answer_text_in_target_slot")
 
-    # constraints attach to existing slot ids; required fields present.
-    n_attached = 0
     for c in constraints:
         if not isinstance(c, dict):
             errors.append("constraint_not_object")
             continue
-        for f in _REQUIRED_CONSTRAINT_FIELDS:
-            if f not in c:
-                errors.append(f"constraint_missing_field:{f}")
-        ctype = c.get("constraint_type")
-        if ctype is not None and ctype not in VALID_CONSTRAINT_TYPES:
-            errors.append(f"unsupported_constraint_type:{ctype}")
-        applies = c.get("applies_to") or []
-        if not isinstance(applies, list):
-            errors.append("constraint_applies_to_not_list")
-            applies = []
+        if not c.get("constraint_id"):
+            errors.append("constraint_missing_id")
+        if not str(c.get("text_span", "")).strip() and not str(c.get("semantic_label", "")).strip():
+            errors.append("constraint_missing_text_and_label")
+        applies = _as_list(c.get("applies_to"))
         for ref in applies:
             if ref not in slot_ids:
                 errors.append(f"constraint_refs_unknown_slot:{ref}")
-        if applies:
-            n_attached += 1
+        # operational usability for REQUIRED constraints (open-world, affordance-first).
+        if bool(c.get("required")) or str(c.get("priority", "")).lower() == "high":
+            if not str(c.get("testable_claim", "")).strip():
+                errors.append(f"required_constraint_missing_testable_claim:{c.get('constraint_id')}")
+            if not (str(c.get("evidence_needed", "")).strip()
+                    or str(c.get("how_to_test", "")).strip()):
+                errors.append(f"required_constraint_missing_evidence_or_how_to_test:{c.get('constraint_id')}")
+            if not (set(applies) & (target_ids | inter_ids)):
+                errors.append(f"required_constraint_no_target_or_intermediate_slot:{c.get('constraint_id')}")
 
-    # dependency edges reference existing slots.
-    for edge in payload.get("dependency_edges", []) or []:
+    for edge in payload.get("dependency_edges", []) or []:    # edges reference real slots
         if (not isinstance(edge, (list, tuple)) or len(edge) != 2
                 or edge[0] not in slot_ids or edge[1] not in slot_ids):
             errors.append("dependency_edge_refs_unknown_slot")
 
-    # known context terms must be GIVEN in the question, and must not be a target
-    # slot name (the WHO-as-target failure) unless the question asks for that source.
-    kct = payload.get("known_context_terms", []) or []
+    kct = payload.get("known_context_terms", []) or []        # known ctx not a target
     target_names = {_norm(str(s.get("slot_name", ""))) for s in targets if isinstance(s, dict)}
     for term in kct:
         tnorm = _norm(str(term))
@@ -266,35 +277,112 @@ def validate_payload(payload: Any, question: str) -> list[str]:
     return errors
 
 
+def parser_warnings(payload: Any, question: str) -> list[str]:
+    """Non-fatal observations (preserved, never trigger fallback): novel facets,
+    unfamiliar slot roles (coerced to 'unknown'), interrogative-head mismatch,
+    unknown affordances (dropped), non-required constraints lacking a testable claim."""
+    warns: list[str] = []
+    if not isinstance(payload, dict):
+        return warns
+    targets = payload.get("target_answer_slots") or []
+    for s in (targets + (payload.get("latent_slots") or [])):
+        if isinstance(s, dict) and s.get("slot_role") not in VALID_ROLES:
+            warns.append(f"unfamiliar_slot_role_coerced_to_unknown:{s.get('slot_role')}")
+    head_role = _interrogative_target_role(question)
+    if head_role is not None and targets and not any(
+            isinstance(s, dict) and s.get("slot_role") == head_role for s in targets):
+        warns.append(f"target_role_mismatch:expected_{head_role}")
+    for c in (payload.get("constraints") or []):
+        if not isinstance(c, dict):
+            continue
+        facets = normalize_facets(str(c.get("semantic_label", "")), c.get("semantic_facets"))
+        for nf in novel_facets(facets):
+            warns.append(f"novel_facet:{nf}")
+        for a in _as_list(c.get("affordances")):
+            if a not in AFFORDANCES:
+                warns.append(f"unknown_affordance_dropped:{a}")
+        if not bool(c.get("required")) and not str(c.get("testable_claim", "")).strip():
+            warns.append(f"constraint_missing_testable_claim:{c.get('constraint_id')}")
+    # de-dup, keep order
+    return list(dict.fromkeys(warns))
+
+
 # --------------------------------------------------------------------------- build
-def _frame_from_payload(item_id: str, payload: dict) -> TaskFrame:
-    """Construct a TaskFrame from a validated payload (fills derived defaults)."""
+def _frame_from_payload(item_id: str, payload: dict, warnings: Optional[list[str]] = None) -> TaskFrame:
+    """Construct a TaskFrame from a validated open-world payload.
+
+    Preserves the raw free-form semantics (``semantic_label``/``semantic_facets``/
+    ``raw_parser_output``) AND derives the closed-set ``affordances`` the planner
+    consumes. ``applies_to`` scalars are normalized to lists; unfamiliar slot roles
+    are coerced to "unknown" (recorded as a warning, not a rejection).
+    """
     def _slot(d: dict, *, target: bool) -> Slot:
+        role = str(d.get("slot_role", "unknown"))
+        if role not in VALID_ROLES:
+            role = "unknown"
         return Slot(
             slot_id=str(d["slot_id"]),
             slot_name=str(d.get("slot_name", "")).strip(),
-            slot_role=str(d.get("slot_role", "unknown")),
+            slot_role=role,
             is_target_answer_slot=bool(d.get("is_target_answer_slot", target)),
             is_intermediate_slot=bool(d.get("is_intermediate_slot", not target)),
-            depends_on=[str(x) for x in (d.get("depends_on") or [])],
-            expected_evidence_type=str(d.get("expected_evidence_type",
-                                              d.get("slot_role", "")) or ""))
+            depends_on=[str(x) for x in _as_list(d.get("depends_on"))],
+            expected_evidence_type=str(d.get("expected_evidence_type", role) or role))
 
     frame = TaskFrame(item_id=item_id)
     frame.target_answer_slots = [_slot(s, target=True) for s in payload["target_answer_slots"]]
     frame.latent_slots = [_slot(s, target=False) for s in payload.get("latent_slots", [])]
+    target_ids = {s.slot_id for s in frame.target_answer_slots}
+    inter_ids = {s.slot_id for s in frame.latent_slots}
+
     for c in payload.get("constraints", []):
-        terms = [str(t) for t in (c.get("normalized_terms") or [])][:10]
-        frame.constraints.append(Constraint(
+        terms = [str(t) for t in _as_list(c.get("normalized_terms"))][:10]
+        label = str(c.get("semantic_label", "") or c.get("constraint_type", "") or "attribute")
+        facets = normalize_facets(label, c.get("semantic_facets"))
+        applies = [str(x) for x in _as_list(c.get("applies_to"))]
+        sup = [str(x) for x in _as_list(c.get("supports_answer_slot_ids"))]
+        con = Constraint(
             constraint_id=str(c["constraint_id"]),
             text_span=str(c.get("text_span", "")).strip(),
             normalized_terms=terms,
-            constraint_type=str(c.get("constraint_type", "attribute")),
-            applies_to=[str(x) for x in (c.get("applies_to") or [])],
+            # keep a legacy facet for back-compat code paths; primary facet or label.
+            constraint_type=str(c.get("constraint_type") or (facets[0] if facets else "attribute")),
+            applies_to=applies,
             specificity_score=float(c.get("specificity_score", 0.0) or 0.0),
             discriminative_score=float(c.get("discriminative_score",
                                              c.get("specificity_score", 0.0)) or 0.0),
-            status=str(c.get("status", "unresolved") or "unresolved")))
+            status=str(c.get("status", "unresolved") or "unresolved"),
+            semantic_label=label, semantic_facets=facets,
+            required=bool(c.get("required", False)),
+            priority=str(c.get("priority", "medium") or "medium").lower(),
+            testable_claim=str(c.get("testable_claim", "") or "").strip(),
+            evidence_needed=str(c.get("evidence_needed", "") or "").strip(),
+            how_to_test=str(c.get("how_to_test", "") or "").strip(),
+            suggested_query_templates=[str(t) for t in _as_list(c.get("suggested_query_templates"))][:6],
+            supports_answer_slot_ids=sup,
+            blocks_answer_if_unresolved=bool(c.get("blocks_answer_if_unresolved", False)),
+            source_quote_or_span=str(c.get("source_quote_or_span", "") or "")[:200],
+            parser_confidence=float(c.get("parser_confidence", 0.0) or 0.0),
+            raw_parser_output={k: c.get(k) for k in (
+                "semantic_label", "semantic_facets", "constraint_type", "priority",
+                "required", "affordances") if k in c})
+        con.affordances = derive_affordances(
+            facets=con.semantic_facets, semantic_label=con.semantic_label,
+            applies_to=con.applies_to, target_slot_ids=target_ids,
+            intermediate_slot_ids=inter_ids,
+            supports_answer_slot_ids=con.supports_answer_slot_ids,
+            required=con.required, priority=con.priority,
+            blocks_answer_if_unresolved=con.blocks_answer_if_unresolved,
+            testable_claim=con.testable_claim, evidence_needed=con.evidence_needed,
+            how_to_test=con.how_to_test, has_terms=bool(con.normalized_terms),
+            emitted=c.get("affordances"))
+        con.planner_interpretation = {"affordances": list(con.affordances),
+                                      "priority": con.priority, "required": con.required,
+                                      "blocks_answer_if_unresolved": con.blocks_answer_if_unresolved}
+        if warnings:
+            con.validation_warnings = [w for w in warnings
+                                       if w.endswith(con.constraint_id) or w.startswith("novel_facet")]
+        frame.constraints.append(con)
     frame.dependency_edges = _build_edges(payload)
     return frame
 
@@ -441,11 +529,14 @@ class LLMTaskFrameParser:
             meta.fallback_reason = "validation_failed"
             self.fallback_count += 1
             return None, meta
-        frame = _frame_from_payload(item_id, payload)
+        warnings = parser_warnings(payload, question)
+        meta.validation_warnings = warnings
+        frame = _frame_from_payload(item_id, payload, warnings)
         frame.dependency_edges = _build_edges(payload)
-        frame.known_context_terms = [str(t) for t in (payload.get("known_context_terms") or [])]
-        frame.answer_shape_hints = [str(t) for t in (payload.get("answer_shape_hints") or [])]
-        frame.source_requirements = [str(t) for t in (payload.get("source_requirements") or [])]
+        frame.known_context_terms = [str(t) for t in _as_list(payload.get("known_context_terms"))]
+        frame.answer_shape_hints = [str(t) for t in _as_list(payload.get("answer_shape_hints"))]
+        frame.source_requirements = [str(t) for t in _as_list(payload.get("source_requirements"))]
+        frame.validation_warnings = warnings
         quality, comps = score_parse_quality(frame, question)
         frame.parse_quality = quality
         meta.parse_quality = quality

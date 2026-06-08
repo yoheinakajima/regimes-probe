@@ -154,7 +154,7 @@ def test_answer_supported_false_when_only_slots_populated_no_evidence():
     res = evaluate_answer_support(f, t)
     assert res.supported is False
     assert "no_clean_evidence_supports_target_or_answer_shape" in res.missing_support_reasons
-    assert any(r.startswith("high_priority_constraint_unresolved") for r in res.missing_support_reasons)
+    assert any(r.startswith("required_blocking_constraint_unresolved") for r in res.missing_support_reasons)
     assert "insufficient_constraint_support" in res.missing_support_reasons
 
 

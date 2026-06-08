@@ -37,6 +37,9 @@ class AgentConfig:
     enable_iterative_clue_resolution: bool = False  # staged candidate-entity resolution
     enable_task_frame: bool = False  # Level 4 constraint-graph / hypothesis-table policy
     enable_llm_task_frame_parser: bool = False  # use cached/validated LLM frame parser
+    auto_epistemic_mode: bool = False  # escalation controller picks mode per question
+    force_task_frame: bool = False     # always escalate to task-frame mode
+    disable_direct_answer: bool = False  # never use the direct-answer mode
     scrape_fallback_to_page_fetch: bool = True  # firecrawl_scrape fail -> page_fetch
     allow_social_scrape: bool = False
     as_of: str = "2026-06-01"
@@ -86,6 +89,9 @@ class EpistemicAgent:
             enable_iterative_clue_resolution=self.config.enable_iterative_clue_resolution,
             enable_task_frame=self.config.enable_task_frame,
             enable_llm_task_frame_parser=self.config.enable_llm_task_frame_parser,
+            auto_epistemic_mode=self.config.auto_epistemic_mode,
+            force_task_frame=self.config.force_task_frame,
+            disable_direct_answer=self.config.disable_direct_answer,
             scrape_fallback_to_page_fetch=self.config.scrape_fallback_to_page_fetch,
             allow_social_scrape=self.config.allow_social_scrape,
         )

@@ -73,6 +73,13 @@ policy:
   # falls back to the deterministic parser when invalid/low-quality. Off by
   # default; --enable-llm-task-frame-parser.
   enable_llm_task_frame_parser: false
+  # Epistemic escalation controller: pick the cheapest mode (direct_answer /
+  # simple_lookup / decomposed_search / iterative_research / task_frame_required)
+  # per question instead of always running the heavy parser. Off by default (the
+  # benchmark uses explicit flags); generic agent mode uses --auto-epistemic-mode.
+  auto_epistemic_mode: false
+  force_task_frame: false        # always escalate to task-frame mode
+  disable_direct_answer: false   # never use the direct-answer mode
   # Level 3 evidence reading: if firecrawl_scrape fails (e.g. 402/quota), fall
   # back to the basic page_fetch on the same URL. Social pages are not scraped
   # unless allow_social_scrape is set.

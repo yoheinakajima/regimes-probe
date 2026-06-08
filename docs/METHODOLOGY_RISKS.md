@@ -270,3 +270,28 @@ set — and the risk surface. Keep the experiment honest:
   is frequently True but accuracy stays low, the gate is being met by the *wrong*
   hypothesis (a parse-quality / constraint-resolution problem), and the gate's
   `True` rate must not be read as an accuracy proxy.
+- **Open-world labels must not become a loophole.** Moving from a fixed
+  `constraint_type` enum to free-form `semantic_label`/`semantic_facets` (Level 4c)
+  fixed brittle fallbacks and avoids overfitting an enum to BrowseComp — but
+  "accept any label" must not mean "accept anything." The guard is that validation
+  shifted from *vocabulary* to *operational usability*: a `required` constraint
+  still must carry a `testable_claim` and an `evidence_needed`/`how_to_test`, still
+  must attach to a real slot, and the gold-text / known-context-as-target checks are
+  unchanged. The planner branches only on the **closed** affordance set, so a novel
+  label cannot smuggle in new control flow. Risks to watch: (a) a parser could
+  emit an affordance (e.g. `can_support_answer`) that the evidence does not justify —
+  affordances are *capabilities*, not *outcomes*; the answer-support gate still
+  requires real evidence, so an over-claimed affordance cannot by itself produce a
+  supported answer; (b) `parser_confidence` and self-declared `priority` are model
+  outputs and must not be trusted as ground truth — treat them as hints and audit
+  `validation_warnings`; (c) facet sprawl — if every question invents new facets,
+  the ontology is not converging; track novel-facet rate over a run and fold the
+  recurring ones into the standardized list deliberately, from traces, not ad hoc.
+- **Escalation can skip work that was actually needed.** The epistemic controller
+  (`--auto-epistemic-mode`) routes easy questions away from the task frame to save
+  budget. The failure mode is a *mis-routed* hard question answered shallowly. It is
+  OFF by default (the benchmark uses explicit flags so all items get the same
+  machinery and conditions stay comparable); when on, audit
+  `selected_epistemic_mode` vs. correctness and watch for items that were routed to
+  direct/simple but should have escalated. Never read "cheaper" as "better" without
+  checking the easy/hard split held.

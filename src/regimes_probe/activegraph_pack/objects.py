@@ -43,6 +43,12 @@ class Objects:
     EVIDENCE_RECORD = "evidence_record"
     EPISTEMIC_ACTION = "epistemic_action"
     READ_VALUE_DECISION = "read_value_decision"
+    # Open-world semantic / affordance + escalation objects (Level 4c)
+    EPISTEMIC_MODE_DECISION = "epistemic_mode_decision"
+    SEMANTIC_CONSTRAINT = "semantic_constraint"
+    CONSTRAINT_FACET = "constraint_facet"
+    OPERATIONAL_AFFORDANCE = "operational_affordance"
+    ANSWER_SUPPORT_PATH = "answer_support_path"
     POLICY_UPDATE = "policy_update"
     PROMOTION_DECISION = "promotion_decision"
     REPORT = "report"
@@ -103,6 +109,11 @@ PROJECTION_OBJECTS: tuple[str, ...] = (
     Objects.EVIDENCE_RECORD,
     Objects.EPISTEMIC_ACTION,
     Objects.READ_VALUE_DECISION,
+    Objects.EPISTEMIC_MODE_DECISION,
+    Objects.SEMANTIC_CONSTRAINT,
+    Objects.CONSTRAINT_FACET,
+    Objects.OPERATIONAL_AFFORDANCE,
+    Objects.ANSWER_SUPPORT_PATH,
 )
 
 #: Map an event-log object type onto its standardized projection type.

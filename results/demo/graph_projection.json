@@ -26,7 +26,12 @@
     "slot_assignment",
     "evidence_record",
     "epistemic_action",
-    "read_value_decision"
+    "read_value_decision",
+    "epistemic_mode_decision",
+    "semantic_constraint",
+    "constraint_facet",
+    "operational_affordance",
+    "answer_support_path"
   ],
   "relation_types": [
     "attempt_for_item",
@@ -53,7 +58,13 @@
     "hypothesis_assigns_candidate",
     "hypothesis_supported_by_evidence",
     "hypothesis_rejected_by_evidence",
-    "answer_supported_by_hypothesis"
+    "answer_supported_by_hypothesis",
+    "constraint_has_facet",
+    "constraint_has_affordance",
+    "hypothesis_assigns_slot",
+    "answer_supported_by_path",
+    "unresolved_constraint_blocks_answer",
+    "epistemic_mode_for_attempt"
   ],
   "detail_limit": 60,
   "event_log": {

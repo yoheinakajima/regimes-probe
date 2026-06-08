@@ -65,6 +65,14 @@ def main() -> int:
               f"followups={r.get('followup_query_count', 0)}")
         if r.get("target_roles"):
             print(f"  target_roles: {r['target_roles']}")
+        # Epistemic escalation: which mode was chosen and why.
+        em = r.get("epistemic_mode") or {}
+        if em:
+            print(f"  EPISTEMIC MODE: {em.get('selected_epistemic_mode')} "
+                  f"(auto={em.get('auto')}, applied={em.get('applied')}; "
+                  f"{em.get('escalation_reason')})")
+            if em.get("skipped_heavy_parser_reason"):
+                print(f"    skipped_heavy_parser: {em.get('skipped_heavy_parser_reason')}")
         # Level 4 task frame: target/latent slots, constraints, coverage, hypotheses.
         tf = r.get("task_frame") or {}
         if tf:
@@ -85,8 +93,14 @@ def main() -> int:
             print(f"  TASK FRAME: targets="
                   f"{[(s['slot_role'], s['slot_name']) for s in tf.get('target_answer_slots', [])]} "
                   f"latent={[(s['slot_role'], s['slot_name']) for s in tf.get('latent_slots', [])]}")
-            print(f"    constraints: "
-                  f"{[(c['constraint_type'], c['status']) for c in tf.get('constraints', [])][:6]}")
+            for c in tf.get("constraints", [])[:8]:
+                blk = " BLOCKING" if (c.get("blocks_answer_if_unresolved")
+                                      or "can_block_answer" in c.get("affordances", [])) else ""
+                print(f"    constraint {c['constraint_id']} [{c.get('status')}{blk}] "
+                      f"label={c.get('semantic_label')!r} facets={c.get('semantic_facets', [])[:4]} "
+                      f"aff={c.get('affordances', [])} -> slots {c.get('applies_to')}")
+            if tf.get("validation_warnings"):
+                print(f"    parser_warnings: {tf.get('validation_warnings')[:6]}")
             print(f"    known_context: {tf.get('known_context_terms', [])[:6]}")
             cov = r.get("frame_coverage", {})
             print(f"    coverage: slot_res={cov.get('slot_resolution_rate')} "

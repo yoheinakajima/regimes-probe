@@ -10,11 +10,33 @@ dist/
 .venv/
 venv/
 
-# User live provider config (secrets live in env vars, never here)
+# Secrets — credentials live in environment variables, NEVER in the repo.
+.env
+.env.*
+*.key
+*.pem
+*.pfx
+secrets.yaml
+secrets.yml
+# User live provider config (selects adapters; references env-var NAMES only).
 config/tools.yaml
 
-# Local scratch run outputs (the committed results/demo + results/regimes-demo
-# are intentionally tracked as grounding artifacts; ignore everything else).
+# Downloaded benchmark datasets — never commit real BrowseComp/LiveBrowseComp
+# data. (The committed *placeholder* fixtures live under fixtures/ and are
+# explicitly re-included below.)
+/data/
+/datasets/
+data_cache/
+*.parquet
+browse_comp*.csv
+browsecomp_test*.csv
+live_browse_comp*.jsonl
+livebrowsecomp_test*.jsonl
+!fixtures/**
+
+# Result directories. Accidental/scratch/live run outputs (results/_*,
+# results/pre-*, results/ablations/, results/live-*, etc.) are all ignored;
+# only the intentionally committed grounding artifacts are tracked.
 results/*
 !results/.gitkeep
 !results/demo/

@@ -6,10 +6,31 @@ the honesty contract for the project (mirrors the `regimes` discipline).
 
 Last updated for: v0 (synthetic harness, Study 0 + Study 1).
 
+**Readiness: READY FOR A TINY LIVE RUN; NOT BENCHMARK-CLAIMED.** The no-key
+scaffold is frozen and auditable — split, four baselines/controls, frozen-memory
+CONFIRM, leakage guards, replay, manifest, prompt pinning, cost estimate, and
+headline-eligibility all pass offline. The only remaining step before numbers is
+wiring live providers and running the tiny 10/20 run in `docs/NEXT_LIVE_RUN.md`
+(budgets [1, 3]). Until that run clears `docs/FIRST_REAL_RESULT_CRITERIA.md` with
+`headline_eligible = true`, **no benchmark performance is claimed.**
+
 **One-line summary:** the scaffold demonstrates the intended mechanism on a
 synthetic fixture; **no BrowseComp/LiveBrowseComp performance is claimed.** The
 skeptic's companion to this ledger is `docs/METHODOLOGY_RISKS.md`; the path to a
 real result is `docs/REAL_BENCHMARK_READINESS.md` + `docs/NEXT_LIVE_RUN.md`.
+
+**Three distinct things — do not conflate them:**
+
+1. **Synthetic-harness result** (`results/demo/`, Study 0/1) — numbers on an
+   *engineered* fixture. Proves the mechanism + plumbing learn the choices the
+   fixture rewards. `headline_eligible = false`. **Not a benchmark.**
+2. **Real-data-shaped smoke test** (`tests/test_real_data_shape.py`,
+   `fixtures/real_shaped/`) — runs the *real adapter path* (decode → split →
+   report → leakage → replay) on *fictional placeholder* data. Proves the
+   pipeline accepts real-benchmark *structure*. **No performance meaning at all.**
+3. **Future real benchmark result** (LiveBrowseComp / BrowseComp) — not yet run.
+   Requires keys + data and must clear `docs/FIRST_REAL_RESULT_CRITERIA.md` with
+   `headline_eligible = true`. **The only thing that could be a benchmark claim.**
 
 ## ✅ Verified claims (with artifacts)
 

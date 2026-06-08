@@ -81,37 +81,22 @@ See `docs/BENCHMARK_TARGETS.md`. Unit tests never require real benchmark data.
 ## Quickstart (no API keys, no network)
 
 ```bash
-pip install -e .            # or: pip install -e '.[dev,activegraph]'
-python -m pytest -q         # 68 tests, no keys/network
-
-# The whole no-key pipeline in one command (the first demo):
-python scripts/run_synthetic_full.py --run-id demo   # split -> baseline -> experience ->
-                                                     # freeze -> CONFIRM -> controls ->
-                                                     # report -> replay -> STATUS print
-
-# ...or step by step:
-python scripts/build_split.py    --run-id demo   # deterministic OPTIMIZE/CONFIRM split
-python scripts/run_baseline.py   --budget 1      # no-memory baseline on CONFIRM
-python scripts/run_experience.py --run-id demo   # experience phase on OPTIMIZE -> frozen snapshot
-python scripts/run_confirm.py    --run-id demo --budget 1   # frozen policy memory on CONFIRM
-python scripts/run_budget_curve.py               # budget curve: no_memory vs policy_memory
-python scripts/make_report.py    --run-id demo   # full report + replay check -> results/demo/
-python scripts/run_regimes_loop.py --run-id rl   # regimes improvement loop with OPTIMIZE/CONFIRM gating
-python scripts/run_ablations.py                  # Level1/Level2/reward/online ablations
-python scripts/inspect_memory_snapshot.py results/demo/memory_snapshot.json   # audit a snapshot
-python scripts/compare_runs.py results/a/report.json results/b/report.json    # diff two runs
-
-# Real-benchmark readiness (all validate config only; call NO providers):
-python scripts/validate_live_readiness.py        # add --strict to gate on gaps
-python scripts/preflight_first_live_run.py --optimize 10 --confirm 20  # writes dry-run manifest
-python scripts/estimate_live_cost.py --optimize 10 --confirm 20        # call/cost footprint
-python scripts/hash_artifacts.py results/demo    # artifact hash ledger
-python scripts/generate_claims.py results/demo/report.json   # conservative claim candidates
-
-# Or via Make (all no-key unless labelled live):
-make check          # test + docs-check + synthetic-full + real-shaped-smoke
-make preflight-live # preflight (no provider calls)
+pip install -e .                              # or: pip install -e '.[dev,activegraph]'
+python -m pytest -q                           # 68 tests, no keys/network
+python scripts/run_synthetic_full.py --run-id demo   # the whole no-key pipeline + STATUS print
+make check                                    # test + docs-check + synthetic-full + smoke
 ```
+
+`run_synthetic_full.py` does it all: deterministic split → `closed_book` /
+`no_memory_search` / `random_memory` / `policy_memory` on CONFIRM → frozen
+snapshot → report + replay check → `results/demo/`. Other no-key helpers:
+`run_ablations.py`, `inspect_memory_snapshot.py`, `compare_runs.py`,
+`hash_artifacts.py`, `generate_claims.py` (and `make help`).
+
+**For a real run** (needs keys), follow **[`docs/NEXT_LIVE_RUN.md`](docs/NEXT_LIVE_RUN.md)**.
+First validate config (calls no providers): `python scripts/validate_live_readiness.py`
+and `python scripts/preflight_first_live_run.py` (defaults to a tiny
+10 OPTIMIZE / 20 CONFIRM run).
 
 Representative **synthetic-fixture** result (committed under `results/demo/`) —
 this validates the *mechanism and harness*, **not** any real benchmark. The

@@ -65,25 +65,36 @@ plus **≥2 independent** search adapters. In `config/default.yaml`:
 - Keep `memory.confirm_uses_frozen_snapshot: true`,
   `memory.confirm_updates_memory: false`.
 
-## 5. First tiny live run (≈10 OPTIMIZE / 20 CONFIRM)
+## 5. First tiny live run — **budgets [1, 3], OPTIMIZE=10, CONFIRM=20**
 
-Start small to validate plumbing and **cost**, not to make a claim.
-
-Recommended sequence (live wiring is the one remaining integration step — pass
-live providers + a live answerer into the same harness the synthetic path uses):
+Start small to validate plumbing and **cost**, not to make a claim. These are the
+exact parameters for the first run; do not scale up until it works.
 
 ```bash
-# 1) closed-book + no-search baselines (bounds intrinsic knowledge) — REQUIRED
-# 2) hosted-search baseline: openai_web_search, no memory
+# Preflight (NO provider calls) — confirms split/conditions/eligibility/cost and
+# writes results/{run_id}/run_manifest.json. Inspect the cost estimate first.
+python scripts/preflight_first_live_run.py \
+    --dataset livebrowsecomp --optimize 10 --confirm 20 --budgets 1 3 --strict
+python scripts/estimate_live_cost.py --optimize 10 --confirm 20 --budgets 1 3
+```
+
+Then the live run executes this sequence (live wiring — passing live providers +
+a live answerer into the same harness the synthetic path uses — is the one
+remaining integration step):
+
+```bash
+# 1) closed_book baseline (no tools)  — bounds intrinsic knowledge — REQUIRED
+# 2) no_memory_search baseline: openai_web_search, no memory
 # 3) experience on the 10 OPTIMIZE items (exploration on)
 # 4) freeze snapshot
 # 5) policy_memory on the 20 CONFIRM items (frozen, exploit)
 # 6) random_memory control on CONFIRM
 ```
 
-Use a small budget set first (e.g. `[1, 3]`) to cap spend. Log every prompt,
-tool call, URL, page hash, timestamp, model id, and tool config (already emitted
-to the event log).
+Keep budgets at `[1, 3]` for the first run to cap spend (the full `[1, 3, 5, 10]`
+curve comes later, after the tiny run works). Log every prompt, tool call, URL,
+page hash, timestamp, model id, and tool config (already emitted to the event
+log). A 10/20 run is a **plumbing + cost check, not a measurement** (§8).
 
 ## 6. Expected artifacts
 

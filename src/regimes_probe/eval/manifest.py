@@ -51,9 +51,11 @@ def build_manifest(
     eligibility_preflight: dict[str, Any],
     cost_estimate: dict[str, Any],
     live: bool = False,
+    live_settings: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
     """Assemble the manifest dict (pure given inputs; git is read locally)."""
     live_cfg = cfg.get("live", {})
+    ls = live_settings or {}
     adapters = (tools_cfg or {}).get("adapters", {}) if tools_cfg else {}
     provider_names = sorted(adapters.keys()) or list(search_tools)
     provider_config = {
@@ -81,11 +83,15 @@ def build_manifest(
             "confirm_ids": list(split.confirm_ids),
         },
         "models": {
-            "answer_model": live_cfg.get("answer_model"),
-            "cheaper_answer_model": live_cfg.get("cheaper_answer_model"),
+            "answer_model": ls.get("answer_model", live_cfg.get("answer_model")),
+            "web_search_model": ls.get("web_search_model"),
+            "web_search_context_size": ls.get("web_search_context_size"),
             "embedder": live_cfg.get("embedder"),
             "search_baseline": live_cfg.get("search_baseline"),
         },
+        "provider_mode": ls.get("provider_mode"),
+        "openai_web_search_enabled": ls.get("openai_web_search_enabled"),
+        "live_settings": ls,
         "prompts": prompts.registry_dict(),
         "tools_enabled": list(search_tools),
         "provider_names": provider_names,

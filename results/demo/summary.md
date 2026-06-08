@@ -15,7 +15,7 @@ Frozen policy memory vs no_memory_search baseline, correct_per_tool_call — bud
 
 ## Models, providers, tools
 
-- answer_model: `gpt-5.5`
+- answer_model: `gpt-5.4-mini`
 - search_baseline: `openai_web_search`
 - tools_enabled: ['generic_web_search', 'news_search', 'official_domain_search', 'brave_search']
 - embedder: `hash_embedder`

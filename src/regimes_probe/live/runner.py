@@ -54,7 +54,9 @@ def subsample_and_split(items: list[Item], *, optimize: int, confirm: int,
     return subset, split, opt, con
 
 
-def estimate_live(conditions, budgets, *, n_opt, n_con, passes, exp_budget, judge):
+def estimate_live(conditions, budgets, *, n_opt, n_con, passes, exp_budget, judge,
+                  settings: Optional[dict] = None):
+    s = settings or {}
     search_conds = [c for c in conditions if c in _SEARCH_CONDS]
     has_exp = "policy_memory" in conditions
     exp_attempts = n_opt * passes if has_exp else 0
@@ -63,19 +65,34 @@ def estimate_live(conditions, budgets, *, n_opt, n_con, passes, exp_budget, judg
     total = exp_attempts + cb_attempts + search_attempts
     worst_exp_tools = exp_attempts * exp_budget
     worst_search_tools = n_con * len(search_conds) * sum(budgets)
+    worst_tools = worst_exp_tools + worst_search_tools
+    # Each enabled search tool is one bandit arm and could receive up to the full
+    # worst-case tool budget (the router may pick it every time).
+    tools = s.get("tools", [])
+    max_calls_by_tool = {t: (0 if t == "page_fetch" else worst_tools) for t in tools}
+    max_calls_by_tool["page_fetch"] = worst_tools if "page_fetch" in tools else 0
     return {
         "conditions": list(conditions),
         "budgets": list(budgets),
         "n_optimize": n_opt, "n_confirm": n_con, "passes": passes,
+        # models / tools in play (so cost is legible at a glance)
+        "answer_model": s.get("answer_model"),
+        "web_search_model": s.get("web_search_model"),
+        "web_search_context_size": s.get("web_search_context_size"),
+        "provider_mode": s.get("provider_mode"),
+        "enabled_tools": tools,
+        "openai_web_search_enabled": s.get("openai_web_search_enabled"),
         "answerer_calls": total,
         "grader_calls": total,
         "judge_calls": total if judge == "llm" else 0,
-        "worst_case_tool_calls": worst_exp_tools + worst_search_tools,
-        "worst_case_search_calls": worst_exp_tools + worst_search_tools,
-        "worst_case_page_fetch_calls": worst_exp_tools + worst_search_tools,
+        "worst_case_tool_calls": worst_tools,
+        "worst_case_search_calls": worst_tools,
+        "worst_case_page_fetch_calls": worst_tools,
+        "max_calls_by_tool": max_calls_by_tool,
         "experience_attempts": exp_attempts,
         "closed_book_attempts": cb_attempts,
         "search_attempts": search_attempts,
+        "warnings": list(s.get("warnings", [])),
         "estimated_cost_usd": "unknown",
     }
 
@@ -88,7 +105,7 @@ def _sha12(s: str) -> str:
 def _spec(cfg, search_tools, budget, split, memory_access) -> ConditionSpec:
     from regimes_probe.agent import prompts
     return ConditionSpec(
-        answer_model=cfg.get("live", {}).get("answer_model", "gpt-5.5"),
+        answer_model=cfg.get("live", {}).get("answer_model", "gpt-5.4-mini"),
         answer_prompt_version=prompts.fingerprint("answerer"),
         enabled_tools=tuple(sorted(search_tools)), tool_budget=budget,
         split_id=_sha12(split.mode + "|" + split.salt + "|" + "|".join(split.confirm_ids)),
@@ -120,7 +137,7 @@ class LivePlan:
 
 def build_plan(cfg, items, *, conditions, budgets, optimize, confirm, split_seed,
                run_id, results_root, dataset_label, dataset_version, dataset_path,
-               is_real, search_tools, tools_cfg=None) -> LivePlan:
+               is_real, search_tools, tools_cfg=None, live_settings=None) -> LivePlan:
     """Plan a live run and write a dry-run manifest. No provider calls."""
     mem_cfg = cfg.get("memory", {})
     subset, split, opt, con = subsample_and_split(
@@ -129,7 +146,8 @@ def build_plan(cfg, items, *, conditions, budgets, optimize, confirm, split_seed
     cost = estimate_live(conditions, budgets, n_opt=len(opt), n_con=len(con),
                          passes=mem_cfg.get("experience_passes", 4),
                          exp_budget=mem_cfg.get("experience_budget", 5),
-                         judge=cfg.get("grading", {}).get("judge", "exact"))
+                         judge=cfg.get("grading", {}).get("judge", "exact"),
+                         settings=live_settings)
     base_spec = _spec(cfg, search_tools, budgets[0], split, "none")
     pol_spec = _spec(cfg, search_tools, budgets[0], split, "frozen_snapshot")
     sc = same_conditions(base_spec, pol_spec)
@@ -145,13 +163,14 @@ def build_plan(cfg, items, *, conditions, budgets, optimize, confirm, split_seed
         run_id=run_id, cfg=cfg, dataset_label=dataset_label, dataset_version=dataset_version,
         dataset_checksum=_dataset_checksum(subset), dataset_path=dataset_path, split=split,
         search_tools=search_tools, tools_cfg=tools_cfg, memory_cfg=mem_cfg,
-        eligibility_preflight=elig.to_dict(), cost_estimate=cost, live=False)
+        eligibility_preflight=elig.to_dict(), cost_estimate=cost, live=False,
+        live_settings=live_settings)
     run_dir = Path(results_root) / run_id
     write_manifest(run_dir, manifest)
     (run_dir / "plan.json").write_text(json.dumps({
         "conditions": list(conditions), "budgets": list(budgets),
         "n_optimize": len(opt), "n_confirm": len(con), "dataset": dataset_label,
-        "is_real": is_real, "cost_estimate": cost,
+        "is_real": is_real, "live_settings": live_settings or {}, "cost_estimate": cost,
         "same_conditions": sc.to_dict(), "eligibility_preflight": elig.to_dict(),
         "executed": False}, indent=2), encoding="utf-8")
     import yaml
@@ -180,7 +199,8 @@ def run_live_pipeline(cfg, items, *, providers, search_agent, cb_agent, cache,
                       conditions, budgets, optimize, confirm, split_seed, run_id,
                       results_root, dataset_label, dataset_version, dataset_path,
                       is_real, search_tools, weights, params, tools_cfg=None,
-                      resume_snapshot: Optional[dict] = None) -> dict[str, Any]:
+                      resume_snapshot: Optional[dict] = None,
+                      live_settings: Optional[dict] = None) -> dict[str, Any]:
     """Execute the requested conditions. Providers/agents are injected (mockable)."""
     mem_cfg = cfg.get("memory", {})
     subset, split, opt, con = subsample_and_split(
@@ -281,8 +301,13 @@ def run_live_pipeline(cfg, items, *, providers, search_agent, cb_agent, cache,
     }
     elig = compute_eligibility(checks, dataset_is_real=is_real)
 
+    ls = live_settings or {}
     meta = {
-        "answer_model": cfg.get("live", {}).get("answer_model"),
+        "answer_model": ls.get("answer_model") or cfg.get("live", {}).get("answer_model"),
+        "web_search_model": ls.get("web_search_model"),
+        "web_search_context_size": ls.get("web_search_context_size"),
+        "provider_mode": ls.get("provider_mode"),
+        "openai_web_search_enabled": ls.get("openai_web_search_enabled"),
         "search_baseline": cfg.get("live", {}).get("search_baseline"),
         "tools_enabled": search_tools, "embedder": "hash_embedder",
         "dataset": dataset_label, "dataset_version": ver,
@@ -306,12 +331,14 @@ def run_live_pipeline(cfg, items, *, providers, search_agent, cb_agent, cache,
     cost = estimate_live(conditions, budgets, n_opt=len(opt), n_con=len(con),
                          passes=mem_cfg.get("experience_passes", 4),
                          exp_budget=mem_cfg.get("experience_budget", 5),
-                         judge=cfg.get("grading", {}).get("judge", "exact"))
+                         judge=cfg.get("grading", {}).get("judge", "exact"),
+                         settings=live_settings)
     manifest = build_manifest(
         run_id=run_id, cfg=cfg, dataset_label=dataset_label, dataset_version=ver,
         dataset_checksum=_dataset_checksum(subset), dataset_path=dataset_path, split=split,
         search_tools=search_tools, tools_cfg=tools_cfg, memory_cfg=mem_cfg,
-        eligibility_preflight=elig.to_dict(), cost_estimate=cost, live=True)
+        eligibility_preflight=elig.to_dict(), cost_estimate=cost, live=True,
+        live_settings=live_settings)
     manifest["cache"] = cache.summary() if cache else {}
     write_manifest(run_dir, manifest)
     import yaml

@@ -1,7 +1,7 @@
 {
   "run_id": "demo",
   "meta": {
-    "answer_model": "gpt-5.5",
+    "answer_model": "gpt-5.4-mini",
     "search_baseline": "openai_web_search",
     "tools_enabled": [
       "generic_web_search",
@@ -76,7 +76,7 @@
   },
   "condition_specs": {
     "no_memory_search": {
-      "answer_model": "gpt-5.5",
+      "answer_model": "gpt-5.4-mini",
       "answer_prompt_version": "answerer@v1#2d353040",
       "enabled_tools": [
         "brave_search",
@@ -94,7 +94,7 @@
       "memory_access": "none"
     },
     "policy_memory": {
-      "answer_model": "gpt-5.5",
+      "answer_model": "gpt-5.4-mini",
       "answer_prompt_version": "answerer@v1#2d353040",
       "enabled_tools": [
         "brave_search",

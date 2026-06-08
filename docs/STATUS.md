@@ -11,7 +11,10 @@ no-key scaffold is frozen and auditable, **and** the live executor
 (`scripts/run_live.py` + `src/regimes_probe/live/`) is now wired into the same
 harness — safe by default (dry-run; refuses to spend without `--execute`). **No
 provider-calling run has been performed; the first one is still pending.** The
-ladder is `docs/LIVE_LADDER.md` (A–E); start with the tiny 10/20, budgets [1, 3]. Until that run clears `docs/FIRST_REAL_RESULT_CRITERIA.md` with
+ladder is `docs/LIVE_LADDER.md` (A–F); start with the tiny 10/20, budgets [1, 3].
+**Defaults are cheap-first** (`gpt-5.4-mini`, provider-diverse routing); OpenAI
+hosted `web_search` + `gpt-5.5` is an opt-in strong baseline (rung F), not the
+default experiment. Until a run clears `docs/FIRST_REAL_RESULT_CRITERIA.md` with
 `headline_eligible = true`, **no benchmark performance is claimed.**
 
 **One-line summary:** the scaffold demonstrates the intended mechanism on a
@@ -67,6 +70,8 @@ not be verified from this environment (network restricted). See
 | The execute pipeline passes **same-conditions + headline-eligibility** plumbing (verified with mock providers, no network). | `tests/test_run_live_safety.py::test_run_live_pipeline_with_mocks_passes_plumbing`. |
 | Secrets never enter cache/manifest/artifacts (env-var names only; key-like fields redacted). | `live/cache.sanitize`; `tests/test_run_live_safety.py`. |
 | LiveBrowseComp **fails closed** on obfuscated rows — encrypted `problem` is never passed through as a question; `run_live` refuses (no placeholder fallback when a real path is given). | `datasets/livebrowsecomp.py`; `scripts/run_live.py`; `tests/test_livebrowsecomp_failclosed.py` (9 tests). |
+| BrowseComp decode matches openai/simple-evals **byte-for-byte** (`derive_key` = repeated `sha256(canary)`). | `datasets/browsecomp.py`; `tests/test_browsecomp_decrypt.py`. |
+| Live config is **cheap-first**: answerer/web_search default `gpt-5.4-mini`; OpenAI hosted `web_search` is **opt-in** (modes cheap/diverse/openai-hosted); no silent fallback to expensive hosted search; gpt-5.5+hosted warns. | `tools/openai_web_search.py` (no gpt-5.5 default), `live/settings.py`, `scripts/run_live.py`; `tests/test_live_provider_modes.py` (12 tests). |
 | The graph is a deterministic projection of the event log (replay passes). | `results/demo/replay_check.md` (`projection_matches: true`); `tests/test_fake_tool_replay.py`. |
 | Fake tool calls are replayable; replay detects divergence. | `tests/test_fake_tool_replay.py::test_recording_then_replay_reproduces_responses`, `::test_replay_divergence_is_detected`. |
 | The project also runs with the standard library + PyYAML only (no `activegraph`). | `EventLog` fallback in `activegraph_pack/behaviors.py`; verified by blocking the import. |

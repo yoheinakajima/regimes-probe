@@ -67,17 +67,31 @@ design. Confirm the field names and the official decode scheme against the
 dataset card/paper before configuring `canary=` (the obfuscation could not be
 verified from this environment; network was restricted).
 
-## 4. Config to edit
+## 4. Config to edit (cheap-first)
 
-Copy `config/tools.example.yaml` → `config/tools.yaml` and enable the baseline
-plus **≥2 independent** search adapters. In `config/default.yaml`:
+**Cheap-first is the default and the right way to start.** OpenAI hosted
+`web_search` + `gpt-5.5` is an opt-in expensive baseline, not the experiment.
+
+Copy `config/tools.example.yaml` → `config/tools.yaml` and add at least one
+**low-cost external** search key (Serper/Brave/Tavily/Exa) so provider routing has
+real arms. In `config/default.yaml` (already cheap-first):
 
 - `dataset.default: BrowseComp` (or LiveBrowseComp) and the dataset path.
-- `live.answer_model: gpt-5.5` (or `gpt-5.4-mini` to economize).
-- `live.embedder: openai_embedder` (or keep `hash_embedder`).
+- `live.answer_model: gpt-5.4-mini` (cheap-first; `gpt-5.5` is the strong baseline).
+- `live.search_provider_mode: cheap` to start; `diverse` for the main experiment.
+- `live.web_search_model: gpt-5.4-mini`, `live.web_search_context_size: low`.
 - `split.mode: time` for LiveBrowseComp (time-disjoint CONFIRM).
 - Keep `memory.confirm_uses_frozen_snapshot: true`,
   `memory.confirm_updates_memory: false`.
+
+**Which to run, in order:**
+1. **Cheap-first** (default) — validate plumbing/cost with `gpt-5.4-mini` + a cheap
+   external search provider.
+2. **Provider-diverse** (`--search-provider-mode diverse`) — **the main experiment**:
+   several search providers as separate bandit arms.
+3. **OpenAI-hosted baseline** (`--search-provider-mode openai-hosted`, optionally
+   `--answer-model gpt-5.5 --web-search-model gpt-5.5`) — a **later strong/expensive
+   baseline only**. Do NOT treat OpenAI hosted browsing as the default test.
 
 ## 5. First tiny live run — **budgets [1, 3], OPTIMIZE=10, CONFIRM=20**
 

@@ -4,13 +4,33 @@ This document defines the default **live** configuration and the tool roster. Ev
 here is wrapped behind common interfaces so the contextual-bandit router never depends on a
 specific provider's behavior, and so every network call is replayable through ActiveGraph.
 
+## Cheap-first by default (important)
+
+`regimes-probe` is about **learned epistemic policy across multiple search
+providers/tools** — NOT OpenAI hosted browsing. The live defaults are
+**cheap-first**, and OpenAI hosted `web_search` (especially with `gpt-5.5`) is an
+**opt-in strong baseline**, never the silent center of the experiment.
+
+Three `--search-provider-mode`s:
+
+- **`cheap`** (default) — answerer `gpt-5.4-mini`; search = `page_fetch` + any
+  low-cost external adapter whose key is present (Serper/Brave/Tavily/Exa). OpenAI
+  `web_search` is **not** added. With no external key, the run **explains which env
+  vars are needed** instead of falling back to expensive hosted search.
+- **`diverse`** (the **main experiment**) — `page_fetch` + every external adapter
+  with a key, plus OpenAI `web_search` as **one arm among many** (unless disabled).
+  The router/bandit sees each provider as a separate arm.
+- **`openai-hosted`** (later **strong/expensive baseline** only) — explicit
+  `openai_web_search` + `page_fetch`; may use `gpt-5.5` if requested.
+
 ## Defaults at a glance
 
-| Role | Default | Cheaper / alt | Notes |
+| Role | Default (cheap-first) | Opt-in baseline | Knob |
 | --- | --- | --- | --- |
-| Answerer | `gpt-5.5` (OpenAI Responses API) | `gpt-5.4-mini` | `answer_model` / `cheaper_answer_model`; configurable |
-| Embeddings | `HashEmbedder` (tests) | OpenAI embeddings (live) | deterministic in tests |
-| Search baseline | `openai_web_search` (Responses API `web_search`) | independent adapters | `search_baseline=openai_web_search` |
+| Answerer | `gpt-5.4-mini` (OpenAI Responses) | `gpt-5.5` | `--answer-model` / `live.answer_model` |
+| Web-search tool model | `gpt-5.4-mini`, ctx `low` | `gpt-5.5` | `--web-search-model` / `--web-search-context-size` |
+| Search tools | provider-diverse (cheap externals + `page_fetch`) | `openai_web_search` | `--tools` / `--search-provider-mode` |
+| Embeddings | `HashEmbedder` (tests) | OpenAI embeddings (live) | `live.embedder` |
 
 OpenAI model and tool references:
 
@@ -19,9 +39,10 @@ OpenAI model and tool references:
 
 ## Answerer
 
-- **Default:** `gpt-5.5` via the **OpenAI Responses API**. Configurable per `benchmark_run`.
-- **Cheaper option:** `gpt-5.4-mini` for cost-bounded runs and the `correct_per_dollar`
-  ablations.
+- **Default:** `gpt-5.4-mini` via the **OpenAI Responses API** (cheap-first).
+  Configurable with `--answer-model` / `live.answer_model`.
+- **Strong baseline:** `gpt-5.5` (`live.strong_answer_model`) — expensive; use only
+  for the explicit hosted baseline, not the learning runs.
 - The answerer consumes only **Layer 2 policy memory** (answer-free priors) and
   `evidence_observation`s from tools — never raw archived traces or benchmark answers
   (see [LEAKAGE_CONTROLS.md](./LEAKAGE_CONTROLS.md)).

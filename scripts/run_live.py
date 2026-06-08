@@ -83,9 +83,22 @@ def main() -> int:
     ap.add_argument("--confirm", type=int, default=20)
     ap.add_argument("--budgets", default="1,3")
     ap.add_argument("--conditions", default=",".join(ALL_CONDITIONS))
-    ap.add_argument("--tools", default=None, help="comma-separated; default from config")
-    ap.add_argument("--answer-model", default=None)
-    ap.add_argument("--judge-model", default=None)
+    ap.add_argument("--tools", default=None,
+                    help="comma-separated; overrides the provider-mode default. "
+                         "Default does NOT require openai_web_search.")
+    ap.add_argument("--search-provider-mode", default=None,
+                    choices=["cheap", "diverse", "openai-hosted"],
+                    help="cheap (default): mini + page_fetch + cheap external search; "
+                         "diverse: providers as separate arms (the main experiment); "
+                         "openai-hosted: explicit expensive hosted baseline.")
+    ap.add_argument("--answer-model", default=None, help="default: gpt-5.4-mini (cheap-first)")
+    ap.add_argument("--web-search-model", default=None, help="default: gpt-5.4-mini")
+    ap.add_argument("--web-search-context-size", default=None,
+                    choices=["low", "medium", "high", "unlimited"], help="default: low")
+    ap.add_argument("--disable-openai-web-search", action="store_true",
+                    help="remove openai_web_search from the tool set entirely")
+    ap.add_argument("--judge-model", default=None,
+                    help="(reserved) LLM judge; grading currently uses exact/normalized match")
     ap.add_argument("--split-seed", default=None)
     ap.add_argument("--dry-run", action="store_true",
                     help="force dry-run even with --execute (default is already dry-run)")
@@ -98,25 +111,32 @@ def main() -> int:
     ap.add_argument("--results-root", default=str(ROOT / "results" / "live"))
     args = ap.parse_args()
 
+    from regimes_probe.live.settings import resolve_live_settings
     cfg = load_config(args.config)
-    if args.answer_model:
-        cfg.setdefault("live", {})["answer_model"] = args.answer_model
+    live_cfg = cfg.get("live", {})
     budgets = [int(b) for b in args.budgets.split(",") if b.strip()]
     conditions = [c.strip() for c in args.conditions.split(",") if c.strip()]
     bad = [c for c in conditions if c not in ALL_CONDITIONS]
     if bad:
         print(f"unknown condition(s): {bad}; valid: {list(ALL_CONDITIONS)}")
         return 2
-    # Default to the benchmark-matching hosted baseline (+ page_fetch) so the
-    # minimal run needs only OPENAI_API_KEY. Override with --tools for diversity.
-    default_tools = [cfg.get("live", {}).get("search_baseline", "openai_web_search"), "page_fetch"]
-    tools = ([t.strip() for t in args.tools.split(",") if t.strip()] if args.tools
-             else default_tools)
-    if "page_fetch" not in tools:
-        tools = tools + ["page_fetch"]
-    search_tools = [t for t in tools if t != "page_fetch"]
+
+    # Resolve models + tools from mode/CLI/config/env (cheap-first; OpenAI hosted
+    # web_search is opt-in, never a silent default).
+    settings = resolve_live_settings(
+        mode=args.search_provider_mode or live_cfg.get("search_provider_mode", "cheap"),
+        cli_tools=([t.strip() for t in args.tools.split(",") if t.strip()] if args.tools else None),
+        answer_model=args.answer_model or live_cfg.get("answer_model", "gpt-5.4-mini"),
+        web_search_model=args.web_search_model or live_cfg.get("web_search_model", "gpt-5.4-mini"),
+        web_search_context_size=(args.web_search_context_size
+                                 or live_cfg.get("web_search_context_size", "low")),
+        disable_openai_web_search=args.disable_openai_web_search,
+    )
+    tools = settings.tools
+    search_tools = settings.search_tools
+    answer_model = settings.answer_model
+    cfg.setdefault("live", {})["answer_model"] = answer_model   # stamp resolved model
     split_seed = args.split_seed or cfg.get("split", {}).get("salt", "regimes-probe-v0")
-    answer_model = cfg.get("live", {}).get("answer_model", "gpt-5.5")
 
     from regimes_probe.datasets.base import DatasetUnavailable
     try:
@@ -151,18 +171,27 @@ def main() -> int:
                       optimize=args.optimize, confirm=args.confirm, split_seed=split_seed,
                       run_id=run_id, results_root=args.results_root, dataset_label=label,
                       dataset_version=version, dataset_path=ds_path, is_real=is_real,
-                      search_tools=search_tools)
+                      search_tools=search_tools, live_settings=settings.to_dict())
 
     miss = missing_keys(tools)
     print(f"=== run_live ({'EXECUTE' if executing else 'DRY-RUN'}) — dataset={label}, "
           f"run_id={run_id} ===")
-    print(f"conditions={conditions}  budgets={budgets}  tools={tools}")
+    print(f"provider_mode={settings.provider_mode}  conditions={conditions}  budgets={budgets}")
+    print(f"tools (bandit arms)={tools}")
+    print(f"answer_model={settings.answer_model}  "
+          f"web_search_model={settings.web_search_model} (ctx={settings.web_search_context_size})  "
+          f"openai_web_search_enabled={settings.openai_web_search_enabled}")
     print(f"optimize/confirm available: {plan.n_optimize}/{plan.n_confirm}")
     print(f"estimated answerer calls={plan.cost['answerer_calls']}  "
-          f"worst-case tool calls={plan.cost['worst_case_tool_calls']}")
+          f"worst-case tool calls={plan.cost['worst_case_tool_calls']}  "
+          f"max_calls_by_tool={plan.cost['max_calls_by_tool']}")
     print(f"headline_eligible(preflight)={plan.eligibility_preflight['headline_eligible']} "
           f"(dataset_is_real={is_real})")
     print(f"required env vars present: {'yes' if not miss else 'NO -> missing ' + str(miss)}")
+    for note in settings.notes:
+        print(f"  note: {note}")
+    for w in settings.warnings:
+        print(f"  ⚠️  {w}")
     print(f"plan + dry-run manifest -> {plan.run_dir}/")
 
     if not executing:
@@ -180,7 +209,9 @@ def main() -> int:
         return 2
 
     cache = RecordingCache(args.recording_cache, mode=args.cache_mode)
-    providers = build_live_providers(tools, cache=cache, armed=True)
+    providers = build_live_providers(tools, cache=cache, armed=True,
+                                     web_search_model=settings.web_search_model,
+                                     web_search_context=settings.web_search_context_size)
     agent_cfg = AgentConfig(available_tools=tools,
                             query_mode=cfg["policy"]["query_mode"],
                             stop_mode=cfg["policy"]["stop_mode"],
@@ -201,7 +232,8 @@ def main() -> int:
         confirm=args.confirm, split_seed=split_seed, run_id=run_id,
         results_root=args.results_root, dataset_label=label, dataset_version=version,
         dataset_path=ds_path, is_real=is_real, search_tools=search_tools,
-        weights=reward_weights(cfg), params=bandit_params(cfg), resume_snapshot=resume)
+        weights=reward_weights(cfg), params=bandit_params(cfg), resume_snapshot=resume,
+        live_settings=settings.to_dict())
     print(f"run dir: {result['run_dir']}")
     print(f"cache: {result['cache']}")
     print(f"headline_eligible={result['eligibility']['headline_eligible']} "

@@ -6,9 +6,18 @@ live providers + a live OpenAI Responses answerer into the same provider-agnosti
 harness the no-key path uses; every live call flows through a recording cache so
 reruns/replay never re-spend.
 
+**Cheap-first.** The default is `--search-provider-mode cheap` with
+`gpt-5.4-mini`. OpenAI hosted `web_search` is **opt-in** (`--search-provider-mode
+openai-hosted` or `--tools …,openai_web_search`); `gpt-5.5` + hosted web_search is
+a **later strong/expensive baseline only** (rung F), not the default experiment.
+
 Conventions:
 - Run dir: `results/live/<run_id>/` (`run_id` is auto-derived or `--run-id`).
-- Default tools: `openai_web_search` + `page_fetch` → only `OPENAI_API_KEY` needed.
+- Default models: answerer + web_search tool both `gpt-5.4-mini`, context `low`.
+- Default tools (cheap mode): `page_fetch` + a low-cost external search adapter if
+  its key is present (Serper/Brave/Tavily/Exa). With **no** external key, the run
+  explains which env var to set — it does **not** fall back to OpenAI web_search.
+- `diverse` mode (the main experiment) makes each provider a separate bandit arm.
 - Estimated calls below are **worst case** (every attempt uses its full budget);
   the cache reduces real spend on reruns.
 - After any run: generate the audit ledger and conservative claims.
@@ -43,15 +52,25 @@ python scripts/run_live.py --dataset livebrowsecomp --dataset-path PATH \
 - Est. calls: **~20 answerer + ≤10 web_search** (no experience, no memory).
 - Env: `OPENAI_API_KEY`.
 
-## C. Tiny full run — all four conditions, budgets 1,3, 10/20
+## C. Tiny full run — all four conditions, budgets 1,3, 10/20 (cheap)
 ```bash
 python scripts/run_live.py --dataset livebrowsecomp --dataset-path PATH \
     --optimize 10 --confirm 20 --budgets 1,3 \
     --recording-cache results/live/cache.json --execute
 ```
 - Calls providers: **yes (with `--execute`).** Run dir: `results/live/<run_id>/`.
-- Est. calls: **~180 answerer + ≤440 tool** (incl. experience 10×4).
-- Env: `OPENAI_API_KEY` (+ optional Brave/Tavily/Exa/Serper if you add `--tools`).
+- Est. calls: **~180 answerer + ≤440 tool** (incl. experience 10×4), all `gpt-5.4-mini`.
+- Env: `OPENAI_API_KEY` + ≥1 external search key (e.g. `SERPER_API_KEY`).
+
+## C′. The MAIN experiment — provider-diverse routing
+```bash
+python scripts/run_live.py --dataset livebrowsecomp --dataset-path PATH \
+    --optimize 10 --confirm 20 --budgets 1,3 --search-provider-mode diverse \
+    --recording-cache results/live/cache.json --execute
+```
+- Each enabled provider (Serper/Brave/Tavily/Exa/OpenAI/page_fetch) is a separate
+  bandit arm — this is what regimes-probe is actually testing.
+- Env: `OPENAI_API_KEY` + the search-provider keys you want as arms.
 
 ## D. Small credible run — all four, budgets 1,3,5, 25/50
 ```bash
@@ -69,7 +88,19 @@ python scripts/run_live.py --dataset livebrowsecomp --dataset-path PATH \
     --recording-cache results/live/cache.json --execute
 ```
 - Calls providers: **yes (with `--execute`).** Run dir: `results/live/<run_id>/`.
-- Est. calls: **~1,200 answerer + ≤3,700 tool** (real money). Env: `OPENAI_API_KEY` (+ optional).
+- Est. calls: **~1,200 answerer + ≤3,700 tool** (real money). Env: `OPENAI_API_KEY` + search keys.
+
+## F. OpenAI-hosted strong baseline — LATER, expensive, opt-in only
+```bash
+python scripts/run_live.py --dataset livebrowsecomp --dataset-path PATH \
+    --optimize 10 --confirm 20 --budgets 1,3 \
+    --search-provider-mode openai-hosted \
+    --answer-model gpt-5.5 --web-search-model gpt-5.5 \
+    --recording-cache results/live/cache.json --execute
+```
+- A **strong/expensive comparison point**, NOT the default regimes-probe test.
+  `run_live` prints an explicit ⚠️ EXPENSIVE warning for `gpt-5.5 + openai_web_search`.
+- Env: `OPENAI_API_KEY`. Run this only after the cheap/diverse runs work.
 
 ---
 

@@ -132,10 +132,21 @@ def main() -> int:
     except Exception as e:
         r.add(FAIL, "results dir writable", str(e))
 
-    # 5. model / tool names present
+    # 5. model / tool names present (cheap-first)
     live = cfg.get("live", {})
-    for key in ("answer_model", "cheaper_answer_model", "embedder", "search_baseline"):
+    for key in ("answer_model", "web_search_model", "web_search_context_size",
+                "search_provider_mode", "embedder", "search_baseline"):
         r.add(PASS if live.get(key) else WARN, f"live.{key}", str(live.get(key)))
+    if live.get("answer_model") == "gpt-5.5":
+        r.add(WARN, "default answerer is cheap", "answer_model=gpt-5.5 is the EXPENSIVE "
+              "baseline; cheap-first default is gpt-5.4-mini")
+    else:
+        r.add(PASS, "default answerer is cheap", str(live.get("answer_model")))
+    if live.get("search_provider_mode") == "openai-hosted":
+        r.add(WARN, "default provider mode", "openai-hosted is the expensive baseline; "
+              "prefer cheap/diverse for the learning experiment")
+    else:
+        r.add(PASS, "default provider mode", str(live.get("search_provider_mode")))
     bad_tools = [t for t in live.get("tools_enabled", []) if t not in ADAPTER_REGISTRY]
     r.add(PASS if not bad_tools else FAIL, "live.tools_enabled are known adapters",
           "ok" if not bad_tools else f"unknown: {bad_tools}")

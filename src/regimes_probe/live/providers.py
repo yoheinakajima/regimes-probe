@@ -169,12 +169,15 @@ class LiveClosedBookAnswerer(_BaseLiveAnswerer):
 
 
 # ----------------------------------------------------------------- builders
-def _build_inner(name: str) -> Optional[SearchProvider]:
+def _build_inner(name: str, *, web_search_model: str = "gpt-5.4-mini",
+                 web_search_context: str = "low") -> Optional[SearchProvider]:
     if name in ("openai_web_search", "openai_web_search_low_context"):
         from regimes_probe.tools.openai_web_search import (
             openai_web_search, openai_web_search_low_context)
-        return (openai_web_search_low_context() if name.endswith("low_context")
-                else openai_web_search())
+        # model/context come from the CALLER (CLI/config), never hardcoded here.
+        if name.endswith("low_context"):
+            return openai_web_search_low_context(model=web_search_model)
+        return openai_web_search(model=web_search_model, context_size=web_search_context)
     if name == "page_fetch":
         from regimes_probe.tools.page_fetch import PageFetch
         return PageFetch()
@@ -201,12 +204,18 @@ def _build_inner(name: str) -> Optional[SearchProvider]:
     return None
 
 
-def build_live_providers(tool_names: list[str], *, cache: RecordingCache,
-                         armed: bool) -> dict[str, SearchProvider]:
-    """Construct + cache-wrap the requested live providers (no network at build)."""
+def build_live_providers(tool_names: list[str], *, cache: RecordingCache, armed: bool,
+                         web_search_model: str = "gpt-5.4-mini",
+                         web_search_context: str = "low") -> dict[str, SearchProvider]:
+    """Construct + cache-wrap the requested live providers (no network at build).
+
+    Each provider becomes a separate bandit arm. ``web_search_model``/
+    ``web_search_context`` are applied to the OpenAI hosted adapter only.
+    """
     providers: dict[str, SearchProvider] = {}
     for name in tool_names:
-        inner = _build_inner(name)
+        inner = _build_inner(name, web_search_model=web_search_model,
+                             web_search_context=web_search_context)
         if inner is None:
             continue
         providers[name] = CachedProvider(inner, cache, armed=armed)

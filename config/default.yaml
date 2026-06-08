@@ -102,14 +102,22 @@ ablations:
     _non_headline: true
 
 # Live model/search settings (inert without keys). See MODEL_AND_TOOL_CHOICES.md.
+# CHEAP-FIRST by default: OpenAI hosted web_search is OPT-IN, not the center of
+# the experiment. The main experiment is provider-diverse tool routing.
 live:
-  answer_model: "gpt-5.5"
-  cheaper_answer_model: "gpt-5.4-mini"
-  embedder: "hash_embedder"       # or "openai_embedder" for live runs
-  search_baseline: "openai_web_search"
+  answer_model: "gpt-5.4-mini"          # cheap-first default answerer
+  strong_answer_model: "gpt-5.5"        # expensive baseline option ONLY (opt-in)
+  web_search_model: "gpt-5.4-mini"      # model for the OpenAI web_search tool (if used)
+  web_search_context_size: "low"        # low | medium | high | unlimited
+  search_provider_mode: "cheap"         # cheap | diverse | openai-hosted
+  embedder: "hash_embedder"             # or "openai_embedder" for live runs
+  search_baseline: "openai_web_search"  # hosted baseline adapter NAME (opt-in only)
+  # Tools considered for cheap/diverse modes (each is a separate bandit arm).
+  # openai_web_search is deliberately absent here; add it via --tools or
+  # --search-provider-mode openai-hosted.
   tools_enabled:
-    - "generic_web_search"
-    - "news_search"
-    - "official_domain_search"
-    - "brave_search"
     - "page_fetch"
+    - "serper_search"
+    - "brave_search"
+    - "tavily_search"
+    - "exa_search"

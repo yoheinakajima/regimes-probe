@@ -3,7 +3,7 @@
   "live": false,
   "git": {
     "branch": "claude/regimes-probe-setup-ILfr0",
-    "commit": "eafd8e09ac9a306ac8b99a03498ba5bb4e90bc49",
+    "commit": "a4ca599ab0b744a7955687a9993ef6b232c90aed",
     "dirty": true
   },
   "dataset": {
@@ -86,11 +86,15 @@
     ]
   },
   "models": {
-    "answer_model": "gpt-5.5",
-    "cheaper_answer_model": "gpt-5.4-mini",
+    "answer_model": "gpt-5.4-mini",
+    "web_search_model": null,
+    "web_search_context_size": null,
     "embedder": "hash_embedder",
     "search_baseline": "openai_web_search"
   },
+  "provider_mode": null,
+  "openai_web_search_enabled": null,
+  "live_settings": {},
   "prompts": {
     "answerer": {
       "name": "answerer",

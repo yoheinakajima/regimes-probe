@@ -41,9 +41,9 @@ class OpenAIWebSearch(SearchProvider):
         self,
         *,
         name: str = "openai_web_search",
-        model: str = "gpt-5.5",
-        context_size: str = "medium",   # "low" | "medium" | "high"
-        cost_per_call: Decimal | str = "0.03",
+        model: str = "gpt-5.4-mini",     # cheap-first; NO gpt-5.5 hardcoded default
+        context_size: str = "low",       # "low" | "medium" | "high" | "unlimited"
+        cost_per_call: Decimal | str = "0.015",
     ) -> None:
         self.name = name
         self.model = model
@@ -116,13 +116,23 @@ def _extract_results(resp: Any, limit: int) -> list[SearchResult]:
     return results
 
 
-def openai_web_search() -> OpenAIWebSearch:
-    return OpenAIWebSearch(name="openai_web_search", context_size="medium")
+def openai_web_search(
+    *,
+    model: str = "gpt-5.4-mini",
+    context_size: str = "low",
+    cost_per_call: Decimal | str = "0.015",
+    name: str = "openai_web_search",
+) -> OpenAIWebSearch:
+    """Build the hosted web_search adapter. Model/context come from the CALLER
+    (config/CLL); nothing here is hardcoded to an expensive model."""
+    return OpenAIWebSearch(name=name, model=model, context_size=context_size,
+                           cost_per_call=cost_per_call)
 
 
-def openai_web_search_low_context() -> OpenAIWebSearch:
+def openai_web_search_low_context(*, model: str = "gpt-5.4-mini") -> OpenAIWebSearch:
     return OpenAIWebSearch(
-        name="openai_web_search_low_context", context_size="low", cost_per_call="0.015"
+        name="openai_web_search_low_context", model=model, context_size="low",
+        cost_per_call="0.012",
     )
 
 

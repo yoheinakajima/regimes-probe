@@ -49,16 +49,19 @@ dataset:
   secondary: BrowseComp
   synthetic_path: fixtures/synthetic_browse.json
 live:
-  answer_model: gpt-5.5
-  cheaper_answer_model: gpt-5.4-mini
+  answer_model: gpt-5.4-mini
   embedder: hash_embedder
   search_baseline: openai_web_search
+  search_provider_mode: cheap
+  strong_answer_model: gpt-5.5
   tools_enabled:
-  - generic_web_search
-  - news_search
-  - official_domain_search
-  - brave_search
   - page_fetch
+  - serper_search
+  - brave_search
+  - tavily_search
+  - exa_search
+  web_search_context_size: low
+  web_search_model: gpt-5.4-mini
 main_metric: correct_per_tool_call
 memory:
   confirm_updates_memory: false

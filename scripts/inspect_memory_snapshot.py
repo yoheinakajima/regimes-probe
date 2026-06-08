@@ -101,15 +101,19 @@ def main() -> int:
     except Exception as e:
         print(f"leakage scan: FAIL -> {e}")
 
-    print("\nexample numeric policy fragments (reward stats only, no answers):")
+    print("\nexample numeric policy fragments (reward stats + trace lineage, no answers):")
     for ck, frag in list(fragments.items())[:2]:
         tr = frag.get("tool_rewards", {})
         qr = frag.get("query_rewards", {})
-        print(f"  cluster '{ck}': support={frag.get('support_count')} "
-              f"correct={frag.get('correct_count')} best_tool={frag.get('best_tool')} "
-              f"best_query_arm={frag.get('best_query_arm')}")
+        sids = frag.get("source_trace_ids", [])
+        aids = frag.get("source_attempt_ids", [])
+        print(f"  cluster '{ck}' (fragment_id={frag.get('fragment_id')}): "
+              f"support={frag.get('support_count')} correct={frag.get('correct_count')} "
+              f"best_tool={frag.get('best_tool')} best_query_arm={frag.get('best_query_arm')}")
         print(f"    tool_rewards={ {k: round(v.get('mean',0),3) for k,v in tr.items()} }")
         print(f"    query_rewards={ {k: round(v.get('mean',0),3) for k,v in qr.items()} }")
+        print(f"    lineage: {len(sids)} source trace id(s), e.g. {sids[:3]}")
+        print(f"             {len(aids)} source attempt id(s), e.g. {aids[:2]}")
     if not fragments:
         print("  (no fragments — run consolidation, e.g. scripts/run_experience.py)")
     return 0

@@ -183,6 +183,11 @@ def full_pipeline(
                      budget=mem_cfg.get("experience_budget", 5),
                      passes=mem_cfg.get("experience_passes", 4),
                      weights=weights, dataset_version=dataset_version)
+    # Consolidate raw traces into answer-free policy fragments (with trace lineage)
+    # BEFORE freezing, so the CONFIRM snapshot carries fragments — mirrors the live
+    # runner and scripts/run_experience.py.
+    from regimes_probe.policy.consolidation import consolidate
+    consolidate(mem, consolidation_event_id=f"consolidate@{run_id}")
     snapshot = mem.snapshot(meta={"dataset_version": dataset_version,
                                   "n_optimize": len(opt_items)})
 

@@ -17,9 +17,10 @@ from dataclasses import dataclass, field
 from typing import Any, Optional
 from urllib.parse import urlparse
 
-_PREVIEW = 200          # default chars for question/answer previews
-_SNIPPET = 240          # chars for an evidence snippet preview
-_MAX_EVIDENCE = 4       # top evidence rows kept per question
+_PREVIEW = 300          # default chars for question/answer previews
+_GOLD = 120             # chars for the gold-answer preview (audit only)
+_SNIPPET = 300          # chars for an evidence snippet preview
+_MAX_EVIDENCE = 3       # top evidence rows kept per question
 
 
 def _prev(s: Optional[str], n: int = _PREVIEW) -> str:
@@ -78,6 +79,7 @@ class DebugRecord:
     failed_tool_errors: list[dict[str, Any]]
     evidence: list[dict[str, Any]]
     regime: str
+    regime_names: list[str]
     support_found: bool
     found_hit: bool
     authority_ok: bool
@@ -85,6 +87,9 @@ class DebugRecord:
     n_results: int
     failed_tool_calls: int
     failure_seam: str
+    evidence_titles: list[str] = field(default_factory=list)
+    evidence_urls: list[str] = field(default_factory=list)
+    evidence_snippet_previews: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return self.__dict__.copy()
@@ -92,6 +97,7 @@ class DebugRecord:
 
 def build_debug_record(*, item, trace, grade, reward, condition: str, budget: int,
                        outcome=None, preview: int = _PREVIEW,
+                       gold_chars: int = _GOLD,
                        snippet_chars: int = _SNIPPET,
                        max_evidence: int = _MAX_EVIDENCE) -> DebugRecord:
     """Assemble a bounded debug record from one attempt."""
@@ -139,21 +145,29 @@ def build_debug_record(*, item, trace, grade, reward, condition: str, budget: in
         support_found=trace.vstate.support_found)
 
     gold = "; ".join(item.gold_answers()) if hasattr(item, "gold_answers") else ""
-    return DebugRecord(
+    record = DebugRecord(
         item_id=item.id, condition=condition, budget=budget,
         question_preview=_prev(item.question, preview),
-        gold_preview=_prev(gold, preview),
+        gold_preview=_prev(gold, gold_chars),
         prediction_preview=_prev(trace.final_answer, preview),
         correct=grade.correct, abstained=grade.abstained,
         tool_sequence=trace.tools_used(), provider_names=sorted(set(trace.tools_used())),
         calls=calls_info, failed_tool_errors=failed_errors, evidence=evidence,
         regime=(label_outcome(outcome) if outcome is not None else ""),
+        regime_names=[],
         support_found=trace.vstate.support_found,
         found_hit=reward.flags.get("found_hit", False),
         authority_ok=trace.vstate.authority_ok, contradiction=trace.vstate.contradiction,
         n_results=n_results,
         failed_tool_calls=sum(1 for c in trace.calls if getattr(c, "failed", False)),
-        failure_seam=seam)
+        failure_seam=seam,
+        evidence_titles=[e["title_preview"] for e in evidence],
+        evidence_urls=[e["url"] for e in evidence],
+        evidence_snippet_previews=[e["snippet_preview"] for e in evidence])
+    # Structured canonical regime names (seam + answer-free detectors).
+    from regimes_probe.eval.failure_regime import regime_names as _regime_names
+    record.regime_names = _regime_names(record.to_dict())
+    return record
 
 
 def write_debug_jsonl(path, records: list[DebugRecord]) -> None:

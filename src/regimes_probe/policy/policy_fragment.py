@@ -37,9 +37,22 @@ def assert_no_answer_leakage(payload: dict[str, Any], where: str = "policy memor
     walk(payload, where)
 
 
+def _top_arms(table: dict[str, dict[str, float]], k: int = 3) -> list[dict[str, Any]]:
+    """Top-``k`` arms by mean reward — a compact, answer-free lineage summary."""
+    rows = sorted(table.items(), key=lambda kv: (-kv[1].get("mean", 0.0), kv[0]))
+    return [{"arm": a, "mean": round(s.get("mean", 0.0), 4), "n": s.get("n", 0)}
+            for a, s in rows[:k]]
+
+
 @dataclass
 class PolicyFragment:
-    """Per-cluster consolidated policy. No answer text — reward stats only."""
+    """Per-cluster consolidated policy. No answer text — reward stats only.
+
+    Lineage fields (``fragment_id``, ``source_trace_ids``, ``source_attempt_ids``,
+    ``snapshot_id``, ``consolidation_event_id``) link a fragment back to the
+    answer-free traces it was distilled from, so a reviewer can audit *why* a
+    prior exists. They are ids/hashes only — never answer text.
+    """
 
     cluster_key: str
     tool_rewards: dict[str, dict[str, float]] = field(default_factory=dict)
@@ -48,6 +61,12 @@ class PolicyFragment:
     stop_rewards: dict[str, dict[str, float]] = field(default_factory=dict)
     support_count: int = 0          # traces backing this fragment
     correct_count: int = 0          # how many were graded correct (a reward, not an answer)
+    # --- lineage (answer-free ids only) ---
+    fragment_id: str = ""
+    source_trace_ids: list[str] = field(default_factory=list)
+    source_attempt_ids: list[str] = field(default_factory=list)
+    snapshot_id: str = ""
+    consolidation_event_id: str = ""
 
     def _best(self, table: dict[str, dict[str, float]]) -> str | None:
         if not table:
@@ -65,14 +84,22 @@ class PolicyFragment:
     def to_dict(self) -> dict[str, Any]:
         d = {
             "cluster_key": self.cluster_key,
+            "fragment_id": self.fragment_id or self.cluster_key,
             "tool_rewards": self.tool_rewards,
             "query_rewards": self.query_rewards,
             "verify_rewards": self.verify_rewards,
             "stop_rewards": self.stop_rewards,
+            "top_tool_rewards": _top_arms(self.tool_rewards),
+            "top_query_rewards": _top_arms(self.query_rewards),
             "support_count": self.support_count,
             "correct_count": self.correct_count,
             "best_tool": self.best_tool,
             "best_query_arm": self.best_query_arm,
+            # lineage (ids/hashes only — answer-free)
+            "source_trace_ids": list(self.source_trace_ids),
+            "source_attempt_ids": list(self.source_attempt_ids),
+            "snapshot_id": self.snapshot_id,
+            "consolidation_event_id": self.consolidation_event_id,
         }
         assert_no_answer_leakage(d, "policy_fragment")
         return d
@@ -87,4 +114,9 @@ class PolicyFragment:
             stop_rewards=d.get("stop_rewards", {}),
             support_count=int(d.get("support_count", 0)),
             correct_count=int(d.get("correct_count", 0)),
+            fragment_id=d.get("fragment_id", ""),
+            source_trace_ids=list(d.get("source_trace_ids", [])),
+            source_attempt_ids=list(d.get("source_attempt_ids", [])),
+            snapshot_id=d.get("snapshot_id", ""),
+            consolidation_event_id=d.get("consolidation_event_id", ""),
         )

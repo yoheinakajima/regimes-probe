@@ -143,3 +143,19 @@ python scripts/compare_runs.py results/live/<run_id>/report.json results/live/<o
 See **[TOOL_ABSTRACTIONS.md](./TOOL_ABSTRACTIONS.md)** for the full taxonomy,
 per-arm metadata, and the safety gates. Recommended order: cheap search-only →
 add scrape → add agentic discovery → (later) specialized research.
+
+## Step 6 — Offline ablations (after a paid run; NO new spend)
+
+Always pass `--recording-cache results/live/cache.json` on the paid run so its
+provider/model/tool outcomes are stored. Then compare policy variants for free:
+
+```
+python scripts/fork_offline_ablation.py results/live/<run_id> \
+    --out <run_id>-fork-a --policy-config ablations/variant_a.yaml
+```
+
+The fork replays the cache (refuses on any miss — it never calls a provider),
+writes a full artifact set marked `offline_fork=true`/`parent_run_id`, and is
+never headline-eligible. Fork the memory variant (`policy_memory`); read the
+fixed `no_memory_search` baseline from the parent report. See
+**[OFFLINE_FORK_ABLATIONS.md](./OFFLINE_FORK_ABLATIONS.md)**.

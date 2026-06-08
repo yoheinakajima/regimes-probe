@@ -102,6 +102,55 @@ class Eligibility:
         }
 
 
+def build_eligibility_verdict(
+    elig: dict[str, Any],
+    *,
+    leakage_details: Optional[dict[str, Any]] = None,
+    replay: Optional[dict[str, Any]] = None,
+    same_conditions: Optional[dict[str, Any]] = None,
+    supporting_artifact_paths: Optional[list[str]] = None,
+    max_provider_failure_rate: float = 0.2,
+) -> dict[str, Any]:
+    """Flatten an eligibility dict into a single ``eligibility_verdict`` object.
+
+    This is the first-class projection/report object documented in
+    ``docs/REPORTING.md``: every gate that contributes to the two verdicts is
+    surfaced as a named boolean/number, so the verdict reads as one record rather
+    than a scattering of nested ``checks``. ``elig`` is :meth:`Eligibility.to_dict`.
+    """
+    elig = elig or {}
+    checks = elig.get("checks", {})
+    ld = leakage_details or {}
+    replay = replay or {}
+    sc = same_conditions or {}
+    return {
+        "structurally_valid": elig.get("structurally_valid", elig.get("mechanism_ok", False)),
+        "headline_eligible_memory_claim": elig.get("headline_eligible_memory_claim",
+                                                   elig.get("headline_eligible", False)),
+        "dataset_is_real": bool(elig.get("dataset_is_real", False)),
+        "conditions_present": list(elig.get("conditions_present", [])),
+        "confirm_size": int(elig.get("confirm_size", 0)),
+        "min_confirm_size": int(elig.get("min_confirm", 0)),
+        "split_disjoint": bool(checks.get("optimize_confirm_disjoint", False)),
+        "replay_pass": bool(replay.get("projection_matches", checks.get("replay_passed", False))),
+        "memory_snapshot_leakage_pass": ld.get("memory_snapshot_leakage_pass",
+                                               checks.get("no_answer_leakage")),
+        "raw_trace_archive_leakage_pass": ld.get("raw_trace_archive_leakage_pass", True),
+        "report_artifacts_leakage_pass": ld.get("report_artifacts_leakage_pass",
+                                                checks.get("no_answer_leakage")),
+        "same_conditions_pass": (None if sc.get("not_applicable") else
+                                 bool(checks.get("same_conditions", sc.get("ok", False)))),
+        "frozen_confirm_memory": bool(checks.get("confirm_memory_frozen", False)),
+        "no_live_updates_during_confirm": bool(checks.get("no_live_updates_during_confirm", False)),
+        "budget_enforced": bool(checks.get("budget_enforced", False)),
+        "provider_failure_rate": round(float(elig.get("provider_failure_rate", 0.0)), 4),
+        "max_provider_failure_rate": round(float(max_provider_failure_rate), 4),
+        "failed_conditions": list(elig.get("failed_conditions", [])),
+        "reasons": list(elig.get("headline_eligibility_reasons", elig.get("reasons", []))),
+        "supporting_artifact_paths": list(supporting_artifact_paths or []),
+    }
+
+
 def compute_eligibility(
     checks: dict[str, bool],
     *,

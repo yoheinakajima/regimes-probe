@@ -1,9 +1,11 @@
 {
   "run_id": "demo",
   "live": false,
+  "offline_fork": false,
+  "parent_run_id": null,
   "git": {
     "branch": "claude/regimes-probe-setup-ILfr0",
-    "commit": "a6cced5145873d8d28f9021b5ca1aa332f3f8e0d",
+    "commit": "0eac55dbed784fa80ab52abfc54b2f7ebde4610f",
     "dirty": true
   },
   "dataset": {

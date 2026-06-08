@@ -27,22 +27,38 @@ def _aggregate(traces: list[TraceRecord], family: str) -> dict[str, dict[str, fl
     }
 
 
-def consolidate(memory: PolicyMemory) -> dict[str, PolicyFragment]:
-    """Build/refresh ``memory.fragments`` from ``memory.traces``. Returns them."""
+#: Cap lineage id lists so a fragment stays compact on a large run.
+_MAX_LINEAGE_IDS = 50
+
+
+def consolidate(memory: PolicyMemory, *,
+                consolidation_event_id: str = "") -> dict[str, PolicyFragment]:
+    """Build/refresh ``memory.fragments`` from ``memory.traces``. Returns them.
+
+    Each fragment links back to the answer-free traces it was distilled from via
+    ``source_trace_ids`` (trace content hashes) and ``source_attempt_ids`` — ids
+    only, never answer text — so a reviewer can audit the lineage of a prior.
+    """
     by_cluster: dict[str, list[TraceRecord]] = {}
     for t in memory.traces:
         by_cluster.setdefault(t.cluster_key, []).append(t)
 
     fragments: dict[str, PolicyFragment] = {}
     for cluster_key, traces in by_cluster.items():
+        trace_ids = [t.norm_hash for t in traces][:_MAX_LINEAGE_IDS]
+        attempt_ids = [t.attempt_id for t in traces][:_MAX_LINEAGE_IDS]
         frag = PolicyFragment(
             cluster_key=cluster_key,
+            fragment_id="frag_" + cluster_key,
             tool_rewards=_aggregate(traces, "tool"),
             query_rewards=_aggregate(traces, "query"),
             verify_rewards=_aggregate(traces, "verify"),
             stop_rewards=_aggregate(traces, "stop"),
             support_count=len(traces),
             correct_count=sum(1 for t in traces if t.correct),
+            source_trace_ids=trace_ids,
+            source_attempt_ids=attempt_ids,
+            consolidation_event_id=consolidation_event_id,
         )
         fragments[cluster_key] = frag
     memory.fragments = fragments

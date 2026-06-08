@@ -52,6 +52,8 @@ def build_manifest(
     cost_estimate: dict[str, Any],
     live: bool = False,
     live_settings: Optional[dict[str, Any]] = None,
+    parent_run_id: Optional[str] = None,
+    offline_fork: bool = False,
 ) -> dict[str, Any]:
     """Assemble the manifest dict (pure given inputs; git is read locally)."""
     live_cfg = cfg.get("live", {})
@@ -67,6 +69,10 @@ def build_manifest(
     return {
         "run_id": run_id,
         "live": live,
+        # Offline-fork lineage: a forked ablation reuses a parent's cached
+        # provider/model/tool outcomes and changes only policy params (no spend).
+        "offline_fork": bool(offline_fork),
+        "parent_run_id": parent_run_id,
         "git": git_provenance(),
         "dataset": {
             "name": dataset_label,

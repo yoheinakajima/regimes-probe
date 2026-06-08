@@ -224,8 +224,14 @@ def run_live_pipeline(cfg, items, *, providers, search_agent, cb_agent, cache,
                       results_root, dataset_label, dataset_version, dataset_path,
                       is_real, search_tools, weights, params, tools_cfg=None,
                       resume_snapshot: Optional[dict] = None,
-                      live_settings: Optional[dict] = None) -> dict[str, Any]:
-    """Execute the requested conditions. Providers/agents are injected (mockable)."""
+                      live_settings: Optional[dict] = None,
+                      parent_run_id: Optional[str] = None,
+                      offline_fork: bool = False) -> dict[str, Any]:
+    """Execute the requested conditions. Providers/agents are injected (mockable).
+
+    ``offline_fork``/``parent_run_id`` mark a run that reused a parent's cached
+    outcomes (no new spend); such a run is recorded but is NEVER headline-eligible.
+    """
     mem_cfg = cfg.get("memory", {})
     subset, split, opt, con = subsample_and_split(
         items, optimize=optimize, confirm=confirm, seed=split_seed,
@@ -357,6 +363,13 @@ def run_live_pipeline(cfg, items, *, providers, search_agent, cb_agent, cache,
                                confirm_size=len(con), min_confirm=min_confirm,
                                provider_failure_rate=pf_rate, failed_conditions=failed_conditions,
                                max_provider_failure_rate=hcfg.get("max_provider_failure_rate", 0.2))
+    if offline_fork:
+        # An offline forked ablation reuses cached outcomes and changes only policy
+        # params; it is auditable but cannot be a headline memory claim.
+        elig.headline_eligible_memory_claim = False
+        elig.headline_eligibility_reasons = (
+            ["offline forked ablation (offline_fork=true): reused cached outcomes; "
+             "not a headline memory claim"] + elig.headline_eligibility_reasons)
 
     ls = live_settings or {}
     meta = {
@@ -394,7 +407,7 @@ def run_live_pipeline(cfg, items, *, providers, search_agent, cb_agent, cache,
         dataset_checksum=_dataset_checksum(subset), dataset_path=dataset_path, split=split,
         search_tools=search_tools, tools_cfg=tools_cfg, memory_cfg=mem_cfg,
         eligibility_preflight=elig.to_dict(), cost_estimate=cost, live=True,
-        live_settings=live_settings)
+        live_settings=live_settings, parent_run_id=parent_run_id, offline_fork=offline_fork)
     manifest["cache"] = cache.summary() if cache else {}
     write_manifest(run_dir, manifest)
     import yaml

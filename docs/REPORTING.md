@@ -242,4 +242,59 @@ Conditions distinguished in reports/CSVs:
 dataset-real + reasons) before any metric, so a synthetic run can never be
 mistaken for a benchmark result. `scripts/compare_runs.py` diffs two reports
 (budget curves, metric deltas, McNemar) and `scripts/inspect_memory_snapshot.py`
-audits a snapshot for answer leakage.
+audits a snapshot for answer leakage (and prints fragment count + a few source
+trace ids per fragment).
+
+## `report.json.metrics` (populated for every completed run)
+
+`report.json` carries `metrics` keyed by `"{condition}@{budget}"`. Each cell
+includes at least: `accuracy`, `correct_per_tool_call`, `mean_tool_calls`,
+`first_tool_hit_rate`, `provider_failure_rate`, `failed_tool_call_count`,
+`stale_source_error_rate`, `false_stop_rate`, `over_search_rate`,
+`abstention_rate`, `support_found_rate`, `evidence_score_mean`. Top-level
+`provider_failure_rate`, `tool_failures`, and `failure_regime_summary` aggregate
+across conditions.
+
+## First-class objects in the report + projection
+
+- **`eligibility_verdict`** — a flat object (also a node in
+  `graph_projection.json`) with: `structurally_valid`,
+  `headline_eligible_memory_claim`, `dataset_is_real`, `conditions_present`,
+  `confirm_size`, `min_confirm_size`, `split_disjoint`, `replay_pass`,
+  `memory_snapshot_leakage_pass`, `raw_trace_archive_leakage_pass`,
+  `report_artifacts_leakage_pass`, `same_conditions_pass`, `frozen_confirm_memory`,
+  `no_live_updates_during_confirm`, `budget_enforced`, `provider_failure_rate`,
+  `max_provider_failure_rate`, `reasons`, `supporting_artifact_paths`.
+  `scripts/generate_claims.py` consumes it. A plumbing run can be
+  `structurally_valid` but never `headline_eligible_memory_claim`; a synthetic
+  run is never headline-eligible.
+- **`failure_regime`** objects — one per failed attempt (regime name + the
+  answer-free flags that triggered it + attempt provenance). `per_question.csv`
+  keeps a single regime string; the structured objects live in
+  `graph_projection.json` and `debug_questions.jsonl` (`regime_names`).
+
+## `graph_projection.json` and `debug_questions.jsonl`
+
+- **`graph_projection.json`** — the standardized, compact, secret-free typed
+  object/relation graph of the run (see `ACTIVEGRAPH_DESIGN.md`). Both are in the
+  artifact hash ledger (`scripts/hash_artifacts.py`).
+- **`debug_questions.jsonl`** — one bounded, secret-free row per attempt:
+  `item_id`, `condition`, `budget`, `question_preview` (≤300), `gold_preview`
+  (≤120), `prediction_preview` (≤300), `correct`, `abstained`, `tool_sequence`,
+  `provider_names`, `failed_tool_errors`, `evidence` (≤3, each with
+  `title_preview`/`url`/`snippet_preview` ≤300), `regime`/`regime_names`,
+  `support_found`/`found_hit`/`authority_ok`/`contradiction`, and the inferred
+  `failure_seam`. **Audit note:** this file may include gold-answer *previews*
+  for debugging; that is intentional and is NOT policy-memory leakage — policy
+  memory remains answer-free (`LEAKAGE_CONTROLS.md`). Live run dirs are
+  git-ignored. Read it with:
+  - `python scripts/debug_run_failures.py results/{run_id} --limit 10`
+  - `python scripts/summarize_provider_returns.py results/{run_id}` (per-provider
+    calls/failures/empties/mean results, status/error codes, domains, snippet
+    availability, cache hits vs live).
+
+## Offline forked ablations
+
+`offline_fork=true` / `parent_run_id` runs reuse a parent's cached outcomes to
+rerun policy variants without spending; they are never headline-eligible. See
+`OFFLINE_FORK_ABLATIONS.md`.

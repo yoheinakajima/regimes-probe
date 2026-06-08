@@ -140,6 +140,27 @@ def write_full_report(
 
     elig = eligibility or {}
     conditions_present = elig.get("conditions_present") or sorted({r.condition for r in runs})
+
+    # --- first-class verdict + failure-regime objects (built from projection data) ---
+    from regimes_probe.eval.eligibility import build_eligibility_verdict
+    from regimes_probe.eval.failure_regime import build_failure_regime
+    _artifacts = ["report.json", "summary.md", "memory_snapshot.json", "replay_check.md",
+                  "budget_curve.csv", "per_question.csv", "graph_projection.json",
+                  "debug_questions.jsonl"]
+    eligibility_verdict = build_eligibility_verdict(
+        elig, leakage_details=leakage_details, replay=replay,
+        same_conditions=same_conditions, supporting_artifact_paths=_artifacts)
+    failure_regimes: list[dict[str, Any]] = []
+    for dr in (debug_records or []):
+        d = dr.to_dict() if hasattr(dr, "to_dict") else dict(dr)
+        aid = f"{d['condition']}-b{int(d['budget'])}-{d['item_id']}"
+        fr = build_failure_regime(d, attempt_id=aid)
+        if fr is not None:
+            failure_regimes.append(fr.to_dict())
+    regime_summary: dict[str, int] = {}
+    for fr in failure_regimes:
+        regime_summary[fr["regime"]] = regime_summary.get(fr["regime"], 0) + 1
+
     report = {
         "run_id": run_id,
         "meta": meta,
@@ -157,6 +178,9 @@ def write_full_report(
         "headline_eligible": elig.get("headline_eligible_memory_claim",
                                       elig.get("headline_eligible", False)),
         "eligibility": elig,
+        # Flat, first-class verdict object (mirrors eval/eligibility.py).
+        "eligibility_verdict": eligibility_verdict,
+        "failure_regime_summary": regime_summary,
         "leakage_check_details": leakage_details or {},
         "same_conditions": same_conditions or {},
         "condition_specs": condition_specs or {},
@@ -177,6 +201,16 @@ def write_full_report(
     if debug_records:
         from regimes_probe.eval.debug import write_debug_jsonl
         write_debug_jsonl(run_dir / "debug_questions.jsonl", debug_records)
+
+    # --- graph_projection.json (standardized, compact, secret-free typed graph) ---
+    from regimes_probe.eval.projection import (
+        build_graph_projection, default_claim_candidates, write_graph_projection)
+    projection = build_graph_projection(
+        run_id, runs=runs, debug_records=debug_records or [],
+        eligibility_verdict=eligibility_verdict, snapshot=snapshot, meta=meta,
+        replay=replay or {}, failure_regimes=failure_regimes,
+        claim_candidates=default_claim_candidates(eligibility_verdict))
+    write_graph_projection(run_dir, projection)
 
     # --- replay_check.md ---
     (run_dir / "replay_check.md").write_text(_replay_md(replay or {}), encoding="utf-8")

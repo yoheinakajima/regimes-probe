@@ -90,6 +90,11 @@ not be verified from this environment (network restricted). See
 | Frozen-memory leakage is checked the same way the inspector checks it, and is layer-separated: only frozen policy memory gates the headline; the raw audit trace may contain gold by design. | `src/regimes_probe/eval/leakage.py` (`leakage_check_details`); `results/demo/report.json` → `leakage_check_details`; `tests/test_debug_artifacts.py::test_report_leakage_matches_inspector_for_clean_snapshot`, `::test_raw_archive_gold_does_not_fail_policy_memory_leakage`. |
 | `report.json` carries non-empty per-condition metrics plus provider-failure accounting. | `results/demo/report.json` → `metrics`, `provider_failure_rate`, `tool_failures`; `tests/test_debug_artifacts.py::test_report_metrics_populated`, `::test_provider_failures_in_report_and_summary`. |
 | Each run emits a bounded, secret-free `debug_questions.jsonl` and two offline triage scripts read it. | `results/demo/debug_questions.jsonl`; `scripts/debug_run_failures.py`, `scripts/summarize_provider_returns.py`; `tests/test_debug_artifacts.py::test_debug_jsonl_bounded_and_has_previews`, `::test_debug_scripts_run`. |
+| Every run exports a compact, secret-free, answer-free typed graph projection with all 17 object + 14 relation types, provenance-linked to the event-log replay. | `results/demo/graph_projection.json`; `eval/projection.py`; `tests/test_graph_native.py::test_graph_projection_has_expected_object_and_relation_types`, `::test_projection_is_bounded_to_detail_sample`. |
+| The two eligibility verdicts are one flat first-class `eligibility_verdict` object, mirrored in `report.json` and the projection and consumed by the claims generator. | `results/demo/report.json` → `eligibility_verdict`; `eval/eligibility.py:build_eligibility_verdict`; `tests/test_graph_native.py::test_eligibility_verdict_object_in_report_and_projection`, `::test_plumbing_run_structurally_valid_but_not_headline`, `::test_all_four_real_can_be_headline_eligible`, `::test_synthetic_cannot_be_headline_eligible`. |
+| Failures are first-class `failure_regime` objects attached to attempts (provider failures become `provider_error`, not strings). | `eval/failure_regime.py`; `results/demo/report.json` → `failure_regime_summary`; `tests/test_graph_native.py::test_failure_regime_objects_attach_to_attempts`. |
+| Policy fragments carry trace lineage (source trace/attempt ids, top arms) and stay answer-free. | `results/demo/memory_snapshot.json` fragments; `policy/consolidation.py`; `scripts/inspect_memory_snapshot.py`; `tests/test_graph_native.py::test_policy_fragments_link_to_source_traces_without_answers`. |
+| Offline forked ablations rerun policy variants on cached outcomes and refuse to call providers; they are never headline-eligible. | `live/fork.py`, `scripts/fork_offline_ablation.py`, `docs/OFFLINE_FORK_ABLATIONS.md`; `tests/test_graph_native.py::test_offline_fork_refuses_live_calls`, `::test_offline_fork_missing_cache_refuses`, `::test_offline_fork_end_to_end_not_headline_no_spend`. |
 
 ## Commands that pass with no keys/network
 
@@ -104,7 +109,8 @@ python scripts/estimate_live_cost.py --optimize 10 --confirm 20
 python scripts/inspect_memory_snapshot.py results/demo/memory_snapshot.json   # leakage PASS
 python scripts/hash_artifacts.py results/demo
 python scripts/generate_claims.py results/demo/report.json   # REFUSES perf claims
-python scripts/docs_check.py                      # 25 docs, no overclaim
+python scripts/docs_check.py                      # required docs present, no overclaim
+python scripts/fork_offline_ablation.py results/live/<run_id> --out <id>-fork  # offline; replay-only, refuses to spend
 python scripts/run_live.py --dataset real-shaped --optimize 5 --confirm 10 \
     --budgets 1 --conditions closed_book,no_memory_search   # DRY-RUN, no calls
 make live-dry-run                                 # no provider calls
@@ -152,4 +158,5 @@ see `docs/LIVE_LADDER.md`.
 - `results/demo/memory_snapshot.json` — the frozen, answer-free policy memory.
 - `results/demo/replay_check.md` — determinism proof.
 - `results/regimes-demo/policy_updates.json` — promotion/rejection record.
-- `results/demo/debug_questions.jsonl` — bounded, secret-free per-question debug previews (tool sequence, providers, evidence, inferred failure seam); read by `scripts/debug_run_failures.py` and `scripts/summarize_provider_returns.py`.
+- `results/demo/debug_questions.jsonl` — bounded, secret-free per-question debug previews (tool sequence, providers, evidence, inferred failure seam, regime names); read by `scripts/debug_run_failures.py` and `scripts/summarize_provider_returns.py`.
+- `results/demo/graph_projection.json` — standardized, compact, secret-free typed graph projection of the run (17 object + 14 relation types incl. `eligibility_verdict`, `failure_regime`, `policy_fragment` lineage); provenance-linked to the event-log replay. In the artifact hash ledger.

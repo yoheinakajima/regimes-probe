@@ -39,11 +39,15 @@ def main() -> int:
     report = json.loads(report_path.read_text(encoding="utf-8"))
 
     elig = report.get("eligibility", {})
-    structurally_valid = bool(report.get("structurally_valid",
-                                         elig.get("structurally_valid", elig.get("mechanism_ok"))))
-    headline = bool(report.get("headline_eligible_memory_claim",
-                               elig.get("headline_eligible_memory_claim", report.get("headline_eligible"))))
-    reasons = (report.get("headline_eligibility_reasons")
+    # Prefer the flat first-class verdict object when present (see eval/eligibility.py).
+    verdict = report.get("eligibility_verdict", {})
+    structurally_valid = bool(verdict.get("structurally_valid",
+                              report.get("structurally_valid",
+                                         elig.get("structurally_valid", elig.get("mechanism_ok")))))
+    headline = bool(verdict.get("headline_eligible_memory_claim",
+                    report.get("headline_eligible_memory_claim",
+                               elig.get("headline_eligible_memory_claim", report.get("headline_eligible")))))
+    reasons = (verdict.get("reasons") or report.get("headline_eligibility_reasons")
                or elig.get("headline_eligibility_reasons") or elig.get("reasons") or [])
     checks = elig.get("checks", {})
     meta = report.get("meta", {})

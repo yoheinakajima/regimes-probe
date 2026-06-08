@@ -21,6 +21,7 @@ _ARTIFACTS = [
     "tool_rewards.csv", "query_rewards.csv", "stop_verify_rewards.csv",
     "memory_snapshot.json", "policy_updates.json", "run_manifest.json",
     "replay_check.md", "config_snapshot.yaml", "debug_questions.jsonl",
+    "graph_projection.json",
 ]
 
 

@@ -152,3 +152,15 @@ set — and the risk surface. Keep the experiment honest:
   the official endpoint shape/OpenAPI is supplied. Do not guess endpoints.
 - **First BrowseComp runs stay cheap search-only.** Add families one at a time,
   after a baseline works, so any change in `correct_per_tool_call` is attributable.
+- **Debug artifacts contain gold-answer previews — policy memory does not.**
+  `debug_questions.jsonl` is an audit/debug artifact and deliberately carries
+  bounded gold/prediction previews for the operator's eyes; this is **not**
+  policy-memory leakage. Only `memory_snapshot_leakage_pass` (frozen policy
+  memory) gates eligibility; the raw audit trace may contain gold by design. Do
+  not conflate the two layers (`LEAKAGE_CONTROLS.md`).
+- **Offline forks are ablations, not measurements.** A forked run reuses a
+  parent's cached outcomes and re-weights/re-routes over already-observed data;
+  it can reveal which variant *would* have done better on the same evidence, but
+  it is `offline_fork=true` and never headline-eligible. A fork that would change
+  the realized query distribution refuses (cache miss) rather than spending — so
+  do not read a "successful" fork as evidence the new policy generalizes.

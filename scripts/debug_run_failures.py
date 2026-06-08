@@ -50,7 +50,8 @@ def main() -> int:
 
     for r in rows[: args.limit]:
         print(f"[{r['item_id']}] {r['condition']}@b{r['budget']}  "
-              f"correct={r['correct']} abstained={r['abstained']}  seam={r['failure_seam']}")
+              f"correct={r['correct']} abstained={r['abstained']}  seam={r['failure_seam']}  "
+              f"regime={r.get('regime','')} regimes={r.get('regime_names', [])}")
         print(f"  Q   : {r['question_preview']}")
         print(f"  gold: {r['gold_preview']}")
         print(f"  pred: {r['prediction_preview'] or '(none / abstained)'}")

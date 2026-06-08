@@ -139,3 +139,17 @@ Two guards gate whether a run may be reported as a headline:
 `scripts/run_synthetic_full.py` runs all of the above offline;
 `scripts/run_ablations.py` runs the Level-1/Level-2/reward/online ablations on
 the fixture. See `docs/FIRST_REAL_RESULT_CRITERIA.md`.
+
+The two verdicts are emitted as one flat `eligibility_verdict` object (in
+`report.json` and as a node in `graph_projection.json`), so every gate is a
+named field rather than buried in nested checks. See `docs/REPORTING.md` and
+`docs/ACTIVEGRAPH_DESIGN.md`.
+
+## Offline forked ablations (no re-spend)
+
+To compare reward/router/stop variants after a paid run, fork it offline: the
+recording cache is replayed (no provider calls) and only policy parameters
+change. A fork is marked `offline_fork=true`/`parent_run_id` and is **never**
+headline-eligible. The fork's natural scope is the memory-variant condition
+(`policy_memory`); read the fixed `no_memory_search` baseline from the parent
+report. See `docs/OFFLINE_FORK_ABLATIONS.md`.

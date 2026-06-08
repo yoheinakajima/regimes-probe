@@ -58,3 +58,23 @@ The strong tier, plus:
 Until a run clears the **Minimum credible** bar with `headline_eligible == true`,
 the honest claim remains: *the scaffold demonstrates the intended mechanism on a
 synthetic fixture.*
+
+## Two eligibility verdicts (don't conflate them)
+
+Reports carry **two** distinct flags (see `eval/eligibility.py`):
+
+- **`structurally_valid`** — split disjoint, replay passes, no answer leakage,
+  budgets enforced, requested runs completed. A *plumbing* run (e.g.
+  `closed_book,no_memory_search`) can be structurally valid.
+- **`headline_eligible_memory_claim`** — the run can support the **main
+  memory-learning claim**. This requires, in addition to structural validity:
+  a **real** dataset; **all four** conditions present (`closed_book`,
+  `no_memory_search`, `random_memory`, `policy_memory`); the same-conditions check
+  on `no_memory_search` vs `policy_memory`; frozen CONFIRM memory with no live
+  updates; and **CONFIRM ≥ `headline.min_confirm_size`** (default 20).
+
+**A run without `policy_memory` is never headline-eligible** — there is no memory
+comparison to make. `scripts/generate_claims.py` refuses memory-performance claims
+in that case and labels the run a "real … plumbing run completed". The minimum
+credible result above therefore requires `headline_eligible_memory_claim == true`,
+not merely `structurally_valid`.

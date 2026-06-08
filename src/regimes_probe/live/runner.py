@@ -154,17 +154,30 @@ def build_plan(cfg, items, *, conditions, budgets, optimize, confirm, split_seed
                          exp_budget=mem_cfg.get("experience_budget", 5),
                          judge=cfg.get("grading", {}).get("judge", "exact"),
                          settings=live_settings)
-    base_spec = _spec(cfg, search_tools, budgets[0], split, "none")
-    pol_spec = _spec(cfg, search_tools, budgets[0], split, "frozen_snapshot")
-    sc = same_conditions(base_spec, pol_spec)
+    # Preflight is optimistic about structural checks, but it must be HONEST about
+    # which conditions are planned: a plan without policy_memory can never be a
+    # headline memory claim.
+    planned = list(conditions)
+    has_comparison = ("no_memory_search" in planned and "policy_memory" in planned)
+    if has_comparison:
+        base_spec = _spec(cfg, search_tools, budgets[0], split, "none")
+        pol_spec = _spec(cfg, search_tools, budgets[0], split, "frozen_snapshot")
+        sc = same_conditions(base_spec, pol_spec)
+        sc_ok = sc.ok
+    else:
+        sc_ok = False
+    has_policy = "policy_memory" in planned
     checks = {
         "optimize_confirm_disjoint": True,
-        "confirm_memory_frozen": bool(mem_cfg.get("confirm_uses_frozen_snapshot")),
-        "no_answer_leakage": True, "same_conditions": sc.ok, "replay_passed": True,
-        "baseline_and_policy_completed": True, "budget_enforced": True,
+        "no_answer_leakage": True, "replay_passed": True,
+        "runs_completed": True, "budget_enforced": True,
+        "confirm_memory_frozen": bool(mem_cfg.get("confirm_uses_frozen_snapshot")) if has_policy else False,
         "no_live_updates_during_confirm": not mem_cfg.get("confirm_updates_memory"),
+        "same_conditions": sc_ok,
     }
-    elig = compute_eligibility(checks, dataset_is_real=is_real)
+    min_confirm = cfg.get("headline", {}).get("min_confirm_size", 20)
+    elig = compute_eligibility(checks, dataset_is_real=is_real, conditions_present=planned,
+                               confirm_size=len(con), min_confirm=min_confirm)
     manifest = build_manifest(
         run_id=run_id, cfg=cfg, dataset_label=dataset_label, dataset_version=dataset_version,
         dataset_checksum=_dataset_checksum(subset), dataset_path=dataset_path, split=split,
@@ -177,7 +190,11 @@ def build_plan(cfg, items, *, conditions, budgets, optimize, confirm, split_seed
         "conditions": list(conditions), "budgets": list(budgets),
         "n_optimize": len(opt), "n_confirm": len(con), "dataset": dataset_label,
         "is_real": is_real, "live_settings": live_settings or {}, "cost_estimate": cost,
-        "same_conditions": sc.to_dict(), "eligibility_preflight": elig.to_dict(),
+        "conditions_present": planned,
+        "same_conditions": (sc.to_dict() if has_comparison
+                            else {"ok": False, "not_applicable": True,
+                                  "reason": "policy_memory and/or no_memory_search not planned"}),
+        "eligibility_preflight": elig.to_dict(),
         "executed": False}, indent=2), encoding="utf-8")
     import yaml
     (run_dir / "config_snapshot.yaml").write_text(yaml.safe_dump(cfg, sort_keys=True),
@@ -292,20 +309,37 @@ def run_live_pipeline(cfg, items, *, providers, search_agent, cb_agent, cache,
     except Exception:
         leak_ok = False
 
-    base_spec = _spec(cfg, search_tools, gate_budget, split, "none")
-    pol_spec = _spec(cfg, search_tools, gate_budget, split, "frozen_snapshot")
-    sc = same_conditions(base_spec, pol_spec)
+    # Conditions that actually completed (one ConditionRun per condition×budget).
+    conditions_present = sorted({r.condition for r in runs})
+    has_comparison = ("no_memory_search" in conditions_present
+                      and "policy_memory" in conditions_present)
+    # same-conditions only means something when BOTH compared conditions ran.
+    if has_comparison:
+        base_spec = _spec(cfg, search_tools, gate_budget, split, "none")
+        pol_spec = _spec(cfg, search_tools, gate_budget, split, "frozen_snapshot")
+        sc = same_conditions(base_spec, pol_spec)
+        sc_ok, sc_dict, specs = sc.ok, sc.to_dict(), {
+            "no_memory_search": base_spec.to_dict(), "policy_memory": pol_spec.to_dict()}
+    else:
+        sc_ok, sc_dict, specs = False, {"ok": False, "not_applicable": True,
+                                        "reason": "policy_memory and/or no_memory_search not run"}, {}
+    has_policy = "policy_memory" in conditions_present
     checks = {
         "optimize_confirm_disjoint": set(split.optimize_ids).isdisjoint(split.confirm_ids),
-        "confirm_memory_frozen": True,
         "no_answer_leakage": leak_ok,
-        "same_conditions": sc.ok,
         "replay_passed": bool(replay.get("projection_matches")),
-        "baseline_and_policy_completed": bool(runs),
+        "runs_completed": bool(runs),
         "budget_enforced": budget_ok,
+        # memory-claim checks (vacuously fine when no policy_memory; eligibility
+        # still fails via missing-conditions, so the verdict is honest):
+        "confirm_memory_frozen": True if has_policy else False,
         "no_live_updates_during_confirm": True,
+        "same_conditions": sc_ok,
     }
-    elig = compute_eligibility(checks, dataset_is_real=is_real)
+    min_confirm = cfg.get("headline", {}).get("min_confirm_size", 20)
+    elig = compute_eligibility(checks, dataset_is_real=is_real,
+                               conditions_present=conditions_present,
+                               confirm_size=len(con), min_confirm=min_confirm)
 
     ls = live_settings or {}
     meta = {
@@ -330,10 +364,8 @@ def run_live_pipeline(cfg, items, *, providers, search_agent, cb_agent, cache,
     }
     run_dir = write_full_report(run_id, runs=runs, snapshot=snap_dict, replay=replay,
                                 significance=significance, meta=meta,
-                                eligibility=elig.to_dict(), same_conditions=sc.to_dict(),
-                                condition_specs={"no_memory_search": base_spec.to_dict(),
-                                                 "policy_memory": pol_spec.to_dict()},
-                                results_root=results_root)
+                                eligibility=elig.to_dict(), same_conditions=sc_dict,
+                                condition_specs=specs, results_root=results_root)
     cost = estimate_live(conditions, budgets, n_opt=len(opt), n_con=len(con),
                          passes=mem_cfg.get("experience_passes", 4),
                          exp_budget=mem_cfg.get("experience_budget", 5),

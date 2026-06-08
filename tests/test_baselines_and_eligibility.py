@@ -71,27 +71,60 @@ def test_same_conditions_allows_intended_query_variation():
 
 
 # --------------------------------------------------------------- eligibility
+_FOUR = ["closed_book", "no_memory_search", "random_memory", "policy_memory"]
+
+
 def _all_pass():
     return {c: True for c in REQUIRED_CHECKS}
 
 
 def test_eligibility_requires_real_dataset():
-    e = compute_eligibility(_all_pass(), dataset_is_real=False)
-    assert e.mechanism_ok is True
-    assert e.headline_eligible is False
-    assert any("synthetic" in r or "placeholder" in r for r in e.reasons)
+    e = compute_eligibility(_all_pass(), dataset_is_real=False,
+                            conditions_present=_FOUR, confirm_size=24)
+    assert e.structurally_valid is True
+    assert e.headline_eligible_memory_claim is False
+    assert any("synthetic" in r or "placeholder" in r for r in e.headline_eligibility_reasons)
 
 
-def test_eligibility_true_when_real_and_all_checks_pass():
-    e = compute_eligibility(_all_pass(), dataset_is_real=True)
-    assert e.headline_eligible is True and e.reasons == []
+def test_eligibility_true_when_real_all_conditions_and_checks_pass():
+    e = compute_eligibility(_all_pass(), dataset_is_real=True,
+                            conditions_present=_FOUR, confirm_size=24)
+    assert e.headline_eligible_memory_claim is True
+    assert e.headline_eligible is True and e.headline_eligibility_reasons == []
 
 
 def test_eligibility_reports_each_failing_check():
     checks = _all_pass()
     checks["replay_passed"] = False
     checks["no_answer_leakage"] = False
-    e = compute_eligibility(checks, dataset_is_real=True)
-    assert e.headline_eligible is False
-    assert any("replay" in r for r in e.reasons)
-    assert any("leakage" in r for r in e.reasons)
+    e = compute_eligibility(checks, dataset_is_real=True, conditions_present=_FOUR, confirm_size=24)
+    assert e.headline_eligible_memory_claim is False
+    assert e.structurally_valid is False
+    assert any("replay" in r for r in e.headline_eligibility_reasons)
+    assert any("leakage" in r for r in e.headline_eligibility_reasons)
+
+
+def test_plumbing_run_structurally_valid_but_not_headline():
+    # closed_book + no_memory_search only: structurally valid, NOT a memory headline
+    e = compute_eligibility(_all_pass(), dataset_is_real=True,
+                            conditions_present=["closed_book", "no_memory_search"],
+                            confirm_size=24)
+    assert e.structurally_valid is True
+    assert e.headline_eligible_memory_claim is False
+    assert any("policy_memory" in r for r in e.headline_eligibility_reasons)
+
+
+def test_small_confirm_blocks_headline():
+    e = compute_eligibility(_all_pass(), dataset_is_real=True,
+                            conditions_present=_FOUR, confirm_size=10, min_confirm=20)
+    assert e.structurally_valid is True
+    assert e.headline_eligible_memory_claim is False
+    assert any("CONFIRM size" in r for r in e.headline_eligibility_reasons)
+
+
+def test_missing_random_memory_blocks_headline():
+    e = compute_eligibility(_all_pass(), dataset_is_real=True,
+                            conditions_present=["closed_book", "no_memory_search", "policy_memory"],
+                            confirm_size=24)
+    assert e.headline_eligible_memory_claim is False
+    assert any("random_memory" in r for r in e.headline_eligibility_reasons)

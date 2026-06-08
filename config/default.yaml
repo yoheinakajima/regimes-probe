@@ -26,6 +26,12 @@ split:
 budgets: [1, 3, 5, 10]           # tool-call budget tracks
 main_metric: "correct_per_tool_call"
 
+# Headline (memory-learning claim) eligibility gates. A run is eligible for the
+# main memory headline only if it runs ALL of closed_book/no_memory_search/
+# random_memory/policy_memory on a real dataset with a CONFIRM set this large.
+headline:
+  min_confirm_size: 20
+
 memory:
   optimize_allows_exploration: true
   confirm_uses_frozen_snapshot: true

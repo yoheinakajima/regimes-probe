@@ -1,13 +1,14 @@
 # regimes-probe run `demo`
 
-## Headline eligibility
+## Eligibility
 
-- **headline_eligible: False**
-- mechanism_ok: True
+- **structurally_valid: True**
+- **headline_eligible_memory_claim: False**
 - dataset_is_real: False
-- reasons not headline-eligible:
+- conditions_present: ['closed_book', 'no_memory_search', 'policy_memory', 'random_memory']
+- reasons NOT headline-eligible (memory claim):
   - dataset is a synthetic/placeholder fixture — not a benchmark headline
-- same_conditions.ok: True (unexpected diffs: [])
+- same_conditions (no_memory_search vs policy_memory) ok: True (unexpected diffs: [])
 
 ## Headline result
 

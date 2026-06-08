@@ -48,6 +48,8 @@ dataset:
   primary: LiveBrowseComp
   secondary: BrowseComp
   synthetic_path: fixtures/synthetic_browse.json
+headline:
+  min_confirm_size: 20
 live:
   answer_model: gpt-5.4-mini
   embedder: hash_embedder

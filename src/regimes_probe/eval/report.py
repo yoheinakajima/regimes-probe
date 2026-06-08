@@ -122,11 +122,23 @@ def write_full_report(
     (run_dir / "memory_snapshot.json").write_text(json.dumps(snapshot, indent=2), encoding="utf-8")
     (run_dir / "policy_updates.json").write_text(json.dumps(promotions, indent=2), encoding="utf-8")
 
+    elig = eligibility or {}
+    conditions_present = elig.get("conditions_present") or sorted({r.condition for r in runs})
     report = {
         "run_id": run_id,
         "meta": meta,
-        "headline_eligible": (eligibility or {}).get("headline_eligible", False),
-        "eligibility": eligibility or {},
+        # Two distinct verdicts (see eval/eligibility.py):
+        "structurally_valid": elig.get("structurally_valid",
+                                       elig.get("mechanism_ok", False)),
+        "headline_eligible_memory_claim": elig.get("headline_eligible_memory_claim",
+                                                   elig.get("headline_eligible", False)),
+        "headline_eligibility_reasons": elig.get("headline_eligibility_reasons",
+                                                 elig.get("reasons", [])),
+        "conditions_present": conditions_present,
+        # back-compat alias (== headline_eligible_memory_claim):
+        "headline_eligible": elig.get("headline_eligible_memory_claim",
+                                      elig.get("headline_eligible", False)),
+        "eligibility": elig,
         "same_conditions": same_conditions or {},
         "condition_specs": condition_specs or {},
         "conditions": [
@@ -174,19 +186,28 @@ def _summary_md(run_id, runs, meta, promotions, significance, replay,
     A = lines.append
     A(f"# regimes-probe run `{run_id}`\n")
 
-    # Eligibility banner — the most important line in the report.
-    he = eligibility.get("headline_eligible")
-    A("## Headline eligibility\n")
-    A(f"- **headline_eligible: {he}**")
-    A(f"- mechanism_ok: {eligibility.get('mechanism_ok')}")
+    # Eligibility banner — the most important lines in the report.
+    present = eligibility.get("conditions_present") or sorted({r.condition for r in runs})
+    has_policy = "policy_memory" in present
+    A("## Eligibility\n")
+    A(f"- **structurally_valid: {eligibility.get('structurally_valid', eligibility.get('mechanism_ok'))}**")
+    A(f"- **headline_eligible_memory_claim: "
+      f"{eligibility.get('headline_eligible_memory_claim', eligibility.get('headline_eligible'))}**")
     A(f"- dataset_is_real: {eligibility.get('dataset_is_real')}")
-    if eligibility.get("reasons"):
-        A("- reasons not headline-eligible:")
-        for r in eligibility["reasons"]:
+    A(f"- conditions_present: {present}")
+    reasons = eligibility.get("headline_eligibility_reasons") or eligibility.get("reasons") or []
+    if reasons:
+        A("- reasons NOT headline-eligible (memory claim):")
+        for r in reasons:
             A(f"  - {r}")
-    if same_conditions:
-        A(f"- same_conditions.ok: {same_conditions.get('ok')} "
-          f"(unexpected diffs: {same_conditions.get('unexpected_diffs')})")
+    # The same-conditions statement only makes sense when BOTH compared
+    # conditions ran. A plumbing run (no policy_memory) must not claim it.
+    if has_policy and same_conditions and not same_conditions.get("not_applicable"):
+        A(f"- same_conditions (no_memory_search vs policy_memory) ok: "
+          f"{same_conditions.get('ok')} (unexpected diffs: {same_conditions.get('unexpected_diffs')})")
+    elif not has_policy:
+        A("- same_conditions: N/A — policy_memory was not run, so there is no memory "
+          "comparison to validate.")
     A("")
 
     # Headline: best paired improvement on the main metric if present.

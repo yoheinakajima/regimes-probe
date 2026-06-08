@@ -39,22 +39,47 @@
       "No claim benchmark answers are stored in policy memory (they are not)."
     ]
   },
+  "structurally_valid": true,
+  "headline_eligible_memory_claim": false,
+  "headline_eligibility_reasons": [
+    "dataset is a synthetic/placeholder fixture \u2014 not a benchmark headline"
+  ],
+  "conditions_present": [
+    "closed_book",
+    "no_memory_search",
+    "policy_memory",
+    "random_memory"
+  ],
   "headline_eligible": false,
   "eligibility": {
+    "structurally_valid": true,
+    "headline_eligible_memory_claim": false,
     "headline_eligible": false,
     "mechanism_ok": true,
+    "reasons": [
+      "dataset is a synthetic/placeholder fixture \u2014 not a benchmark headline"
+    ],
     "dataset_is_real": false,
+    "conditions_present": [
+      "closed_book",
+      "no_memory_search",
+      "policy_memory",
+      "random_memory"
+    ],
+    "confirm_size": 28,
+    "min_confirm": 20,
     "checks": {
       "optimize_confirm_disjoint": true,
-      "confirm_memory_frozen": true,
-      "no_answer_leakage": true,
-      "same_conditions": true,
       "replay_passed": true,
-      "baseline_and_policy_completed": true,
+      "no_answer_leakage": true,
       "budget_enforced": true,
-      "no_live_updates_during_confirm": true
+      "runs_completed": true,
+      "confirm_memory_frozen": true,
+      "no_live_updates_during_confirm": true,
+      "same_conditions": true
     },
-    "reasons": [
+    "structural_reasons": [],
+    "headline_eligibility_reasons": [
       "dataset is a synthetic/placeholder fixture \u2014 not a benchmark headline"
     ]
   },

@@ -1,69 +1,160 @@
-"""Headline-eligibility computation for a report.
+"""Eligibility for a report — TWO distinct verdicts.
 
-A run is *headline-eligible* only if every structural guard passes AND the
-dataset is a real benchmark (a synthetic/placeholder fixture is never a benchmark
-headline). When ineligible, the report carries the reasons. See
-``docs/METHODOLOGY_RISKS.md`` and ``docs/FIRST_REAL_RESULT_CRITERIA.md``.
+1. ``structurally_valid`` — the run's mechanics are sound: OPTIMIZE/CONFIRM
+   disjoint, replay passes, no answer leakage, budgets enforced, the requested
+   runs completed. A plumbing run (e.g. ``closed_book,no_memory_search``) can be
+   structurally valid.
+
+2. ``headline_eligible_memory_claim`` — the run can support the **main
+   regimes-probe memory-learning claim**. This is much stricter: it requires a
+   real dataset, ALL of the comparison conditions (closed_book, no_memory_search,
+   random_memory, policy_memory), the same-conditions check on
+   no_memory_search-vs-policy_memory, frozen CONFIRM memory with no live updates,
+   and a nontrivial CONFIRM size. A run without ``policy_memory`` can NEVER be
+   headline-eligible.
+
+See ``docs/METHODOLOGY_RISKS.md`` and ``docs/FIRST_REAL_RESULT_CRITERIA.md``.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Optional
 
-#: The structural checks every headline-eligible run must satisfy.
-REQUIRED_CHECKS = (
+#: Conditions the main memory-learning comparison requires.
+REQUIRED_CONDITIONS = ("closed_book", "no_memory_search", "random_memory", "policy_memory")
+
+#: Structural checks (a plumbing run can satisfy these).
+STRUCTURAL_CHECKS = (
     "optimize_confirm_disjoint",
-    "confirm_memory_frozen",
-    "no_answer_leakage",
-    "same_conditions",
     "replay_passed",
-    "baseline_and_policy_completed",
+    "no_answer_leakage",
     "budget_enforced",
-    "no_live_updates_during_confirm",
+    "runs_completed",
 )
+#: Extra checks the memory-learning headline needs (only meaningful when the
+#: no_memory_search vs policy_memory comparison actually ran).
+MEMORY_CLAIM_CHECKS = (
+    "confirm_memory_frozen",
+    "no_live_updates_during_confirm",
+    "same_conditions",
+)
+#: Back-compat union (some callers/tests iterate this).
+REQUIRED_CHECKS = STRUCTURAL_CHECKS + MEMORY_CLAIM_CHECKS
 
 _REASONS = {
     "optimize_confirm_disjoint": "OPTIMIZE and CONFIRM splits overlap",
-    "confirm_memory_frozen": "CONFIRM did not use a frozen memory snapshot",
-    "no_answer_leakage": "answer-leakage check failed on policy memory",
-    "same_conditions": "baseline and policy runs differ in more than memory access",
     "replay_passed": "replay check failed (graph != projection of log)",
-    "baseline_and_policy_completed": "baseline and/or policy run did not complete",
+    "no_answer_leakage": "answer-leakage check failed on policy memory",
     "budget_enforced": "a run exceeded its tool-call budget",
+    "runs_completed": "the requested runs did not complete",
+    "confirm_memory_frozen": "CONFIRM did not use a frozen memory snapshot",
     "no_live_updates_during_confirm": "policy memory was updated during CONFIRM",
+    "same_conditions": "no_memory_search and policy_memory differ in more than memory access",
 }
 
 
 @dataclass
 class Eligibility:
-    mechanism_ok: bool
-    headline_eligible: bool
+    structurally_valid: bool
+    headline_eligible_memory_claim: bool
     dataset_is_real: bool
+    conditions_present: list[str]
     checks: dict[str, bool]
-    reasons: list[str]
+    structural_reasons: list[str]
+    headline_eligibility_reasons: list[str]
+    confirm_size: int = 0
+    min_confirm: int = 20
+
+    # --- back-compat aliases (older code/reports read these) ---
+    @property
+    def mechanism_ok(self) -> bool:
+        return self.structurally_valid
+
+    @property
+    def headline_eligible(self) -> bool:
+        return self.headline_eligible_memory_claim
+
+    @property
+    def reasons(self) -> list[str]:
+        return self.headline_eligibility_reasons
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "headline_eligible": self.headline_eligible,
-            "mechanism_ok": self.mechanism_ok,
+            "structurally_valid": self.structurally_valid,
+            "headline_eligible_memory_claim": self.headline_eligible_memory_claim,
+            # back-compat keys:
+            "headline_eligible": self.headline_eligible_memory_claim,
+            "mechanism_ok": self.structurally_valid,
+            "reasons": self.headline_eligibility_reasons,
+            # detail:
             "dataset_is_real": self.dataset_is_real,
+            "conditions_present": self.conditions_present,
+            "confirm_size": self.confirm_size,
+            "min_confirm": self.min_confirm,
             "checks": self.checks,
-            "reasons": self.reasons,
+            "structural_reasons": self.structural_reasons,
+            "headline_eligibility_reasons": self.headline_eligibility_reasons,
         }
 
 
-def compute_eligibility(checks: dict[str, bool], *, dataset_is_real: bool) -> Eligibility:
-    """Combine structural checks + dataset realness into an eligibility verdict."""
-    full = {name: bool(checks.get(name, False)) for name in REQUIRED_CHECKS}
-    mechanism_ok = all(full.values())
-    reasons = [_REASONS[name] for name, ok in full.items() if not ok]
+def compute_eligibility(
+    checks: dict[str, bool],
+    *,
+    dataset_is_real: bool,
+    conditions_present: Optional[list[str]] = None,
+    confirm_size: int = 0,
+    min_confirm: int = 20,
+) -> Eligibility:
+    """Compute structural validity AND headline (memory-claim) eligibility.
+
+    ``conditions_present`` is the list of comparison conditions that actually
+    completed in the run. The memory-learning headline requires all of
+    :data:`REQUIRED_CONDITIONS`; a run missing ``policy_memory`` (e.g. a plumbing
+    run) is structurally valid at best, never headline-eligible.
+    """
+    c = {k: bool(v) for k, v in (checks or {}).items()}
+    # tolerate the legacy key name for "runs completed"
+    c.setdefault("runs_completed", bool(checks.get("baseline_and_policy_completed", False)))
+    present = list(conditions_present or [])
+
+    structural = {name: c.get(name, False) for name in STRUCTURAL_CHECKS}
+    structurally_valid = all(structural.values())
+    structural_reasons = [_REASONS[n] for n, ok in structural.items() if not ok]
+
+    missing = [cond for cond in REQUIRED_CONDITIONS if cond not in present]
+    confirm_ok = confirm_size >= min_confirm
+    has_comparison = ("no_memory_search" in present) and ("policy_memory" in present)
+    mem_checks = {name: c.get(name, False) for name in MEMORY_CLAIM_CHECKS}
+    mem_checks_ok = all(mem_checks.values())
+
+    reasons: list[str] = list(structural_reasons)
     if not dataset_is_real:
         reasons.append("dataset is a synthetic/placeholder fixture — not a benchmark headline")
+    if missing:
+        reasons.append(
+            "main memory-learning comparison requires all of "
+            f"{list(REQUIRED_CONDITIONS)}; missing: {missing}")
+    elif not mem_checks_ok:                       # only meaningful when all present
+        reasons += [_REASONS[n] for n, ok in mem_checks.items() if not ok]
+    if not confirm_ok:
+        reasons.append(
+            f"CONFIRM size {confirm_size} is below the minimum {min_confirm} for a "
+            "headline memory claim")
+
+    headline = bool(
+        structurally_valid and dataset_is_real and has_comparison and not missing
+        and confirm_ok and mem_checks_ok)
+
+    all_checks = {**structural, **mem_checks}
     return Eligibility(
-        mechanism_ok=mechanism_ok,
-        headline_eligible=bool(mechanism_ok and dataset_is_real),
+        structurally_valid=structurally_valid,
+        headline_eligible_memory_claim=headline,
         dataset_is_real=dataset_is_real,
-        checks=full,
-        reasons=reasons,
+        conditions_present=present,
+        checks=all_checks,
+        structural_reasons=structural_reasons,
+        headline_eligibility_reasons=reasons,
+        confirm_size=confirm_size,
+        min_confirm=min_confirm,
     )

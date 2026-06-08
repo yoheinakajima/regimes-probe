@@ -251,17 +251,22 @@ def full_pipeline(
     except Exception:
         leak_ok = False
     dataset_is_real = dataset_label in _REAL_DATASETS
+    # full_pipeline always runs all four comparison conditions.
+    conditions_present = ["closed_book", "no_memory_search", "policy_memory", "random_memory"]
     checks = {
         "optimize_confirm_disjoint": set(split.optimize_ids).isdisjoint(split.confirm_ids),
-        "confirm_memory_frozen": not online_confirm,
         "no_answer_leakage": leak_ok,
-        "same_conditions": sc.ok,
         "replay_passed": bool(replay.get("projection_matches")),
-        "baseline_and_policy_completed": bool(aligned[gate_budget][0]) and bool(aligned[gate_budget][1]),
+        "runs_completed": bool(aligned[gate_budget][0]) and bool(aligned[gate_budget][1]),
         "budget_enforced": budget_ok,
+        "confirm_memory_frozen": not online_confirm,
         "no_live_updates_during_confirm": not online_confirm,
+        "same_conditions": sc.ok,
     }
-    eligibility = compute_eligibility(checks, dataset_is_real=dataset_is_real)
+    min_confirm = cfg.get("headline", {}).get("min_confirm_size", 20)
+    eligibility = compute_eligibility(checks, dataset_is_real=dataset_is_real,
+                                      conditions_present=conditions_present,
+                                      confirm_size=len(con_items), min_confirm=min_confirm)
 
     meta = {
         "answer_model": cfg.get("live", {}).get("answer_model"),

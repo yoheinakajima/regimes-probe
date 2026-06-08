@@ -201,17 +201,22 @@ def main() -> int:
         experience_budget=mem.get("experience_budget", 5),
         judge=cfg.get("grading", {}).get("judge", "exact"), prices=cfg.get("pricing"),
     )
+    # This preflight assumes the full four-condition comparison.
+    conditions_present = ["closed_book", "no_memory_search", "random_memory", "policy_memory"]
     checks = {
         "optimize_confirm_disjoint": True,
         "confirm_memory_frozen": bool(frozen),
         "no_answer_leakage": True,        # optimistic; verified on real traces at run time
         "same_conditions": sc.ok,
         "replay_passed": True,            # optimistic; verified at run time
-        "baseline_and_policy_completed": True,
+        "runs_completed": True,
         "budget_enforced": True,
         "no_live_updates_during_confirm": not online,
     }
-    elig = compute_eligibility(checks, dataset_is_real=is_real)
+    min_confirm = cfg.get("headline", {}).get("min_confirm_size", 20)
+    elig = compute_eligibility(checks, dataset_is_real=is_real,
+                               conditions_present=conditions_present,
+                               confirm_size=len(con), min_confirm=min_confirm)
     manifest = build_manifest(
         run_id=run_id, cfg=cfg, dataset_label=label, dataset_version=version,
         dataset_checksum=_dataset_checksum(subset), dataset_path=path, split=split,

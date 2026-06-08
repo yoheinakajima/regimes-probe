@@ -201,8 +201,12 @@ def main() -> int:
     print(f"estimated answerer calls={plan.cost['answerer_calls']}  "
           f"worst-case tool calls={plan.cost['worst_case_tool_calls']}  "
           f"max_calls_by_tool={plan.cost['max_calls_by_tool']}")
-    print(f"headline_eligible(preflight)={plan.eligibility_preflight['headline_eligible']} "
-          f"(dataset_is_real={is_real})")
+    ep = plan.eligibility_preflight
+    print(f"structurally_valid(preflight)={ep.get('structurally_valid')}  "
+          f"headline_eligible_memory_claim(preflight)={ep.get('headline_eligible_memory_claim')} "
+          f"(dataset_is_real={is_real}, conditions={conditions})")
+    if not ep.get("headline_eligible_memory_claim") and ep.get("headline_eligibility_reasons"):
+        print(f"  not a memory headline: {ep['headline_eligibility_reasons']}")
     print(f"required env vars present: {'yes' if not miss else 'NO -> missing ' + str(miss)}")
     for note in settings.notes:
         print(f"  note: {note}")
@@ -252,10 +256,14 @@ def main() -> int:
         dataset_path=ds_path, is_real=is_real, search_tools=search_tools,
         weights=reward_weights(cfg), params=bandit_params(cfg), resume_snapshot=resume,
         live_settings=settings.to_dict())
+    el = result["eligibility"]
     print(f"run dir: {result['run_dir']}")
     print(f"cache: {result['cache']}")
-    print(f"headline_eligible={result['eligibility']['headline_eligible']} "
-          f"reasons={result['eligibility']['reasons']}")
+    print(f"structurally_valid={el.get('structurally_valid')}  "
+          f"headline_eligible_memory_claim={el.get('headline_eligible_memory_claim')}  "
+          f"conditions_present={el.get('conditions_present')}")
+    if not el.get("headline_eligible_memory_claim"):
+        print(f"  not a memory headline: {el.get('headline_eligibility_reasons')}")
     print("Follow-up:\n" + _follow_ups(result["run_dir"]))
     return 0
 

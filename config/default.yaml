@@ -68,6 +68,11 @@ policy:
   # target/latent slots + constraints and plans actions to resolve them. Off by
   # default; --enable-task-frame.
   enable_task_frame: false
+  # Optional cached/validated LLM task-frame parser (Level 4). Requires
+  # enable_task_frame. Emits the same TaskFrame schema, is schema-validated, and
+  # falls back to the deterministic parser when invalid/low-quality. Off by
+  # default; --enable-llm-task-frame-parser.
+  enable_llm_task_frame_parser: false
   # Level 3 evidence reading: if firecrawl_scrape fails (e.g. 402/quota), fall
   # back to the basic page_fetch on the same URL. Social pages are not scraped
   # unless allow_social_scrape is set.

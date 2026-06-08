@@ -36,6 +36,7 @@ class AgentConfig:
     enable_query_decomposition: bool = False  # Level 2 multi-query decomposition
     enable_iterative_clue_resolution: bool = False  # staged candidate-entity resolution
     enable_task_frame: bool = False  # Level 4 constraint-graph / hypothesis-table policy
+    enable_llm_task_frame_parser: bool = False  # use cached/validated LLM frame parser
     scrape_fallback_to_page_fetch: bool = True  # firecrawl_scrape fail -> page_fetch
     allow_social_scrape: bool = False
     as_of: str = "2026-06-01"
@@ -46,15 +47,16 @@ class AgentConfig:
 
 class EpistemicAgent:
     def __init__(self, config: AgentConfig, *, extractor: Optional[SignatureExtractor] = None,
-                 answerer=None) -> None:
+                 answerer=None, task_frame_parser=None) -> None:
         self.config = config
         self.extractor = extractor or SignatureExtractor()
         self.router = Router(config.router)
         self.query_policy = QueryPolicy(config.query_mode)
         self.stopping_policy = StoppingPolicy(config.stop_mode, config.stop)
         self.answerer = answerer
+        self.task_frame_parser = task_frame_parser
         self.loop = SearchLoop(self.router, self.query_policy, self.stopping_policy,
-                               answerer=answerer)
+                               answerer=answerer, task_frame_parser=task_frame_parser)
 
     def signature(self, item: Item) -> QuerySignature:
         return self.extractor.compute(item.question)
@@ -83,6 +85,7 @@ class EpistemicAgent:
             enable_query_decomposition=self.config.enable_query_decomposition,
             enable_iterative_clue_resolution=self.config.enable_iterative_clue_resolution,
             enable_task_frame=self.config.enable_task_frame,
+            enable_llm_task_frame_parser=self.config.enable_llm_task_frame_parser,
             scrape_fallback_to_page_fetch=self.config.scrape_fallback_to_page_fetch,
             allow_social_scrape=self.config.allow_social_scrape,
         )

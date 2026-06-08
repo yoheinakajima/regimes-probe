@@ -48,8 +48,9 @@ def build_synthetic(cfg: dict[str, Any]):
     return items, providers, tools, search_tools
 
 
-def build_agent(cfg: dict[str, Any], tools: list[str]) -> EpistemicAgent:
+def build_agent(cfg: dict[str, Any], tools: list[str], *, task_frame_parser=None) -> EpistemicAgent:
     pol = cfg.get("policy", {})
+    enable_llm_parser = bool(pol.get("enable_llm_task_frame_parser", False))
     agent_cfg = AgentConfig(
         available_tools=tools,
         query_mode=pol.get("query_mode", "learned"),
@@ -57,6 +58,7 @@ def build_agent(cfg: dict[str, Any], tools: list[str]) -> EpistemicAgent:
         enable_query_decomposition=bool(pol.get("enable_query_decomposition", False)),
         enable_iterative_clue_resolution=bool(pol.get("enable_iterative_clue_resolution", False)),
         enable_task_frame=bool(pol.get("enable_task_frame", False)),
+        enable_llm_task_frame_parser=enable_llm_parser,
         scrape_fallback_to_page_fetch=bool(pol.get("scrape_fallback_to_page_fetch", True)),
         allow_social_scrape=bool(pol.get("allow_social_scrape", False)),
         as_of=cfg.get("run", {}).get("as_of", "2026-06-01"),
@@ -64,7 +66,18 @@ def build_agent(cfg: dict[str, Any], tools: list[str]) -> EpistemicAgent:
         stop=StopConfig(**cfg.get("stopping", {})) if cfg.get("stopping") else StopConfig(),
         verification=VerificationConfig(**cfg.get("verification", {})) if cfg.get("verification") else VerificationConfig(),
     )
-    return EpistemicAgent(agent_cfg)
+    # When the LLM parser is enabled, attach a cached/replayable parser. No live
+    # model client is wired here (offline-safe): with no injected model_fn the
+    # parser is cache/replay-only and falls back to the deterministic parser on a
+    # cache miss. A live runner injects a model_fn + file-backed cache.
+    if task_frame_parser is None and enable_llm_parser:
+        from regimes_probe.agent.llm_task_frame import LLMTaskFrameParser, ParserCache
+        cache_path = pol.get("task_frame_parser_cache_path")
+        task_frame_parser = LLMTaskFrameParser(
+            model_fn=None, cache=ParserCache(cache_path),
+            model=str(pol.get("task_frame_parser_model", "stub")),
+            replay_only=bool(pol.get("task_frame_parser_replay_only", False)))
+    return EpistemicAgent(agent_cfg, task_frame_parser=task_frame_parser)
 
 
 def base_argparser(description: str) -> argparse.ArgumentParser:
@@ -299,6 +312,8 @@ def full_pipeline(
         "query_decomposition_enabled": bool(cfg.get("policy", {}).get("enable_query_decomposition", False)),
         "iterative_clue_resolution_enabled": bool(cfg.get("policy", {}).get("enable_iterative_clue_resolution", False)),
         "task_frame_enabled": bool(cfg.get("policy", {}).get("enable_task_frame", False)),
+        "llm_task_frame_parser_enabled": bool(
+            cfg.get("policy", {}).get("enable_llm_task_frame_parser", False)),
         "dataset": dataset_label,
         "dataset_version": dataset_version,
         "split": split.to_dict() | {"optimize_ids": "...", "confirm_ids": "..."},

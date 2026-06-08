@@ -52,6 +52,8 @@ class AttemptOutcome:
     scrape: dict = field(default_factory=dict)
     # Level 4 task-frame / hypothesis-table stats
     frame: dict = field(default_factory=dict)
+    # Level 4 task-frame PARSER provenance (deterministic vs LLM)
+    frame_parse: dict = field(default_factory=dict)
 
     def to_row(self) -> dict[str, Any]:
         return {
@@ -187,6 +189,37 @@ def _frame_metrics(stats: list[dict]) -> dict[str, Any]:
     }
 
 
+def _frame_parser_metrics(stats: list[dict]) -> dict[str, Any]:
+    """Aggregate task-frame PARSER provenance (deterministic vs LLM) across a cell."""
+    from collections import Counter
+    used = [s for s in stats if s]
+    if not used:
+        return {}
+    llm_used = sum(1 for s in used if s.get("parser_used") == "llm")
+    fallbacks = [s for s in used if s.get("parser_used") != "llm" and s.get("fallback_reason")]
+    val_failures: Counter = Counter()
+    for s in fallbacks:
+        for e in s.get("validation_errors", []):
+            val_failures[str(e).split(":")[0]] += 1
+        if s.get("fallback_reason"):
+            val_failures[f"reason:{s['fallback_reason']}"] += 1
+    role_dist: Counter = Counter()
+    for s in used:
+        for r in s.get("target_slot_roles", []):
+            role_dist[r] += 1
+    qualities = [float(s.get("parse_quality", 0.0)) for s in used]
+    return {
+        "llm_task_frame_used_count": llm_used,
+        "llm_task_frame_fallback_count": len(fallbacks),
+        "task_frame_parse_quality_mean": (sum(qualities) / len(qualities)) if qualities else 0.0,
+        "parser_validation_failure_counts": dict(val_failures),
+        "deterministic_fallback_rate": _safe_div(len(fallbacks), len(used)),
+        "target_slot_role_distribution": dict(role_dist),
+        "constraint_attachment_count": sum(int(s.get("constraint_attachment_count", 0))
+                                           for s in used),
+    }
+
+
 def compute_metrics(outcomes: list[AttemptOutcome]) -> dict[str, Any]:
     """Aggregate metrics for one condition+budget cell."""
     n = len(outcomes)
@@ -236,6 +269,8 @@ def compute_metrics(outcomes: list[AttemptOutcome]) -> dict[str, Any]:
         **_scrape_metrics(outcomes),
         # Level 4 task-frame / hypothesis aggregates
         **_frame_metrics([o.frame for o in outcomes]),
+        # Level 4 task-frame parser provenance (deterministic vs LLM)
+        **_frame_parser_metrics([o.frame_parse for o in outcomes]),
         "correct_per_tool_call": _safe_div(correct, calls),
         "correct_per_dollar": _safe_div(correct, cost) if cost else 0.0,
         "correct_per_second": _safe_div(correct, latency) if latency else 0.0,

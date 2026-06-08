@@ -75,6 +75,56 @@ _QUERY_LLM_V1 = (
     "entities and add precise terms. Return only the query string."
 )
 
+_TASK_FRAME_PARSER_V1 = (
+    "You parse a research question into a constraint-satisfaction TASK FRAME. "
+    "These questions are constraint-satisfaction problems over latent (hidden) "
+    "variables: a target answer plus intermediate variables, linked by constraints.\n"
+    "\n"
+    "RULES — read carefully:\n"
+    "- Do NOT answer the question. Do NOT solve it. Do NOT guess any entity, name, "
+    "date, or value. You only PARSE.\n"
+    "- Output ONLY structure: slots and constraints derived from the question text.\n"
+    "- Distinguish KNOWN CONTEXT TERMS (entities/values GIVEN in the question, e.g. "
+    "an organization that released a report) from UNKNOWN VARIABLES (what must be "
+    "found).\n"
+    "- The TARGET slot is the single thing being ASKED FOR (the interrogative head: "
+    "'which series…' -> the series; '…in which year' -> the year; 'who…' -> a "
+    "person). It is NOT every entity mentioned.\n"
+    "- INTERMEDIATE slots are things that must be found BEFORE the answer.\n"
+    "- Attach each clue/clause to the slot it constrains via applies_to.\n"
+    "- Preserve multi-hop dependencies in dependency_edges (intermediate -> target).\n"
+    "- Do NOT promote a source/organization given in the question to a TARGET slot "
+    "unless the question explicitly asks for that source/organization.\n"
+    "- Never put a concrete answer (a name/date/value not present in the question) "
+    "into any slot_name or term.\n"
+    "\n"
+    "GENERIC EXAMPLES (illustrative shapes only — do not copy, do not answer):\n"
+    "- 'Which TV series starred an actor born in <place>…' -> target = series "
+    "(title_or_work); intermediate = the actor (person); constraints attach the "
+    "birthplace/era to the actor, the actor to the series.\n"
+    "- 'A restaurant near a hotel and a museum, founded by a chef born in which "
+    "year' -> target = the birth year (date_or_time); intermediate = restaurant, "
+    "hotel, museum (organization/location) and the founder (person); distance/"
+    "location constraints attach to the restaurant.\n"
+    "- 'A report by <organization>; foreword by a person; introduction by a person; "
+    "who is the introduction author' -> known context = the organization; "
+    "intermediate = report (title_or_work), foreword author (person); target = the "
+    "introduction author (person).\n"
+    "- 'A paper using a census sample asks which journal published it' -> target = "
+    "the journal/publication (publication_or_source); intermediate = the paper "
+    "(title_or_work), authors (person), country/sample as constraints.\n"
+    "\n"
+    "OUTPUT: a single JSON object with keys target_answer_slots, latent_slots, "
+    "constraints, dependency_edges, known_context_terms, unresolved_slots, "
+    "answer_shape_hints, source_requirements, parse_quality. Each slot has slot_id, "
+    "slot_name, slot_role, is_target_answer_slot, is_intermediate_slot, depends_on, "
+    "expected_evidence_type. Each constraint has constraint_id, text_span, "
+    "normalized_terms, constraint_type, applies_to, specificity_score, "
+    "discriminative_score, status. slot_role is one of person, organization, "
+    "location, title_or_work, publication_or_source, event, concept, date_or_time, "
+    "number, unknown. Return ONLY the JSON object, no prose."
+)
+
 PROMPTS: dict[str, Prompt] = {
     "answerer": Prompt(
         name="answerer", version="v1", content=_ANSWERER_V1,
@@ -94,6 +144,11 @@ PROMPTS: dict[str, Prompt] = {
     "query_llm": Prompt(
         name="query_llm", version="v1", content=_QUERY_LLM_V1,
         intended_use="LLM query generation (Level 2; replaceable by templates)",
+        allowed_to_vary=True,
+    ),
+    "task_frame_parser": Prompt(
+        name="task_frame_parser", version="v1", content=_TASK_FRAME_PARSER_V1,
+        intended_use="LLM task-frame parsing (Level 4; produces task state, never answers)",
         allowed_to_vary=True,
     ),
 }

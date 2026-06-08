@@ -208,6 +208,26 @@ on vs off, same tool set), reading the frame metrics: `slot_resolution_rate`,
 The success signal is not just answer rate but whether reads/queries are
 **frame-grounded** (each action tests a specific unresolved constraint/slot) and the
 final answer is **supported by the question's own constraints** — a guard against
-answering with an ungrounded high-frequency entity. The v0 parser is heuristic and
-gold-free; an LLM parser is future work, and per-item/per-topic rules are forbidden
-(that would overfit the benchmark, see `METHODOLOGY_RISKS.md`).
+answering with an ungrounded high-frequency entity. Per-item/per-topic rules are
+forbidden (that would overfit the benchmark, see `METHODOLOGY_RISKS.md`).
+
+The first structurally-successful Level-4 live run
+(`browsecomp-taskframe-debug-001`) confirmed the wiring works, runs are
+headline-eligible, policy memory stays answer-free, and the planner uses far less
+budget than scrape-read (`policy_memory@12` mean tool calls dropped 12.0 → 5.9) —
+but accuracy was still 0 because the **deterministic parser built the wrong frame**
+(wrong target, wrong constraint attachment, source/org promoted to target). The
+limiting factor is parse quality, not the planner.
+
+**Level 4b: LLM task-frame parser as an ablation.** `--enable-llm-task-frame-parser`
+(requires `--enable-task-frame`) swaps the deterministic parser for a cached,
+schema-validated LLM parser that emits the **same** frame and **does not answer**
+(`QUERY_POLICY.md` Level 4b). Evaluate it as a parser ablation holding everything
+else fixed, and read the new provenance metrics: `parser_used`,
+`task_frame_parse_quality_mean`, `deterministic_fallback_rate`,
+`parser_validation_failure_counts`, `target_slot_role_distribution`. Because the
+parser is cached and fallback-safe, a replay never calls a model and a bad/invalid
+parse silently reverts to the deterministic frame — so a comparison stays valid even
+when the model is unavailable. The honest read: does a **higher-quality frame**
+(better target identification + constraint attachment) raise frame-grounded action
+rates and `final_answer_supported_by_constraints_rate`, and only then accuracy?

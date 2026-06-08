@@ -114,6 +114,10 @@ def main() -> int:
     ap.add_argument("--enable-task-frame", action="store_true",
                     help="Level 4: parse a task frame (slots+constraints) and plan "
                          "actions to resolve it. Off by default.")
+    ap.add_argument("--enable-llm-task-frame-parser", action="store_true",
+                    help="Use the cached/validated LLM task-frame parser (requires "
+                         "--enable-task-frame); falls back to deterministic on "
+                         "invalid/low-quality output. Off by default.")
     ap.add_argument("--judge-model", default=None,
                     help="(reserved) LLM judge; grading currently uses exact/normalized match")
     ap.add_argument("--split-seed", default=None)
@@ -145,6 +149,11 @@ def main() -> int:
                          or bool(cfg.get("policy", {}).get("enable_iterative_clue_resolution", False)))
     task_frame_enabled = (args.enable_task_frame
                           or bool(cfg.get("policy", {}).get("enable_task_frame", False)))
+    # The LLM parser only takes effect when the task frame itself is enabled.
+    llm_parser_enabled = (
+        (args.enable_llm_task_frame_parser
+         or bool(cfg.get("policy", {}).get("enable_llm_task_frame_parser", False)))
+        and task_frame_enabled)
 
     # Resolve models + tools from mode/CLI/config/env (cheap-first; OpenAI hosted
     # web_search is opt-in, never a silent default).
@@ -163,11 +172,13 @@ def main() -> int:
         enable_query_decomposition=decompose_enabled,
         enable_iterative_clue_resolution=iterative_enabled,
         enable_task_frame=task_frame_enabled,
+        enable_llm_task_frame_parser=llm_parser_enabled,
     )
     # Stamp the effective flags into cfg.policy so the agent + manifest both see them.
     cfg.setdefault("policy", {})["enable_query_decomposition"] = decompose_enabled
     cfg.setdefault("policy", {})["enable_iterative_clue_resolution"] = iterative_enabled
     cfg.setdefault("policy", {})["enable_task_frame"] = task_frame_enabled
+    cfg.setdefault("policy", {})["enable_llm_task_frame_parser"] = llm_parser_enabled
     tools = settings.tools
     search_tools = settings.search_tools
     answer_model = settings.answer_model
@@ -219,7 +230,8 @@ def main() -> int:
     print(f"provider_classes={settings.provider_classes()}")
     print(f"query_decomposition_enabled={settings.query_decomposition_enabled}  "
           f"iterative_clue_resolution_enabled={settings.iterative_clue_resolution_enabled}  "
-          f"task_frame_enabled={settings.task_frame_enabled}")
+          f"task_frame_enabled={settings.task_frame_enabled}  "
+          f"llm_task_frame_parser_enabled={settings.llm_task_frame_parser_enabled}")
     print(f"flags: agentic_discovery={settings.agentic_tool_discovery_enabled} "
           f"scrape={settings.scrape_tools_enabled} browserish={settings.browserish_tools_enabled} "
           f"stateful_or_paid_allowed={settings.stateful_or_paid_tools_allowed}")
@@ -269,16 +281,29 @@ def main() -> int:
                             enable_query_decomposition=decompose_enabled,
                             enable_iterative_clue_resolution=iterative_enabled,
                             enable_task_frame=task_frame_enabled,
+                            enable_llm_task_frame_parser=llm_parser_enabled,
                             scrape_fallback_to_page_fetch=bool(
                                 cfg["policy"].get("scrape_fallback_to_page_fetch", True)),
                             allow_social_scrape=bool(cfg["policy"].get("allow_social_scrape", False)),
                             as_of=cfg.get("run", {}).get("as_of", "2026-06-01"))
+    # Cached/replayable task-frame parser (Level 4). No live model client is wired
+    # here; with model_fn=None it is cache/replay-only and falls back to the
+    # deterministic parser on a cache miss.
+    tf_parser = None
+    if llm_parser_enabled:
+        from regimes_probe.agent.llm_task_frame import LLMTaskFrameParser, ParserCache
+        cache_path = str(Path(plan.run_dir) / "task_frame_parser_cache.json")
+        tf_parser = LLMTaskFrameParser(
+            model_fn=None, cache=ParserCache(cache_path),
+            model=str(cfg["policy"].get("task_frame_parser_model", "stub")))
     search_agent = EpistemicAgent(agent_cfg,
                                   answerer=build_live_answerer("search", model=answer_model,
-                                                               cache=cache, armed=True))
+                                                               cache=cache, armed=True),
+                                  task_frame_parser=tf_parser)
     cb_agent = EpistemicAgent(agent_cfg,
                               answerer=build_live_answerer("closed_book", model=answer_model,
-                                                           cache=cache, armed=True))
+                                                           cache=cache, armed=True),
+                              task_frame_parser=tf_parser)
     resume = (json.loads(Path(args.resume_from_snapshot).read_text())
               if args.resume_from_snapshot else None)
 

@@ -412,3 +412,57 @@ Metrics add `evidence_progress_per_action`, `read_value_precision`,
 `hypothesis_rejection_counts`, and `final_answer_supported_by_constraints_rate`.
 Policy memory remains **answer-free**: only the route/query/verify/stop policy is
 learned; no slot value, candidate, or answer text is ever written.
+
+### Level 4b: optional LLM task-frame parser (cached, validated, fallback-safe)
+
+The deterministic v0 parser proved the constraint-satisfaction architecture, but
+**parse quality is the limiting factor**: on live BrowseComp it mis-types slots,
+attaches constraints to the wrong slot, and promotes a source/context entity to a
+target (e.g. searching "Infectious Diseases" university for the WHO report, or
+binding Friends/Schwimmer too early on a TV-series item). The frame, planner, and
+hypothesis machinery are sound — the *frame* is wrong.
+
+`agent/llm_task_frame.py` adds an **optional** LLM parser (`--enable-llm-task-frame-parser`,
+default off; requires `--enable-task-frame`). It produces task **state only** and
+emits the **same `TaskFrame` schema** — there is **no new planner contract**; the
+hypothesis table, evidence ledger, action planner, and read-value gate are
+unchanged. Discipline mirrors the gated LLM query policy:
+
+- **Answer-free / gold-free.** The parser receives only the question text. It must
+  not receive or emit final-answer text; nothing it produces is written to policy
+  memory. The pinned prompt (`prompts.py::task_frame_parser`) explicitly tells the
+  model: *do not answer, do not solve, do not guess entities; only parse into slots
+  and constraints; distinguish known context from unknown variables; the target is
+  the thing asked for (not every entity); attach each clue to the slot it
+  constrains; preserve multi-hop dependencies; do not promote a source/org to a
+  target unless the question asks for it.* It carries generic, non-answering example
+  shapes (TV-series/actor, restaurant/hotel/museum/founder/year, report/foreword/
+  introduction author, paper/journal/census).
+- **Cached + replayable.** Every call goes through a parser cache keyed by
+  `prompt_fingerprint | model | question`. A replay (or any run with no injected
+  `model_fn`) **never calls a model** — a cache miss falls back to the deterministic
+  parser. The cache records `prompt_version`, `prompt_hash`, `model`, `input_hash`,
+  `output_hash`, `parse_quality`, and `validation_errors`.
+- **Schema-validated + fallback-safe.** `validate_payload` enforces: ≥1 target slot;
+  the target role matches the interrogative head where detectable; constraints
+  attach to existing slot ids; dependency edges reference existing slots; no
+  unsupported role/constraint labels; no empty required fields; **known context
+  terms are not also target slots**; and **no gold-like answer text** (a target slot
+  naming a concrete entity absent from the question, or any forbidden `answer`/
+  `final_answer`/`solution` key, is rejected). Any failure — invalid JSON, schema
+  error, or aggregate `parse_quality` below the floor — records a `fallback_reason`
+  and uses the deterministic frame. **The deterministic parser is always the
+  default and the safety net.**
+
+**Parse-quality components** (`score_parse_quality`, each in [0,1], aggregated):
+`target_identification_score`, `constraint_attachment_score`, `dependency_score`,
+`known_context_separation_score`, `slot_coverage_score`, `ambiguity_score`.
+
+Debug (`task_frame_parse` block) and metrics add parser provenance:
+`parser_used` (deterministic|llm), `prompt_version`/`prompt_hash`, `parse_quality`,
+`fallback_reason`, `validation_errors`; aggregates `llm_task_frame_used_count`,
+`llm_task_frame_fallback_count`, `task_frame_parse_quality_mean`,
+`parser_validation_failure_counts`, `deterministic_fallback_rate`,
+`target_slot_role_distribution`, `constraint_attachment_count`. No live model client
+is wired in v0 (offline-safe); a live runner injects a `model_fn` + file-backed
+cache.

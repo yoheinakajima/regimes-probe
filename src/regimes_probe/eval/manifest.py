@@ -121,6 +121,9 @@ def build_manifest(
         "task_frame_enabled": ls.get(
             "task_frame_enabled",
             bool(cfg.get("policy", {}).get("enable_task_frame", False))),
+        "llm_task_frame_parser_enabled": ls.get(
+            "llm_task_frame_parser_enabled",
+            bool(cfg.get("policy", {}).get("enable_llm_task_frame_parser", False))),
         "live_settings": ls,
         "prompts": prompts.registry_dict(),
         # Tool inventory, split by routing role:

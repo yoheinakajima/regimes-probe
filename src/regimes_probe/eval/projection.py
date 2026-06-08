@@ -179,11 +179,16 @@ def build_graph_projection(
             # --- Level 4 task-frame subgraph (when present) ---
             tf = d.get("task_frame") or {}
             if tf:
+                pm = d.get("task_frame_parse") or {}
                 tf_node = g.obj(f"task_frame#{aid}", Objects.TASK_FRAME, {
                     "n_target_slots": len(tf.get("target_answer_slots", [])),
                     "n_latent_slots": len(tf.get("latent_slots", [])),
                     "n_constraints": len(tf.get("constraints", [])),
                     "parse_quality": tf.get("parse_quality"),
+                    "parser_used": pm.get("parser_used", "deterministic"),
+                    "prompt_version": pm.get("prompt_version", ""),
+                    "prompt_hash": pm.get("prompt_hash", ""),
+                    "fallback_reason": pm.get("fallback_reason", ""),
                     "known_context_terms": tf.get("known_context_terms", [])[:8]})
                 g.rel(tf_node, a_node, Relations.FRAME_FOR_ATTEMPT)
                 for s in (tf.get("target_answer_slots", []) + tf.get("latent_slots", [])):

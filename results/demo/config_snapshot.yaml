@@ -77,6 +77,7 @@ memory:
 policy:
   allow_social_scrape: false
   enable_iterative_clue_resolution: false
+  enable_llm_task_frame_parser: false
   enable_query_decomposition: false
   enable_task_frame: false
   query_mode: learned

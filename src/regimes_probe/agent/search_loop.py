@@ -202,6 +202,7 @@ class AttemptTrace:
     task_frame: dict[str, Any] = field(default_factory=dict)
     hypothesis_summary: dict[str, Any] = field(default_factory=dict)
     frame_coverage: dict[str, Any] = field(default_factory=dict)
+    task_frame_parse: dict[str, Any] = field(default_factory=dict)
 
     @property
     def tool_calls(self) -> int:
@@ -235,6 +236,7 @@ class SearchLoopConfig:
     enable_query_decomposition: bool = False
     enable_iterative_clue_resolution: bool = False
     enable_task_frame: bool = False
+    enable_llm_task_frame_parser: bool = False
     scrape_fallback_to_page_fetch: bool = True
     allow_social_scrape: bool = False
 
@@ -250,12 +252,14 @@ class SearchLoop:
         *,
         answerer: Optional[DeterministicAnswerer] = None,
         invoker_factory=None,
+        task_frame_parser=None,
     ) -> None:
         self.router = router
         self.query_policy = query_policy
         self.stopping_policy = stopping_policy
         self.answerer = answerer or DeterministicAnswerer()
         self._invoker_factory = invoker_factory
+        self.task_frame_parser = task_frame_parser
 
     def run(
         self,
@@ -332,11 +336,16 @@ class SearchLoop:
         # iterative beam). Clue terms feed the answer/read gating.
         task_frame = config.enable_task_frame
         frame = htable = planner = None
+        frame_parse_meta: dict[str, Any] = {}
         if task_frame:
-            from regimes_probe.agent.task_frame import parse_task_frame
             from regimes_probe.agent.hypothesis_table import HypothesisTable
             from regimes_probe.agent.action_planner import ActionPlanner, frame_read_value
-            frame = parse_task_frame(item.id, item.question)
+            from regimes_probe.agent.llm_task_frame import build_task_frame
+            frame, _pm = build_task_frame(
+                item.id, item.question,
+                use_llm=config.enable_llm_task_frame_parser,
+                parser=self.task_frame_parser)
+            frame_parse_meta = _pm.to_dict()
             htable = HypothesisTable(frame)
             planner = ActionPlanner(frame, htable)
             if not clue_terms:
@@ -699,4 +708,5 @@ class SearchLoop:
                                  terminal_action=terminal_action.get("kind", ""),
                                  n_actions=len(task_actions))
                             if task_frame and htable is not None else {}),
+            task_frame_parse=(frame_parse_meta if task_frame else {}),
         )

@@ -68,6 +68,18 @@ def main() -> int:
         # Level 4 task frame: target/latent slots, constraints, coverage, hypotheses.
         tf = r.get("task_frame") or {}
         if tf:
+            pm = r.get("task_frame_parse") or {}
+            if pm:
+                line = (f"  PARSER: used={pm.get('parser_used')} "
+                        f"quality={pm.get('parse_quality')}")
+                if pm.get("parser_used") == "llm" or pm.get("prompt_hash"):
+                    line += (f" prompt={pm.get('prompt_version')}#{pm.get('prompt_hash')} "
+                             f"model={pm.get('model')} cache_hit={pm.get('cache_hit')}")
+                if pm.get("fallback_reason"):
+                    line += f" fallback={pm.get('fallback_reason')}"
+                print(line)
+                if pm.get("validation_errors"):
+                    print(f"    validation_errors: {pm.get('validation_errors')[:6]}")
             print(f"  TASK FRAME: targets="
                   f"{[(s['slot_role'], s['slot_name']) for s in tf.get('target_answer_slots', [])]} "
                   f"latent={[(s['slot_role'], s['slot_name']) for s in tf.get('latent_slots', [])]}")

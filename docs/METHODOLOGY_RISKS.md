@@ -234,3 +234,21 @@ set — and the risk surface. Keep the experiment honest:
   given in the question (e.g. an org named in the prompt) must **never** be promoted
   into a target answer slot. Watch `read_value_precision`, `no_progress_action_rate`,
   `repeated_equivalent_query_rate`, and `final_answer_supported_by_constraints_rate`.
+- **The LLM task-frame parser must produce task STATE, not answers.** Letting a model
+  parse the frame (`--enable-llm-task-frame-parser`) is the natural fix for the v0
+  parser's quality ceiling, but it reintroduces every LLM risk and one new one:
+  *the parser could quietly answer the question* (put the gold entity into a target
+  slot) and the agent would then "find" its own guess. Controls: (a) the prompt
+  forbids answering/solving/guessing; (b) `validate_payload` rejects a target slot
+  naming a concrete entity absent from the question and any `answer`/`final_answer`/
+  `solution` key, and rejects known-context-as-target — on any failure the
+  **deterministic parser is used instead** (`fallback_reason` recorded); (c) the
+  parser is **cached + replayable** (keyed by prompt/model/question) so a replay
+  never calls a model and numbers are reproducible — but note the new
+  non-determinism risk at parse time, so log `prompt_version`/`prompt_hash`/`model`
+  and report `deterministic_fallback_rate`; (d) it produces only task state — the
+  answerer/grader/judge prompts and the answer path are unchanged, and nothing the
+  parser emits is written to policy memory. A "win" from the LLM parser is only
+  credible if `task_frame_parse_quality_mean` and frame-grounded action rates rise
+  **and** the closed-book baseline did not already know the answer (the parser must
+  not be smuggling intrinsic knowledge into the frame).

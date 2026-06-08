@@ -138,7 +138,11 @@ attempts run with `policy.enable_task_frame` on (off in the byte-identical demo)
 `hypothesis_supported_by_evidence`, `hypothesis_rejected_by_evidence`,
 `answer_supported_by_hypothesis` — making the constraint graph an auditable
 subgraph: which action tested which constraint on which slot, and which evidence
-advanced or rejected which hypothesis.
+advanced or rejected which hypothesis. The `task_frame` node also carries parser
+provenance (`parser_used` deterministic|llm, `prompt_version`, `prompt_hash`,
+`fallback_reason`) so a reviewer can see whether a frame came from the deterministic
+v0 parser or the optional cached/validated LLM parser (`QUERY_POLICY.md` Level 4b),
+and why it fell back when it did.
 
 **Bounding / safety.** Every attempt gets compact `question_attempt`/
 `answer_attempt`/`grade_result`/`reward_assignment` (+ `failure_regime` when it

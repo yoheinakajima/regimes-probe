@@ -211,6 +211,7 @@ def write_full_report(
         "query_decomposition_enabled": bool(meta.get("query_decomposition_enabled", False)),
         "iterative_clue_resolution_enabled": bool(meta.get("iterative_clue_resolution_enabled", False)),
         "task_frame_enabled": bool(meta.get("task_frame_enabled", False)),
+        "llm_task_frame_parser_enabled": bool(meta.get("llm_task_frame_parser_enabled", False)),
         "leakage_check_details": leakage_details or {},
         "same_conditions": same_conditions or {},
         "condition_specs": condition_specs or {},

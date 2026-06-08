@@ -80,7 +80,26 @@ def _outcome(trace, grade, reward, *, condition: str, budget: int) -> AttemptOut
         iterative=_iterative_stats(trace),
         scrape=_scrape_stats(trace),
         frame=_frame_stats(trace),
+        frame_parse=_frame_parse_stats(trace),
     )
+
+
+def _frame_parse_stats(trace) -> dict:
+    """Per-attempt task-frame parser provenance (deterministic vs LLM)."""
+    meta = getattr(trace, "task_frame_parse", {}) or {}
+    if not meta:
+        return {}
+    tf = getattr(trace, "task_frame", {}) or {}
+    target_roles = [s.get("slot_role") for s in tf.get("target_answer_slots", [])]
+    n_attached = sum(1 for c in tf.get("constraints", []) if c.get("applies_to"))
+    return {
+        "parser_used": meta.get("parser_used", "deterministic"),
+        "parse_quality": meta.get("parse_quality", 0.0),
+        "fallback_reason": meta.get("fallback_reason", ""),
+        "validation_errors": list(meta.get("validation_errors", [])),
+        "target_slot_roles": target_roles,
+        "constraint_attachment_count": n_attached,
+    }
 
 
 def _frame_stats(trace) -> dict:

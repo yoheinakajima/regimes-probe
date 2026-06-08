@@ -5,7 +5,7 @@
   "parent_run_id": null,
   "git": {
     "branch": "claude/regimes-probe-setup-ILfr0",
-    "commit": "99f80b5e69aa53129dd4cc80256587ebb7fe1161",
+    "commit": "9e8660726f7ff2310212bf470529677207285c81",
     "dirty": true
   },
   "dataset": {
@@ -105,6 +105,7 @@
   "query_decomposition_enabled": false,
   "iterative_clue_resolution_enabled": false,
   "task_frame_enabled": false,
+  "llm_task_frame_parser_enabled": false,
   "live_settings": {},
   "prompts": {
     "answerer": {
@@ -137,6 +138,14 @@
       "content_hash": "7014092a3e253215",
       "fingerprint": "query_llm@v1#7014092a",
       "intended_use": "LLM query generation (Level 2; replaceable by templates)",
+      "allowed_to_vary": true
+    },
+    "task_frame_parser": {
+      "name": "task_frame_parser",
+      "version": "v1",
+      "content_hash": "8e9e551642002706",
+      "fingerprint": "task_frame_parser@v1#8e9e5516",
+      "intended_use": "LLM task-frame parsing (Level 4; produces task state, never answers)",
       "allowed_to_vary": true
     }
   },

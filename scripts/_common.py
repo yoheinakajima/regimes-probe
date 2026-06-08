@@ -91,6 +91,7 @@ from regimes_probe.eval.report import ConditionRun, write_full_report
 from regimes_probe.eval.significance import bootstrap_correct_per_tool_call, mcnemar
 from regimes_probe.eval.split import build_split, partition
 from regimes_probe.policy.memory import PolicyMemory
+from regimes_probe.eval.leakage import leakage_check_details
 from regimes_probe.policy.policy_fragment import assert_no_answer_leakage
 
 _REAL_DATASETS = {"BrowseComp", "LiveBrowseComp", "browsecomp", "livebrowsecomp"}
@@ -186,6 +187,7 @@ def full_pipeline(
                                   "n_optimize": len(opt_items)})
 
     runs: list[ConditionRun] = []
+    debug_records: list = []
     aligned: dict[int, tuple] = {}
     replay_log = None
     budget_ok = True
@@ -197,7 +199,7 @@ def full_pipeline(
     cb = run_condition(con_items, cb_agent, providers, PolicyMemory(params.copy()),
                        condition="closed_book", budget=0, weights=weights,
                        explore=False, dataset_version=dataset_version)
-    runs.append(ConditionRun("closed_book", 0, cb.outcomes))
+    runs.append(ConditionRun("closed_book", 0, cb.outcomes)); debug_records += cb.debug
 
     for b in budgets:
         step(f"budget {b}: no_memory_search / policy_memory / random_memory on CONFIRM")
@@ -217,6 +219,7 @@ def full_pipeline(
         runs += [ConditionRun("no_memory_search", b, base.outcomes),
                  ConditionRun("policy_memory", b, pol.outcomes),
                  ConditionRun("random_memory", b, rnd.outcomes)]
+        debug_records += base.debug + pol.debug + rnd.debug
         aligned[b] = (base.outcomes, pol.outcomes, rnd.outcomes)
         budget_ok = budget_ok and all(
             o.tool_calls <= b for o in base.outcomes + pol.outcomes + rnd.outcomes)
@@ -244,12 +247,8 @@ def full_pipeline(
 
     step("headline-eligibility computation")
     snap_dict = snapshot.to_dict()
-    try:
-        assert_no_answer_leakage(snap_dict, "policy_memory_snapshot")
-        leak_ok = not any(g in __import__("json").dumps(snap_dict)
-                          for it in items for g in it.gold_answers() if g)
-    except Exception:
-        leak_ok = False
+    leakage_details = leakage_check_details(snap_dict, items)
+    leak_ok = leakage_details["memory_snapshot_leakage_pass"]
     dataset_is_real = dataset_label in _REAL_DATASETS
     # full_pipeline always runs all four comparison conditions.
     conditions_present = ["closed_book", "no_memory_search", "policy_memory", "random_memory"]
@@ -311,6 +310,7 @@ def full_pipeline(
                                 same_conditions=sc.to_dict(),
                                 condition_specs={"no_memory_search": base_spec.to_dict(),
                                                  "policy_memory": pol_spec.to_dict()},
+                                leakage_details=leakage_details, debug_records=debug_records,
                                 results_root=results_root)
 
     # Run manifest (no secrets) — written for every run dir so any run is

@@ -13,7 +13,7 @@ Each attempt yields an :class:`AttemptOutcome` for the metrics layer.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Optional
 
 from regimes_probe.activegraph_pack.behaviors import (
@@ -37,6 +37,7 @@ class ConditionResult:
     budget: int
     outcomes: list[AttemptOutcome]
     log: EventLog
+    debug: list = field(default_factory=list)   # list[DebugRecord]
 
 
 def _outcome(trace, grade, reward, *, condition: str, budget: int) -> AttemptOutcome:
@@ -88,7 +89,9 @@ def run_condition(
     record_run_start(log, dataset_version=dataset_version, condition=condition,
                      config={"budget": budget, "explore": explore,
                              "update_memory": update_memory})
+    from regimes_probe.eval.debug import build_debug_record
     outcomes: list[AttemptOutcome] = []
+    debug: list = []
     for item in items:
         attempt_id = f"{condition}-b{budget}-{pass_tag}-{item.id}"
         rec = record_attempt(log, "benchmark_run#1", agent, item, memory, providers,
@@ -100,9 +103,13 @@ def run_condition(
         if update_memory:
             record_policy_update(log, memory, sig, attempt_id, reward, rec["trace"],
                                  correct=grade.correct)
-        outcomes.append(_outcome(rec["trace"], grade, reward,
-                                 condition=condition, budget=budget))
-    return ConditionResult(condition=condition, budget=budget, outcomes=outcomes, log=log)
+        outcome = _outcome(rec["trace"], grade, reward, condition=condition, budget=budget)
+        outcomes.append(outcome)
+        debug.append(build_debug_record(item=item, trace=rec["trace"], grade=grade,
+                                        reward=reward, condition=condition, budget=budget,
+                                        outcome=outcome))
+    return ConditionResult(condition=condition, budget=budget, outcomes=outcomes,
+                           log=log, debug=debug)
 
 
 def experience_phase(

@@ -87,6 +87,9 @@ not be verified from this environment (network restricted). See
 | The synthetic result is **not** perfect — residual failures remain so diagnostics are meaningful. | `results/demo/summary.md` (policy accuracy 0.75 at budget 3, not 1.0); `per_question.csv` regime labels. |
 | The regimes loop detects regimes, proposes bounded updates, gates them, and records a promotion decision. | `tests/test_regimes_gates.py`; `results/regimes-demo/policy_updates.json`. |
 | Base model weights are unchanged by construction. | No training/fine-tuning code exists; the only learned state is the bandit/memory. |
+| Frozen-memory leakage is checked the same way the inspector checks it, and is layer-separated: only frozen policy memory gates the headline; the raw audit trace may contain gold by design. | `src/regimes_probe/eval/leakage.py` (`leakage_check_details`); `results/demo/report.json` → `leakage_check_details`; `tests/test_debug_artifacts.py::test_report_leakage_matches_inspector_for_clean_snapshot`, `::test_raw_archive_gold_does_not_fail_policy_memory_leakage`. |
+| `report.json` carries non-empty per-condition metrics plus provider-failure accounting. | `results/demo/report.json` → `metrics`, `provider_failure_rate`, `tool_failures`; `tests/test_debug_artifacts.py::test_report_metrics_populated`, `::test_provider_failures_in_report_and_summary`. |
+| Each run emits a bounded, secret-free `debug_questions.jsonl` and two offline triage scripts read it. | `results/demo/debug_questions.jsonl`; `scripts/debug_run_failures.py`, `scripts/summarize_provider_returns.py`; `tests/test_debug_artifacts.py::test_debug_jsonl_bounded_and_has_previews`, `::test_debug_scripts_run`. |
 
 ## Commands that pass with no keys/network
 
@@ -149,3 +152,4 @@ see `docs/LIVE_LADDER.md`.
 - `results/demo/memory_snapshot.json` — the frozen, answer-free policy memory.
 - `results/demo/replay_check.md` — determinism proof.
 - `results/regimes-demo/policy_updates.json` — promotion/rejection record.
+- `results/demo/debug_questions.jsonl` — bounded, secret-free per-question debug previews (tool sequence, providers, evidence, inferred failure seam); read by `scripts/debug_run_failures.py` and `scripts/summarize_provider_returns.py`.

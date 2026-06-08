@@ -6,6 +6,7 @@
 - **headline_eligible_memory_claim: False**
 - dataset_is_real: False
 - conditions_present: ['closed_book', 'no_memory_search', 'policy_memory', 'random_memory']
+- frozen policy-memory leakage pass: **True** (same check as inspect_memory_snapshot; raw audit trace may contain gold by design and does NOT gate)
 - reasons NOT headline-eligible (memory claim):
   - dataset is a synthetic/placeholder fixture — not a benchmark headline
 - same_conditions (no_memory_search vs policy_memory) ok: True (unexpected diffs: [])

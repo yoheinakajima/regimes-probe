@@ -28,6 +28,7 @@ from regimes_probe.eval.split import build_split, partition
 from regimes_probe.policy.consolidation import consolidate
 from regimes_probe.policy.contextual_bandit import BanditParams
 from regimes_probe.policy.memory import PolicyMemory
+from regimes_probe.eval.leakage import leakage_check_details
 from regimes_probe.policy.policy_fragment import assert_no_answer_leakage
 
 ALL_CONDITIONS = ("closed_book", "no_memory_search", "random_memory", "policy_memory")
@@ -231,6 +232,7 @@ def run_live_pipeline(cfg, items, *, providers, search_agent, cb_agent, cache,
         mode=cfg.get("split", {}).get("mode", "hash"))
     ver = dataset_version
     runs: list[ConditionRun] = []
+    debug_records: list = []
     aligned: dict[int, dict] = {}
     replay_log = None
     budget_ok = True
@@ -240,7 +242,7 @@ def run_live_pipeline(cfg, items, *, providers, search_agent, cb_agent, cache,
         cb = run_condition(con, cb_agent, providers, PolicyMemory(params.copy()),
                            condition="closed_book", budget=0, weights=weights,
                            dataset_version=ver)
-        runs.append(ConditionRun("closed_book", 0, cb.outcomes))
+        runs.append(ConditionRun("closed_book", 0, cb.outcomes)); debug_records += cb.debug
 
     snapshot = None
     if "policy_memory" in conditions:
@@ -267,12 +269,14 @@ def run_live_pipeline(cfg, items, *, providers, search_agent, cb_agent, cache,
                               condition="no_memory_search", budget=b, weights=weights,
                               dataset_version=ver)
             runs.append(ConditionRun("no_memory_search", b, r.outcomes)); per["no_memory_search"] = r
+            debug_records += r.debug
         if "policy_memory" in conditions:
             r = run_condition(con, search_agent, providers,
                               PolicyMemory.from_snapshot(snapshot, frozen=True),
                               condition="policy_memory", budget=b, weights=weights,
                               dataset_version=ver)
             runs.append(ConditionRun("policy_memory", b, r.outcomes)); per["policy_memory"] = r
+            debug_records += r.debug
             if b == gate_budget:
                 replay_log = r.log
         if "random_memory" in conditions:
@@ -281,6 +285,7 @@ def run_live_pipeline(cfg, items, *, providers, search_agent, cb_agent, cache,
                               condition="random_memory", budget=b, weights=weights,
                               dataset_version=ver)
             runs.append(ConditionRun("random_memory", b, r.outcomes)); per["random_memory"] = r
+            debug_records += r.debug
         if replay_log is None and per:
             replay_log = next(iter(per.values())).log
         aligned[b] = per
@@ -302,12 +307,11 @@ def run_live_pipeline(cfg, items, *, providers, search_agent, cb_agent, cache,
 
     replay = replay_check(replay_log).to_dict() if replay_log is not None else {}
     snap_dict = snapshot.to_dict() if snapshot is not None else {}
-    try:
-        assert_no_answer_leakage(snap_dict, "policy_memory_snapshot")
-        leak_ok = not any(g in json.dumps(snap_dict)
-                          for it in items for g in it.gold_answers() if g)
-    except Exception:
-        leak_ok = False
+    # Frozen policy-memory leakage uses the SAME function/payload as
+    # scripts/inspect_memory_snapshot.py (key-based), plus a robust gold scan.
+    # The raw audit trace may contain gold by design and does NOT gate this.
+    leakage_details = leakage_check_details(snap_dict, items)
+    leak_ok = leakage_details["memory_snapshot_leakage_pass"]
 
     # Conditions that actually completed (one ConditionRun per condition×budget).
     conditions_present = sorted({r.condition for r in runs})
@@ -378,7 +382,8 @@ def run_live_pipeline(cfg, items, *, providers, search_agent, cb_agent, cache,
     run_dir = write_full_report(run_id, runs=runs, snapshot=snap_dict, replay=replay,
                                 significance=significance, meta=meta,
                                 eligibility=elig.to_dict(), same_conditions=sc_dict,
-                                condition_specs=specs, results_root=results_root)
+                                condition_specs=specs, leakage_details=leakage_details,
+                                debug_records=debug_records, results_root=results_root)
     cost = estimate_live(conditions, budgets, n_opt=len(opt), n_con=len(con),
                          passes=mem_cfg.get("experience_passes", 4),
                          exp_budget=mem_cfg.get("experience_budget", 5),

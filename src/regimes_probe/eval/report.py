@@ -103,6 +103,8 @@ def write_full_report(
     eligibility: Optional[dict[str, Any]] = None,
     same_conditions: Optional[dict[str, Any]] = None,
     condition_specs: Optional[dict[str, Any]] = None,
+    leakage_details: Optional[dict[str, Any]] = None,
+    debug_records: Optional[list] = None,
     results_root: str | Path = "results",
 ) -> Path:
     """Write every artifact and return the run directory."""
@@ -155,17 +157,26 @@ def write_full_report(
         "headline_eligible": elig.get("headline_eligible_memory_claim",
                                       elig.get("headline_eligible", False)),
         "eligibility": elig,
+        "leakage_check_details": leakage_details or {},
         "same_conditions": same_conditions or {},
         "condition_specs": condition_specs or {},
         "conditions": [
             {"condition": r.condition, "budget": r.budget, "metrics": r.metrics}
             for r in runs
         ],
+        # Aggregate metrics keyed by "condition@budget" so report.json.metrics is
+        # never empty for a completed run.
+        "metrics": {f"{r.condition}@{r.budget}": r.metrics for r in runs},
         "significance": significance or {},
         "promotions": promotions,
         "replay_check": replay or {},
     }
     (run_dir / "report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
+
+    # --- debug_questions.jsonl (bounded previews; never full pages/secrets) ---
+    if debug_records:
+        from regimes_probe.eval.debug import write_debug_jsonl
+        write_debug_jsonl(run_dir / "debug_questions.jsonl", debug_records)
 
     # --- replay_check.md ---
     (run_dir / "replay_check.md").write_text(_replay_md(replay or {}), encoding="utf-8")
@@ -173,7 +184,8 @@ def write_full_report(
     # --- summary.md ---
     (run_dir / "summary.md").write_text(
         _summary_md(run_id, runs, meta, promotions, significance or {}, replay or {},
-                    eligibility or {}, same_conditions or {}, failures_by_tool),
+                    eligibility or {}, same_conditions or {}, failures_by_tool,
+                    leakage_details or {}),
         encoding="utf-8",
     )
     return run_dir
@@ -195,7 +207,8 @@ def _replay_md(replay: dict[str, Any]) -> str:
 
 
 def _summary_md(run_id, runs, meta, promotions, significance, replay,
-                eligibility=None, same_conditions=None, failures_by_tool=None) -> str:
+                eligibility=None, same_conditions=None, failures_by_tool=None,
+                leakage_details=None) -> str:
     eligibility = eligibility or {}
     same_conditions = same_conditions or {}
     lines: list[str] = []
@@ -211,6 +224,13 @@ def _summary_md(run_id, runs, meta, promotions, significance, replay,
       f"{eligibility.get('headline_eligible_memory_claim', eligibility.get('headline_eligible'))}**")
     A(f"- dataset_is_real: {eligibility.get('dataset_is_real')}")
     A(f"- conditions_present: {present}")
+    ld = leakage_details or {}
+    if ld:
+        A(f"- frozen policy-memory leakage pass: **{ld.get('memory_snapshot_leakage_pass')}** "
+          f"(same check as inspect_memory_snapshot; raw audit trace may contain gold by "
+          f"design and does NOT gate)")
+        if ld.get("failed_path"):
+            A(f"  - leakage failed at: `{ld.get('failed_path')}` — {ld.get('message')}")
     reasons = eligibility.get("headline_eligibility_reasons") or eligibility.get("reasons") or []
     if reasons:
         A("- reasons NOT headline-eligible (memory claim):")

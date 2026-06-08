@@ -42,6 +42,7 @@ class EvidenceObservation:
     supports: bool
     asserts: Optional[str]
     content_hash: str
+    title: str = ""           # result title (for debug artifacts)
     fetchable: bool = False   # relevant doc whose assertion is hidden until fetched
     # failed tool-call observation (provider/API error, not a crash)
     failed: bool = False
@@ -117,6 +118,7 @@ def score_observation(
         tool=tool,
         query_arm=query_arm,
         url=result.url,
+        title=result.title or "",
         snippet=result.snippet,
         source_authority=float(result.source_authority),
         published_at=result.published_at,

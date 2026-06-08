@@ -1,0 +1,165 @@
+"""Per-question DEBUG records — bounded previews to diagnose why a run failed.
+
+These carry the question/gold/prediction previews, the tool sequence + provider
+names, per-call result counts and sanitized errors, top evidence (title/url/
+snippet previews), the regime, and an inferred *failure seam*. Previews are
+length-bounded; full pages are never stored. Error messages come from the
+already-sanitized provider ``error_meta`` (no secrets).
+
+This is a debug artifact (``results/{run_id}/debug_questions.jsonl``), separate
+from the answer-free policy memory — it is allowed to contain gold/prediction
+previews for the operator's eyes (live run dirs are git-ignored).
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Any, Optional
+from urllib.parse import urlparse
+
+_PREVIEW = 200          # default chars for question/answer previews
+_SNIPPET = 240          # chars for an evidence snippet preview
+_MAX_EVIDENCE = 4       # top evidence rows kept per question
+
+
+def _prev(s: Optional[str], n: int = _PREVIEW) -> str:
+    if not s:
+        return ""
+    s = " ".join(str(s).split())
+    return s if len(s) <= n else s[: n - 1] + "…"
+
+
+#: Failure seams (ordered most-specific first).
+SEAMS = ("provider_error", "provider_returned_no_results", "evidence_absent",
+         "evidence_not_selected", "answer_extraction", "grader_strictness",
+         "exact_answer_missing", "weak_query", "unknown")
+
+
+def infer_failure_seam(*, correct: bool, abstained: bool, prediction: Optional[str],
+                       gold_norms: list[str], pred_norm: str, n_tool_calls: int,
+                       n_failed_calls: int, n_results: int, found_hit: bool,
+                       support_found: bool) -> str:
+    """Best-effort label for where a wrong/empty answer went off the rails."""
+    if correct:
+        return "ok"
+    if n_failed_calls > 0 and n_results == 0:
+        return "provider_error"
+    if n_failed_calls > 0:
+        return "provider_error"
+    if n_tool_calls > 0 and n_results == 0:
+        return "provider_returned_no_results"
+    if found_hit and not correct:
+        return "answer_extraction"          # had the answer-bearing evidence, answered wrong
+    if abstained or not (prediction and prediction.strip()):
+        return "evidence_absent" if n_results == 0 else "exact_answer_missing"
+    if not support_found:
+        return "evidence_not_selected"      # results returned but none selected as support
+    # prediction present, supported, still wrong: close-but-graded-wrong vs weak query
+    if pred_norm and any(pred_norm in g or g in pred_norm for g in gold_norms if g):
+        return "grader_strictness"
+    if n_results > 0:
+        return "weak_query"
+    return "unknown"
+
+
+@dataclass
+class DebugRecord:
+    item_id: str
+    condition: str
+    budget: int
+    question_preview: str
+    gold_preview: str
+    prediction_preview: str
+    correct: bool
+    abstained: bool
+    tool_sequence: list[str]
+    provider_names: list[str]
+    calls: list[dict[str, Any]]
+    failed_tool_errors: list[dict[str, Any]]
+    evidence: list[dict[str, Any]]
+    regime: str
+    support_found: bool
+    found_hit: bool
+    authority_ok: bool
+    contradiction: bool
+    n_results: int
+    failed_tool_calls: int
+    failure_seam: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return self.__dict__.copy()
+
+
+def build_debug_record(*, item, trace, grade, reward, condition: str, budget: int,
+                       outcome=None, preview: int = _PREVIEW,
+                       snippet_chars: int = _SNIPPET,
+                       max_evidence: int = _MAX_EVIDENCE) -> DebugRecord:
+    """Assemble a bounded debug record from one attempt."""
+    from regimes_probe.regimes.detectors import label_outcome
+
+    calls_info: list[dict[str, Any]] = []
+    failed_errors: list[dict[str, Any]] = []
+    evidence: list[dict[str, Any]] = []
+    n_results = 0
+    for c in trace.calls:
+        n_ok = sum(1 for o in c.observations if not getattr(o, "failed", False))
+        n_results += n_ok
+        calls_info.append({
+            "call_index": c.call_index, "tool": c.tool, "query_arm": c.query_arm,
+            "query_preview": _prev(c.query, preview), "n_results": n_ok,
+            "failed": bool(getattr(c, "failed", False)),
+            "error_type": getattr(c, "error_type", None),
+            "status_code": getattr(c, "status_code", None),
+        })
+        if getattr(c, "failed", False):
+            err_obs = next((o for o in c.observations if getattr(o, "failed", False)), None)
+            failed_errors.append({
+                "tool": c.tool, "error_type": getattr(c, "error_type", None),
+                "status_code": getattr(c, "status_code", None),
+                "message_preview": _prev(getattr(err_obs, "error_message", "") if err_obs else "", preview),
+            })
+        for o in c.observations:
+            if getattr(o, "failed", False) or len(evidence) >= max_evidence:
+                continue
+            evidence.append({
+                "title_preview": _prev(getattr(o, "title", ""), preview),
+                "url": (o.url or "")[:300],
+                "snippet_preview": _prev(o.snippet, snippet_chars),
+                "supports": bool(o.supports),
+                "source_authority": round(float(o.source_authority), 3),
+            })
+
+    gold_norms = [g for g in (grade.gold_norm or [])]
+    pred_norm = grade.prediction_norm or ""
+    seam = infer_failure_seam(
+        correct=grade.correct, abstained=grade.abstained, prediction=trace.final_answer,
+        gold_norms=gold_norms, pred_norm=pred_norm, n_tool_calls=trace.tool_calls,
+        n_failed_calls=sum(1 for c in trace.calls if getattr(c, "failed", False)),
+        n_results=n_results, found_hit=reward.flags.get("found_hit", False),
+        support_found=trace.vstate.support_found)
+
+    gold = "; ".join(item.gold_answers()) if hasattr(item, "gold_answers") else ""
+    return DebugRecord(
+        item_id=item.id, condition=condition, budget=budget,
+        question_preview=_prev(item.question, preview),
+        gold_preview=_prev(gold, preview),
+        prediction_preview=_prev(trace.final_answer, preview),
+        correct=grade.correct, abstained=grade.abstained,
+        tool_sequence=trace.tools_used(), provider_names=sorted(set(trace.tools_used())),
+        calls=calls_info, failed_tool_errors=failed_errors, evidence=evidence,
+        regime=(label_outcome(outcome) if outcome is not None else ""),
+        support_found=trace.vstate.support_found,
+        found_hit=reward.flags.get("found_hit", False),
+        authority_ok=trace.vstate.authority_ok, contradiction=trace.vstate.contradiction,
+        n_results=n_results,
+        failed_tool_calls=sum(1 for c in trace.calls if getattr(c, "failed", False)),
+        failure_seam=seam)
+
+
+def write_debug_jsonl(path, records: list[DebugRecord]) -> None:
+    import json
+    from pathlib import Path
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as fh:
+        for r in records:
+            fh.write(json.dumps(r.to_dict(), sort_keys=True) + "\n")

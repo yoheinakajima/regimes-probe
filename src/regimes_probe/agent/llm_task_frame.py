@@ -83,6 +83,10 @@ class ParserCache:
             except Exception:
                 self._store = {}
 
+    @property
+    def path(self) -> Optional[str]:
+        return self._path
+
     def get(self, key: str) -> Optional[str]:
         return self._store.get(key)
 

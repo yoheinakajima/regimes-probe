@@ -142,7 +142,14 @@ advanced or rejected which hypothesis. The `task_frame` node also carries parser
 provenance (`parser_used` deterministic|llm, `prompt_version`, `prompt_hash`,
 `fallback_reason`) so a reviewer can see whether a frame came from the deterministic
 v0 parser or the optional cached/validated LLM parser (`QUERY_POLICY.md` Level 4b),
-and why it fell back when it did.
+and why it fell back when it did. The LLM parser's model calls flow through the same
+`RecordingCache` as the answerer, so parser parses are recorded/replayed like any
+other tool call (dry-run and replay never call the model), and the report carries
+answer-free parser accounting (`task_frame_parser`: model, model calls, cache
+hits/misses, fallbacks). Whether a final answer is constraint-supported is recorded
+on the attempt's `frame_coverage` (`answer_support_gate` + `missing_support_reasons`)
+from the strict `evaluate_answer_support` gate — so an `answer_supported_by_hypothesis`
+edge reflects supported evidence, not a merely-bound slot.
 
 **Bounding / safety.** Every attempt gets compact `question_attempt`/
 `answer_attempt`/`grade_result`/`reward_assignment` (+ `failure_regime` when it

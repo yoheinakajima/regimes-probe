@@ -251,4 +251,22 @@ set — and the risk surface. Keep the experiment honest:
   parser emits is written to policy memory. A "win" from the LLM parser is only
   credible if `task_frame_parse_quality_mean` and frame-grounded action rates rise
   **and** the closed-book baseline did not already know the answer (the parser must
-  not be smuggling intrinsic knowledge into the frame).
+  not be smuggling intrinsic knowledge into the frame). The parser model is wired
+  through the **same `RecordingCache`** as the answerer (dry-run/replay never call
+  it), defaults to `--answer-model`, and its spend is reported separately
+  (`parser_model_calls`, `parser_cache_hits/misses`, `parser_fallback_count`) so a
+  "win" cannot hide extra model calls. Flags fail closed:
+  `--enable-llm-task-frame-parser` without `--enable-task-frame` is a hard error (no
+  silent downgrade), so a run never quietly does something other than what was asked.
+- **"answer_supported" must mean supported, not "a slot is filled."** An earlier
+  task-frame run reported `target_sup=1.0` / `answer_supported=True` while producing
+  no correct answer — the flag was satisfied by a *bound slot*, not by evidence. That
+  is exactly the kind of self-deception this doc exists to catch: a green internal
+  signal that does not track correctness. The fix is a strict gate
+  (`evaluate_answer_support`) requiring non-contaminated evidence tied to the
+  hypothesis to support the target, the target's discriminative constraint resolved,
+  nothing contradicted, and ≥2 supported constraints; failures are itemized in
+  `missing_support_reasons`. Watch for the inverse failure too: if `answer_support_gate`
+  is frequently True but accuracy stays low, the gate is being met by the *wrong*
+  hypothesis (a parse-quality / constraint-resolution problem), and the gate's
+  `True` rate must not be read as an accuracy proxy.

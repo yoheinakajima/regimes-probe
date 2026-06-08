@@ -689,6 +689,23 @@ class SearchLoop:
         # which never entered the loop body, still produces a candidate.
         candidate = self.answerer.answer(observations, item=item)
         final_answer = candidate.answer
+
+        # Strict answer-support gate (Level 4): a final answer counts as
+        # constraint-supported only when evidence tied to the hypothesis supports
+        # the target — never from slot existence alone.
+        support = None
+        if task_frame and htable is not None:
+            from regimes_probe.agent.action_planner import evaluate_answer_support
+            support = evaluate_answer_support(frame, htable)
+        frame_coverage: dict[str, Any] = {}
+        if task_frame and htable is not None:
+            frame_coverage = dict(
+                htable.coverage(),
+                final_answer_supported_by_constraints=bool(support and support.supported),
+                answer_support_gate=bool(support and support.supported),
+                missing_support_reasons=(support.missing_support_reasons if support else []),
+                terminal_action=terminal_action.get("kind", ""),
+                n_actions=len(task_actions))
         return AttemptTrace(
             attempt_id=attempt_id,
             item_id=item.id,
@@ -702,11 +719,6 @@ class SearchLoop:
             mode="explore" if config.explore else "exploit",
             task_frame=(frame.to_dict() if task_frame and frame is not None else {}),
             hypothesis_summary=(htable.to_debug() if task_frame and htable is not None else {}),
-            frame_coverage=(dict(htable.coverage(),
-                                 final_answer_supported_by_constraints=bool(
-                                     terminal_action.get("kind") == "answer_if_supported"),
-                                 terminal_action=terminal_action.get("kind", ""),
-                                 n_actions=len(task_actions))
-                            if task_frame and htable is not None else {}),
+            frame_coverage=frame_coverage,
             task_frame_parse=(frame_parse_meta if task_frame else {}),
         )

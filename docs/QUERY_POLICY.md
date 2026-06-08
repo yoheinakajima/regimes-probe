@@ -463,6 +463,30 @@ Debug (`task_frame_parse` block) and metrics add parser provenance:
 `fallback_reason`, `validation_errors`; aggregates `llm_task_frame_used_count`,
 `llm_task_frame_fallback_count`, `task_frame_parse_quality_mean`,
 `parser_validation_failure_counts`, `deterministic_fallback_rate`,
-`target_slot_role_distribution`, `constraint_attachment_count`. No live model client
-is wired in v0 (offline-safe); a live runner injects a `model_fn` + file-backed
-cache.
+`target_slot_role_distribution`, `constraint_attachment_count`.
+
+**Live model wiring + strict guardrail.** `--enable-llm-task-frame-parser` is a hard
+error without `--enable-task-frame` (`run_live` exits non-zero *before* writing any
+artifact; the same check lives in `build_agent`) — a user-requested flag is never
+silently downgraded. When enabled, `run_live` injects a `model_fn`
+(`providers.build_task_frame_model_fn`) that calls the parser model through the
+**same `RecordingCache`** as the answerer: a dry-run (un-armed) raises `NotArmed`, a
+replay miss raises `ReplayMiss`, and a successful call is recorded — so **dry-run and
+replay never call the model**, and any failure is caught and falls back to the
+deterministic parser (`fallback_reason=model_error:*`). The parser model defaults to
+`--answer-model`; `--task-frame-parser-model` overrides it. The model parses the
+question into task state only — it is **never** asked to answer. Call accounting
+(answer-free) is reported: `parser_model_calls_estimated` (dry-run),
+`parser_model_calls`, `parser_cache_hits`, `parser_cache_misses`,
+`parser_fallback_count`, `task_frame_parser_model`.
+
+**Answer-support gate.** A final answer counts as constraint-supported
+(`final_answer_supported_by_constraints` / `answer_support_gate`) only via
+`action_planner.evaluate_answer_support`, which requires ALL of: a target-slot
+candidate exists; **non-contaminated** evidence *tied to the selected hypothesis*
+supports the target slot or a found answer-shape hint; the target's
+most-discriminative constraint(s) are resolved (not unresolved); no constraint on a
+bound slot is contradicted; and the hypothesis carries ≥2 supported constraints.
+This closes the earlier bug where a bound slot alone reported `answer_supported=True`
+with no correct answer. When the gate fails, `missing_support_reasons` lists exactly
+which checks failed.

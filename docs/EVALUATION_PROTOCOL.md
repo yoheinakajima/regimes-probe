@@ -231,3 +231,24 @@ parse silently reverts to the deterministic frame — so a comparison stays vali
 when the model is unavailable. The honest read: does a **higher-quality frame**
 (better target identification + constraint attachment) raise frame-grounded action
 rates and `final_answer_supported_by_constraints_rate`, and only then accuracy?
+
+**Live wiring + cost.** The parser model is wired through the same `RecordingCache`
+as the answerer (`build_task_frame_model_fn`); the parser model defaults to
+`--answer-model` (override with `--task-frame-parser-model`). The dry-run plan
+prints and records `parser_model_calls_estimated` (≈ distinct optimize+confirm
+questions, since the parser cache dedups), and the report records the realized
+`parser_model_calls`, `parser_cache_hits`, `parser_cache_misses`,
+`parser_fallback_count`, and `task_frame_parser_model` so the parser's spend and
+fallback rate are auditable alongside the answerer's. `--enable-llm-task-frame-parser`
+without `--enable-task-frame` is a hard configuration error (non-zero exit, no
+artifacts) — flags are never silently downgraded.
+
+**Answer-support is gated, not assumed.** `answer_supported` /
+`final_answer_supported_by_constraints` now comes from a strict gate
+(`evaluate_answer_support`): a bound slot is not enough — non-contaminated evidence
+tied to the hypothesis must support the target, the target's discriminative
+constraint must be resolved, nothing contradicted, and ≥2 constraints supported.
+Audit `missing_support_reasons` to see why an attempt did not earn a supported
+answer; a run whose `answer_support_gate` rate is high but accuracy is low indicates
+the gate is being satisfied by the wrong hypothesis (re-check parse quality and
+constraint resolution), not that the gate is too lax.

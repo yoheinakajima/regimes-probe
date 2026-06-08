@@ -26,7 +26,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(ROOT / "src"))
 
-from _common import bandit_params, load_config, reward_weights
+from _common import (bandit_params, load_config, reward_weights,
+                     validate_task_frame_flags)
 
 from regimes_probe.agent.planner import AgentConfig, EpistemicAgent
 from regimes_probe.live.providers import (
@@ -118,6 +119,9 @@ def main() -> int:
                     help="Use the cached/validated LLM task-frame parser (requires "
                          "--enable-task-frame); falls back to deterministic on "
                          "invalid/low-quality output. Off by default.")
+    ap.add_argument("--task-frame-parser-model", default=None,
+                    help="Model for the LLM task-frame parser (default: --answer-model). "
+                         "Cached/replayable; only used with --enable-llm-task-frame-parser.")
     ap.add_argument("--judge-model", default=None,
                     help="(reserved) LLM judge; grading currently uses exact/normalized match")
     ap.add_argument("--split-seed", default=None)
@@ -149,11 +153,17 @@ def main() -> int:
                          or bool(cfg.get("policy", {}).get("enable_iterative_clue_resolution", False)))
     task_frame_enabled = (args.enable_task_frame
                           or bool(cfg.get("policy", {}).get("enable_task_frame", False)))
-    # The LLM parser only takes effect when the task frame itself is enabled.
-    llm_parser_enabled = (
-        (args.enable_llm_task_frame_parser
-         or bool(cfg.get("policy", {}).get("enable_llm_task_frame_parser", False)))
-        and task_frame_enabled)
+    # The LLM parser REQUIRES the task frame. Fail fast (before writing any
+    # artifacts) on an explicit/config request without it — never silently
+    # downgrade a user-requested flag.
+    llm_parser_requested = (args.enable_llm_task_frame_parser
+                            or bool(cfg.get("policy", {}).get("enable_llm_task_frame_parser", False)))
+    try:
+        validate_task_frame_flags(task_frame=task_frame_enabled, llm_parser=llm_parser_requested)
+    except ValueError as exc:
+        print(f"=== run_live: REFUSING (configuration error) ===\n{exc}")
+        return 2
+    llm_parser_enabled = llm_parser_requested
 
     # Resolve models + tools from mode/CLI/config/env (cheap-first; OpenAI hosted
     # web_search is opt-in, never a silent default).
@@ -179,6 +189,13 @@ def main() -> int:
     cfg.setdefault("policy", {})["enable_iterative_clue_resolution"] = iterative_enabled
     cfg.setdefault("policy", {})["enable_task_frame"] = task_frame_enabled
     cfg.setdefault("policy", {})["enable_llm_task_frame_parser"] = llm_parser_enabled
+    # Parser model defaults to the answer model unless explicitly overridden.
+    task_frame_parser_model = (args.task_frame_parser_model
+                               or cfg.get("policy", {}).get("task_frame_parser_model")
+                               or settings.answer_model)
+    if llm_parser_enabled:
+        cfg["policy"]["task_frame_parser_model"] = task_frame_parser_model
+        settings.task_frame_parser_model = task_frame_parser_model
     tools = settings.tools
     search_tools = settings.search_tools
     answer_model = settings.answer_model
@@ -242,6 +259,10 @@ def main() -> int:
     print(f"estimated answerer calls={plan.cost['answerer_calls']}  "
           f"worst-case tool calls={plan.cost['worst_case_tool_calls']}  "
           f"max_calls_by_tool={plan.cost['max_calls_by_tool']}")
+    if llm_parser_enabled:
+        print(f"task-frame parser: model={task_frame_parser_model}  "
+              f"estimated model calls={plan.cost.get('parser_model_calls_estimated')} "
+              f"(cached/replayable; dry-run makes none)")
     ep = plan.eligibility_preflight
     print(f"structurally_valid(preflight)={ep.get('structurally_valid')}  "
           f"headline_eligible_memory_claim(preflight)={ep.get('headline_eligible_memory_claim')} "
@@ -286,16 +307,19 @@ def main() -> int:
                                 cfg["policy"].get("scrape_fallback_to_page_fetch", True)),
                             allow_social_scrape=bool(cfg["policy"].get("allow_social_scrape", False)),
                             as_of=cfg.get("run", {}).get("as_of", "2026-06-01"))
-    # Cached/replayable task-frame parser (Level 4). No live model client is wired
-    # here; with model_fn=None it is cache/replay-only and falls back to the
-    # deterministic parser on a cache miss.
+    # Cached/replayable task-frame parser (Level 4b). The model_fn routes through
+    # the SAME RecordingCache as the answerer (dry-run raises, replay reads cache,
+    # success is recorded); the parser's own ParserCache file dedups parses across
+    # conditions/passes. Any model failure -> deterministic fallback.
     tf_parser = None
     if llm_parser_enabled:
         from regimes_probe.agent.llm_task_frame import LLMTaskFrameParser, ParserCache
+        from regimes_probe.live.providers import build_task_frame_model_fn
         cache_path = str(Path(plan.run_dir) / "task_frame_parser_cache.json")
+        tf_model_fn = build_task_frame_model_fn(task_frame_parser_model, cache, armed=True)
         tf_parser = LLMTaskFrameParser(
-            model_fn=None, cache=ParserCache(cache_path),
-            model=str(cfg["policy"].get("task_frame_parser_model", "stub")))
+            model_fn=tf_model_fn, cache=ParserCache(cache_path),
+            model=task_frame_parser_model)
     search_agent = EpistemicAgent(agent_cfg,
                                   answerer=build_live_answerer("search", model=answer_model,
                                                                cache=cache, armed=True),
@@ -315,7 +339,7 @@ def main() -> int:
         results_root=args.results_root, dataset_label=label, dataset_version=version,
         dataset_path=ds_path, is_real=is_real, search_tools=search_tools,
         weights=reward_weights(cfg), params=bandit_params(cfg), resume_snapshot=resume,
-        live_settings=settings.to_dict())
+        live_settings=settings.to_dict(), task_frame_parser=tf_parser)
     el = result["eligibility"]
     print(f"run dir: {result['run_dir']}")
     print(f"cache: {result['cache']}")

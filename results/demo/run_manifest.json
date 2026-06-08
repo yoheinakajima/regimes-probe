@@ -5,7 +5,7 @@
   "parent_run_id": null,
   "git": {
     "branch": "claude/regimes-probe-setup-ILfr0",
-    "commit": "9e8660726f7ff2310212bf470529677207285c81",
+    "commit": "af97c39c704ca3a559bedeafa8d8996be042f7cf",
     "dirty": true
   },
   "dataset": {
@@ -106,6 +106,7 @@
   "iterative_clue_resolution_enabled": false,
   "task_frame_enabled": false,
   "llm_task_frame_parser_enabled": false,
+  "task_frame_parser_model": null,
   "live_settings": {},
   "prompts": {
     "answerer": {

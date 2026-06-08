@@ -258,6 +258,41 @@ def build_live_answerer(kind: str, *, model: str, cache: RecordingCache, armed: 
     return LiveAnswerer(model, cache, armed=armed)
 
 
+def build_task_frame_model_fn(model: str, cache: RecordingCache, *, armed: bool):
+    """A cached/replayable ``model_fn(prompt)->str`` for the LLM task-frame parser.
+
+    Routes through the same :class:`RecordingCache` as the answerer: a dry-run
+    (un-armed) raises :class:`NotArmed`, a replay miss raises :class:`ReplayMiss`,
+    and a successful call is recorded. The parser catches any exception and falls
+    back to the deterministic parser (recording ``fallback_reason``). The model is
+    NOT called to answer the question — only to parse it into task state.
+    """
+    def _model_fn(prompt_text: str) -> str:
+        from regimes_probe.agent import prompts
+        meta = {"model": model, "prompt": prompts.fingerprint("task_frame_parser"),
+                "input": prompt_text}
+        h = cache.request_hash("openai_responses_task_frame", model, meta)
+        entry = cache.get(h)
+        if entry and cache.mode in ("auto", "replay"):
+            cache.hits += 1
+            return entry["response"].get("text", "")
+        if cache.mode == "replay":
+            raise ReplayMiss("task_frame_parser: no cached response (replay mode)")
+        if not armed:
+            raise NotArmed("task_frame_parser: refusing to call model in dry-run "
+                           "(pass --execute to arm live calls)")
+        from openai import OpenAI  # local import: never at module load
+        client = OpenAI()
+        resp = client.responses.create(model=model, input=prompt_text)
+        text = (getattr(resp, "output_text", "") or "").strip()
+        cache.calls += 1
+        if cache.mode != "off":
+            cache.store(h, provider="openai_responses_task_frame", name=model,
+                        request_meta=meta, response_payload={"text": text})
+        return text
+    return _model_fn
+
+
 def missing_keys(tool_names: list[str], *, answer_model_needs_openai: bool = True) -> list[str]:
     """Env-var NAMES that are required but absent (for execute/strict errors)."""
     needed: set[str] = set()

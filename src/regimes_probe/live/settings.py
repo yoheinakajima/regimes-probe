@@ -62,6 +62,7 @@ class LiveSettings:
     iterative_clue_resolution_enabled: bool = False
     task_frame_enabled: bool = False
     llm_task_frame_parser_enabled: bool = False
+    task_frame_parser_model: Optional[str] = None
     missing_search_keys: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
@@ -110,6 +111,7 @@ class LiveSettings:
             "iterative_clue_resolution_enabled": self.iterative_clue_resolution_enabled,
             "task_frame_enabled": self.task_frame_enabled,
             "llm_task_frame_parser_enabled": self.llm_task_frame_parser_enabled,
+            "task_frame_parser_model": self.task_frame_parser_model,
             "provider_classes": self.provider_classes(),
             "tools_meta": self.tools_meta(),
             "missing_search_keys": self.missing_search_keys,
@@ -239,5 +241,5 @@ def resolve_live_settings(
         query_decomposition_enabled=enable_query_decomposition,
         iterative_clue_resolution_enabled=enable_iterative_clue_resolution,
         task_frame_enabled=enable_task_frame,
-        llm_task_frame_parser_enabled=enable_llm_task_frame_parser and enable_task_frame,
+        llm_task_frame_parser_enabled=enable_llm_task_frame_parser,
         missing_search_keys=sorted(set(missing)), notes=notes, warnings=warnings)

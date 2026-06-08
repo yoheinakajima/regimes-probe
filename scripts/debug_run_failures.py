@@ -70,13 +70,15 @@ def main() -> int:
         if tf:
             pm = r.get("task_frame_parse") or {}
             if pm:
-                line = (f"  PARSER: used={pm.get('parser_used')} "
-                        f"quality={pm.get('parse_quality')}")
-                if pm.get("parser_used") == "llm" or pm.get("prompt_hash"):
-                    line += (f" prompt={pm.get('prompt_version')}#{pm.get('prompt_hash')} "
-                             f"model={pm.get('model')} cache_hit={pm.get('cache_hit')}")
+                used = pm.get("parser_used")
+                used_label = ("fallback" if (used == "deterministic" and pm.get("fallback_reason"))
+                              else used)
+                line = (f"  PARSER: used={used_label} model={pm.get('model')} "
+                        f"quality={pm.get('parse_quality')} cache_hit={pm.get('cache_hit')}")
+                if used == "llm" or pm.get("prompt_hash"):
+                    line += f" prompt={pm.get('prompt_version')}#{pm.get('prompt_hash')}"
                 if pm.get("fallback_reason"):
-                    line += f" fallback={pm.get('fallback_reason')}"
+                    line += f" fallback_reason={pm.get('fallback_reason')}"
                 print(line)
                 if pm.get("validation_errors"):
                     print(f"    validation_errors: {pm.get('validation_errors')[:6]}")
@@ -90,8 +92,11 @@ def main() -> int:
             print(f"    coverage: slot_res={cov.get('slot_resolution_rate')} "
                   f"constraint_sup={cov.get('constraint_support_rate')} "
                   f"target_sup={cov.get('target_slot_support_rate')} "
-                  f"terminal={cov.get('terminal_action')} "
+                  f"terminal={cov.get('terminal_action')}")
+            print(f"    answer_support_gate={cov.get('answer_support_gate')} "
                   f"answer_supported={cov.get('final_answer_supported_by_constraints')}")
+            if cov.get("missing_support_reasons"):
+                print(f"    missing_support_reasons: {cov.get('missing_support_reasons')[:6]}")
             for h in (r.get("hypothesis_summary") or {}).get("top_hypotheses", [])[:3]:
                 print(f"    hyp {h['hypothesis_id']}: {h['slot_assignments']} "
                       f"support={h['support_score']} conf={h['confidence_score']} active={h['active']}")

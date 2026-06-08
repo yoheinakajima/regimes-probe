@@ -118,6 +118,11 @@ def estimate_live(conditions, budgets, *, n_opt, n_con, passes, exp_budget, judg
         "experience_attempts": exp_attempts,
         "closed_book_attempts": cb_attempts,
         "search_attempts": search_attempts,
+        # LLM task-frame parser model-call estimate (cache dedups by question, so the
+        # upper bound is the number of distinct optimize+confirm questions parsed).
+        "parser_model_calls_estimated": (
+            (n_opt + n_con) if s.get("llm_task_frame_parser_enabled") else 0),
+        "task_frame_parser_model": s.get("task_frame_parser_model"),
         "warnings": list(s.get("warnings", [])),
         "estimated_cost_usd": "unknown",
     }
@@ -245,6 +250,7 @@ def run_live_pipeline(cfg, items, *, providers, search_agent, cb_agent, cache,
                       resume_snapshot: Optional[dict] = None,
                       live_settings: Optional[dict] = None,
                       parent_run_id: Optional[str] = None,
+                      task_frame_parser=None,
                       offline_fork: bool = False) -> dict[str, Any]:
     """Execute the requested conditions. Providers/agents are injected (mockable).
 
@@ -410,6 +416,9 @@ def run_live_pipeline(cfg, items, *, providers, search_agent, cb_agent, cache,
         "llm_task_frame_parser_enabled": ls.get(
             "llm_task_frame_parser_enabled",
             bool(cfg.get("policy", {}).get("enable_llm_task_frame_parser", False))),
+        # LLM task-frame parser accounting (answer-free): model calls + cache + fallbacks.
+        "task_frame_parser": (task_frame_parser.stats() if task_frame_parser is not None
+                              else {}),
         "tools_enabled": search_tools, "embedder": "hash_embedder",
         "dataset": dataset_label, "dataset_version": ver,
         "split": split.to_dict() | {"optimize_ids": "...", "confirm_ids": "..."},

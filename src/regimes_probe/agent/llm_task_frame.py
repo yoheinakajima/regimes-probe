@@ -386,9 +386,22 @@ class LLMTaskFrameParser:
         self.model = model
         self.prompt = prompts.get(prompt_name)
         self.replay_only = replay_only
+        # accounting (read into report/manifest by the runner)
+        self.model_calls = 0
+        self.cache_hits = 0
+        self.cache_misses = 0
+        self.fallback_count = 0
 
     def _input_hash(self, question: str) -> str:
         return _sha(f"{self.prompt.fingerprint()}|{self.model}|{question.strip()}")
+
+    def stats(self) -> dict[str, Any]:
+        """Answer-free parser accounting (model calls / cache / fallbacks)."""
+        return {"task_frame_parser_model": self.model,
+                "parser_model_calls": self.model_calls,
+                "parser_cache_hits": self.cache_hits,
+                "parser_cache_misses": self.cache_misses,
+                "parser_fallback_count": self.fallback_count}
 
     def parse(self, item_id: str, question: str) -> tuple[Optional[TaskFrame], ParseMeta]:
         """Attempt an LLM parse. Returns (frame|None, meta); None means: fall back."""
@@ -398,16 +411,21 @@ class LLMTaskFrameParser:
         raw = self.cache.get(meta.input_hash)
         if raw is not None:
             meta.cache_hit = True
+            self.cache_hits += 1
         else:
+            self.cache_misses += 1
             if self.replay_only or self.model_fn is None:
                 meta.fallback_reason = ("cache_miss_in_replay" if self.replay_only
                                         else "no_model_available")
+                self.fallback_count += 1
                 return None, meta
             prompt_text = f"{self.prompt.content}\n\nQUESTION:\n{question.strip()}"
             try:
+                self.model_calls += 1
                 raw = self.model_fn(prompt_text)
             except Exception as exc:  # model error -> deterministic fallback
                 meta.fallback_reason = f"model_error:{type(exc).__name__}"
+                self.fallback_count += 1
                 return None, meta
             self.cache.put(meta.input_hash, raw or "")
         meta.output_hash = _sha(raw or "")
@@ -415,11 +433,13 @@ class LLMTaskFrameParser:
         payload = _extract_json(raw or "")
         if payload is None:
             meta.fallback_reason = "invalid_json"
+            self.fallback_count += 1
             return None, meta
         errors = validate_payload(payload, question)
         meta.validation_errors = errors
         if errors:
             meta.fallback_reason = "validation_failed"
+            self.fallback_count += 1
             return None, meta
         frame = _frame_from_payload(item_id, payload)
         frame.dependency_edges = _build_edges(payload)
@@ -432,6 +452,7 @@ class LLMTaskFrameParser:
         meta.parse_quality_components = comps
         if quality < MIN_LLM_PARSE_QUALITY:
             meta.fallback_reason = "low_quality"
+            self.fallback_count += 1
             return None, meta
         return frame, meta
 

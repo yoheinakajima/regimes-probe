@@ -50,6 +50,87 @@ class EpistemicAction:
 
 
 @dataclass
+class AnswerSupportResult:
+    """Strict gate: may the agent answer from the current hypothesis + evidence?
+
+    Answering must be tied to *supported evidence*, not to a slot merely being
+    bound. ``missing_support_reasons`` is empty iff ``supported`` is True.
+    """
+    supported: bool
+    hypothesis_id: Optional[str] = None
+    target_candidate: Optional[str] = None
+    support_score: float = 0.0
+    missing_support_reasons: list[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"answer_supported": self.supported,
+                "hypothesis_id": self.hypothesis_id,
+                "target_candidate": self.target_candidate,
+                "support_score": round(self.support_score, 3),
+                "missing_support_reasons": list(self.missing_support_reasons)}
+
+
+def evaluate_answer_support(frame, table, best=None) -> AnswerSupportResult:
+    """Decide whether a final answer is *supported by the question's constraints*.
+
+    ``answer_supported`` is True only when ALL hold (else each failing check adds a
+    reason): a target slot candidate exists; non-contaminated evidence tied to the
+    selected hypothesis explicitly supports the target slot or a found answer-shape
+    hint; the target's most-discriminative constraint(s) are resolved (not
+    unresolved); no constraint on a bound slot is contradicted; and the hypothesis
+    carries at least ``_MIN_SUPPORT_TO_ANSWER`` supported constraints. This guards
+    against the failure where a slot is bound but nothing actually supports it.
+    """
+    best = best if best is not None else table.best_hypothesis()
+    reasons: list[str] = []
+    tgt = frame.target_answer_slots[0] if frame.target_answer_slots else None
+    if tgt is None:
+        return AnswerSupportResult(False, missing_support_reasons=["no_target_slot"])
+    if best is None:
+        return AnswerSupportResult(False, missing_support_reasons=["no_active_hypothesis"])
+
+    cand_id = best.slot_assignments.get(tgt.slot_id)
+    cand_text = table.candidate_text(cand_id) if cand_id else None
+    if not cand_id:
+        reasons.append("target_slot_unbound")
+
+    # (1) clean, hypothesis-tied evidence that supports the target slot or answer shape.
+    ev_ids = set(best.evidence_ids)
+    clean = [e for e in getattr(table, "evidence", [])
+             if e.evidence_id in ev_ids and float(getattr(e, "contamination_score", 0.0)) == 0.0
+             and (tgt.slot_id in getattr(e, "supports_slot_ids", [])
+                  or getattr(e, "answer_shape_hints_found", []))]
+    if not clean:
+        reasons.append("no_clean_evidence_supports_target_or_answer_shape")
+
+    # (2) the target's most-discriminative constraint(s) must be resolved.
+    tgt_cons = [c for c in frame.constraints
+                if tgt.slot_id in c.applies_to and c.constraint_type != "answer_shape"]
+    if tgt_cons:
+        top = max(c.discriminative_score for c in tgt_cons)
+        high = [c for c in tgt_cons if c.discriminative_score >= top - 1e-9]
+        unresolved_high = [c.constraint_id for c in high if c.status != "resolved"]
+        if unresolved_high:
+            reasons.append("high_priority_constraint_unresolved:" + ",".join(unresolved_high))
+
+    # (3) no constraint on a bound slot is contradicted.
+    bound = set(best.slot_assignments) | {tgt.slot_id}
+    contradicted = [c.constraint_id for c in frame.constraints
+                    if c.status == "contradicted" and (set(c.applies_to) & bound)]
+    if contradicted:
+        reasons.append("constraints_contradicted:" + ",".join(contradicted))
+
+    # (4) the hypothesis must carry enough supported constraints (tied to it).
+    if best.support_score < _MIN_SUPPORT_TO_ANSWER:
+        reasons.append("insufficient_constraint_support")
+
+    return AnswerSupportResult(
+        supported=not reasons, hypothesis_id=best.hypothesis_id,
+        target_candidate=cand_text, support_score=best.support_score,
+        missing_support_reasons=reasons)
+
+
+@dataclass
 class ReadValueDecision:
     should_read: bool
     target_slot_id: Optional[str] = None
@@ -143,6 +224,7 @@ class ActionPlanner:
         self._ac = 0
         self._query_hashes: set[str] = set()
         self._slot_attempts: dict[str, int] = {}
+        self.last_answer_support: Optional[AnswerSupportResult] = None
 
     def _next_id(self) -> str:
         self._ac += 1
@@ -165,13 +247,15 @@ class ActionPlanner:
         best = t.best_hypothesis()
         tgt_slot = f.target_answer_slots[0] if f.target_answer_slots else None
 
-        # 1. Answer if the target hypothesis has enough supported constraints.
-        if best and tgt_slot and tgt_slot.slot_id in best.slot_assignments \
-                and best.support_score >= _MIN_SUPPORT_TO_ANSWER:
+        # 1. Answer only when the strict support gate passes (supported evidence
+        #    tied to the hypothesis — not merely a bound slot).
+        supp = evaluate_answer_support(f, t, best)
+        self.last_answer_support = supp
+        if supp.supported and tgt_slot:
             return EpistemicAction(self._next_id(), "answer_if_supported",
                                    target_slot_id=tgt_slot.slot_id,
-                                   hypothesis_id=best.hypothesis_id,
-                                   rationale="target slot bound with supported constraints")
+                                   hypothesis_id=best.hypothesis_id if best else None,
+                                   rationale="target bound + evidence supports target/constraints")
         # 2. Abstain when out of budget and no supported path exists.
         if budget_remaining <= 0 or (not f.unresolved_constraints and not best
                                      and not f.all_slots):

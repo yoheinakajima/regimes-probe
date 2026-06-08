@@ -89,6 +89,11 @@ class LiveSettings:
         return {
             "provider_mode": self.provider_mode,
             "tools": self.tools,
+            # First-hop (search) bandit arms vs URL-only follow-up tools. Only the
+            # first-hop arms are routed/learned; follow-up tools (page_fetch/scrape)
+            # run on a URL from evidence and are NOT bandit arms.
+            "first_hop_tools": self.first_hop_tools,
+            "followup_tools": self.followup_tools,
             "answer_model": self.answer_model,
             "web_search_model": self.web_search_model,
             "web_search_context_size": self.web_search_context_size,

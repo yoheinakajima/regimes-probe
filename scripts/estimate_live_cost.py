@@ -71,7 +71,9 @@ def main() -> int:
     print(f"  answerer model         : {est['answer_model']}")
     print(f"  web_search model/ctx   : {est['web_search_model']} / {est['web_search_context_size']}"
           f"  (enabled={est['openai_web_search_enabled']})")
-    print(f"  enabled tools (arms)   : {est['enabled_tools']}")
+    print(f"  first-hop bandit arms  : {est.get('first_hop_tools')}")
+    print(f"  follow-up tools (URL)  : {est.get('followup_tools')}  (not bandit arms)")
+    print(f"  all enabled tools      : {est.get('all_enabled_tools', est['enabled_tools'])}")
     print(f"  provider classes       : {est.get('provider_classes')}")
     print(f"  flags                  : agentic_discovery={est.get('agentic_tool_discovery_enabled')} "
           f"scrape={est.get('scrape_tools_enabled')} browserish={est.get('browserish_tools_enabled')} "
@@ -83,6 +85,8 @@ def main() -> int:
     print(f"  answerer calls         : {est['answerer_calls']}")
     print(f"  judge calls (LLM)      : {est['judge_calls']}")
     print(f"  worst-case tool calls  : {est['worst_case_tool_calls']}")
+    print(f"    ├─ first-hop search (≤): {est.get('worst_case_first_hop_calls')}")
+    print(f"    └─ follow-up fetch (≤) : {est.get('worst_case_followup_calls')}  (shares the budget)")
     print(f"  max calls by tool      : {est['max_calls_by_tool']}")
     print(f"  estimated cost (USD)   : {est['estimated_cost_usd']}")
     for n in settings.notes:

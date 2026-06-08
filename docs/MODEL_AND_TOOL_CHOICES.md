@@ -13,15 +13,21 @@ providers/tools** — NOT OpenAI hosted browsing. The live defaults are
 
 Three `--search-provider-mode`s:
 
-- **`cheap`** (default) — answerer `gpt-5.4-mini`; search = `page_fetch` + any
-  low-cost external adapter whose key is present (Serper/Brave/Tavily/Exa). OpenAI
-  `web_search` is **not** added. With no external key, the run **explains which env
-  vars are needed** instead of falling back to expensive hosted search.
-- **`diverse`** (the **main experiment**) — `page_fetch` + every external adapter
-  with a key, plus OpenAI `web_search` as **one arm among many** (unless disabled).
-  The router/bandit sees each provider as a separate arm.
+First-hop **search** providers are the bandit arms (one per provider). `page_fetch`
+(and scrape tools) are **follow-up** tools: they operate on a URL returned by a
+search and are *not* bandit arms — the router never routes them first-hop.
+
+- **`cheap`** (default) — answerer `gpt-5.4-mini`; first-hop search arms = any
+  low-cost external adapter whose key is present (Serper/Brave/Tavily/Exa), with
+  `page_fetch` available as a follow-up tool. OpenAI `web_search` is **not** added.
+  With no external key, the run **explains which env vars are needed** instead of
+  falling back to expensive hosted search.
+- **`diverse`** (the **main experiment**) — every external search adapter with a
+  key, plus OpenAI `web_search` as **one arm among many** (unless disabled); the
+  router/bandit sees each **search** provider as a separate first-hop arm.
+  `page_fetch` remains a follow-up tool, not an arm.
 - **`openai-hosted`** (later **strong/expensive baseline** only) — explicit
-  `openai_web_search` + `page_fetch`; may use `gpt-5.5` if requested.
+  `openai_web_search` first-hop arm + `page_fetch` follow-up; may use `gpt-5.5`.
 
 ## Defaults at a glance
 
@@ -29,7 +35,7 @@ Three `--search-provider-mode`s:
 | --- | --- | --- | --- |
 | Answerer | `gpt-5.4-mini` (OpenAI Responses) | `gpt-5.5` | `--answer-model` / `live.answer_model` |
 | Web-search tool model | `gpt-5.4-mini`, ctx `low` | `gpt-5.5` | `--web-search-model` / `--web-search-context-size` |
-| Search tools | provider-diverse (cheap externals + `page_fetch`) | `openai_web_search` | `--tools` / `--search-provider-mode` |
+| First-hop search arms | provider-diverse cheap externals (`page_fetch` is follow-up only) | `openai_web_search` | `--tools` / `--search-provider-mode` |
 | Embeddings | `HashEmbedder` (tests) | OpenAI embeddings (live) | `live.embedder` |
 
 OpenAI model and tool references:

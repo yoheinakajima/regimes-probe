@@ -24,8 +24,8 @@ class CostEstimate:
     grader_calls: int
     judge_calls: int
     worst_case_tool_calls: int
-    worst_case_search_calls: int
-    worst_case_page_fetch_calls: int
+    worst_case_first_hop_calls: int
+    worst_case_followup_calls: int
     per_condition: dict[str, Any]
     # money (optional)
     prices: dict[str, Any] = field(default_factory=dict)
@@ -42,8 +42,12 @@ class CostEstimate:
             "grader_calls": self.grader_calls,
             "judge_calls": self.judge_calls,
             "worst_case_tool_calls": self.worst_case_tool_calls,
-            "worst_case_search_calls": self.worst_case_search_calls,
-            "worst_case_page_fetch_calls": self.worst_case_page_fetch_calls,
+            # First-hop (search bandit arms) vs follow-up (page_fetch/scrape, URL-
+            # only). They SHARE the budget; a follow-up replaces a first-hop call.
+            "worst_case_first_hop_calls": self.worst_case_first_hop_calls,
+            "worst_case_followup_calls": self.worst_case_followup_calls,
+            # back-compat alias (== first-hop search-arm bound):
+            "worst_case_search_calls": self.worst_case_first_hop_calls,
             "per_condition": self.per_condition,
             "prices": self.prices,
             "estimated_cost_usd": self.estimated_cost_usd,
@@ -57,8 +61,8 @@ class CostEstimate:
             f"  grader calls (exact)   : {self.grader_calls}",
             f"  judge calls (LLM)      : {self.judge_calls}",
             f"  worst-case tool calls  : {self.worst_case_tool_calls}",
-            f"    ├─ search (≤)        : {self.worst_case_search_calls}",
-            f"    └─ page_fetch (≤)    : {self.worst_case_page_fetch_calls}",
+            f"    ├─ first-hop search (≤) : {self.worst_case_first_hop_calls}",
+            f"    └─ follow-up fetch (≤)  : {self.worst_case_followup_calls}  (URL-only; not a bandit arm)",
             f"  estimated cost (USD)   : {self.estimated_cost_usd}",
         ]
         return "\n".join(lines)
@@ -99,10 +103,13 @@ def estimate_calls(
     worst_exp_tools = n_optimize * passes * experience_budget
     worst_confirm_tools = n_confirm * search_conditions * sum_budgets
     worst_case_tool_calls = worst_exp_tools + worst_confirm_tools
-    # Search vs page_fetch is policy-dependent; each is bounded above by the
-    # total (they share the same budget), so report the bound for each.
-    worst_case_search_calls = worst_case_tool_calls
-    worst_case_page_fetch_calls = worst_case_tool_calls
+    # First-hop search arms can be picked every step, so each is bounded by the
+    # full per-attempt budget. A follow-up fetch needs a prior first-hop search to
+    # yield a URL, so at most (budget-1) of each attempt's calls can be follow-ups
+    # — never the full first-hop search budget.
+    tool_attempts = exp_attempts + confirm_search_attempts
+    worst_case_first_hop_calls = worst_case_tool_calls
+    worst_case_followup_calls = max(0, worst_case_tool_calls - tool_attempts)
 
     per_condition = {
         "experience": {"attempts": exp_attempts, "max_tool_calls": worst_exp_tools},
@@ -132,7 +139,7 @@ def estimate_calls(
         experience_budget=experience_budget, answerer_calls=answerer_calls,
         grader_calls=grader_calls, judge_calls=judge_calls,
         worst_case_tool_calls=worst_case_tool_calls,
-        worst_case_search_calls=worst_case_search_calls,
-        worst_case_page_fetch_calls=worst_case_page_fetch_calls,
+        worst_case_first_hop_calls=worst_case_first_hop_calls,
+        worst_case_followup_calls=worst_case_followup_calls,
         per_condition=per_condition, prices=prices, estimated_cost_usd=cost,
     )

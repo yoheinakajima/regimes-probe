@@ -56,8 +56,17 @@ def build_manifest(
     offline_fork: bool = False,
 ) -> dict[str, Any]:
     """Assemble the manifest dict (pure given inputs; git is read locally)."""
+    from regimes_probe.tools.metadata import first_hop_tools as _first_hop
+    from regimes_probe.tools.metadata import followup_tools as _followup
+
     live_cfg = cfg.get("live", {})
     ls = live_settings or {}
+    # All enabled tools and their first-hop/follow-up split. Prefer the resolved
+    # live settings; otherwise derive from search_tools (page_fetch is appended at
+    # runtime as a follow-up tool, so derive both subsets from metadata families).
+    all_enabled_tools = ls.get("tools") or list(search_tools)
+    first_hop_tools_list = ls.get("first_hop_tools") or _first_hop(all_enabled_tools)
+    followup_tools_list = ls.get("followup_tools") or _followup(all_enabled_tools)
     adapters = (tools_cfg or {}).get("adapters", {}) if tools_cfg else {}
     provider_names = sorted(adapters.keys()) or list(search_tools)
     provider_config = {
@@ -105,6 +114,14 @@ def build_manifest(
         "stateful_or_paid_tools_allowed": ls.get("stateful_or_paid_tools_allowed"),
         "live_settings": ls,
         "prompts": prompts.registry_dict(),
+        # Tool inventory, split by routing role:
+        #   all_enabled_tools — every tool the agent may use
+        #   first_hop_tools   — search-family bandit arms (routed/learned)
+        #   followup_tools    — URL-only tools (page_fetch/scrape); NOT bandit arms
+        "all_enabled_tools": list(all_enabled_tools),
+        "first_hop_tools": list(first_hop_tools_list),
+        "followup_tools": list(followup_tools_list),
+        # back-compat: == first-hop search arms (kept for older readers).
         "tools_enabled": list(search_tools),
         "provider_names": provider_names,
         "provider_config": provider_config,

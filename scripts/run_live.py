@@ -189,7 +189,9 @@ def main() -> int:
     print(f"=== run_live ({'EXECUTE' if executing else 'DRY-RUN'}) — dataset={label}, "
           f"run_id={run_id} ===")
     print(f"provider_mode={settings.provider_mode}  conditions={conditions}  budgets={budgets}")
-    print(f"tools (bandit arms)={tools}")
+    print(f"first-hop bandit arms={settings.first_hop_tools}")
+    print(f"follow-up tools (URL-only, not bandit arms)={settings.followup_tools}")
+    print(f"all enabled tools={settings.tools}")
     print(f"provider_classes={settings.provider_classes()}")
     print(f"flags: agentic_discovery={settings.agentic_tool_discovery_enabled} "
           f"scrape={settings.scrape_tools_enabled} browserish={settings.browserish_tools_enabled} "

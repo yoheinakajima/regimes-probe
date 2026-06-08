@@ -5,7 +5,7 @@
   "parent_run_id": null,
   "git": {
     "branch": "claude/regimes-probe-setup-ILfr0",
-    "commit": "c9bccdbcc64c0f68f34712bcf52b371d8af82710",
+    "commit": "6eb00d01cd5c11195f82ad9ecd2797ca0f94da05",
     "dirty": true
   },
   "dataset": {
@@ -137,6 +137,19 @@
       "allowed_to_vary": true
     }
   },
+  "all_enabled_tools": [
+    "generic_web_search",
+    "news_search",
+    "official_domain_search",
+    "brave_search"
+  ],
+  "first_hop_tools": [
+    "generic_web_search",
+    "news_search",
+    "official_domain_search",
+    "brave_search"
+  ],
+  "followup_tools": [],
   "tools_enabled": [
     "generic_web_search",
     "news_search",
@@ -213,8 +226,9 @@
     "grader_calls": 504,
     "judge_calls": 0,
     "worst_case_tool_calls": 2296,
+    "worst_case_first_hop_calls": 2296,
+    "worst_case_followup_calls": 1820,
     "worst_case_search_calls": 2296,
-    "worst_case_page_fetch_calls": 2296,
     "per_condition": {
       "experience": {
         "attempts": 140,

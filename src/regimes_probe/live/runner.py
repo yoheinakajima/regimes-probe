@@ -67,11 +67,24 @@ def estimate_live(conditions, budgets, *, n_opt, n_con, passes, exp_budget, judg
     worst_exp_tools = exp_attempts * exp_budget
     worst_search_tools = n_con * len(search_conds) * sum(budgets)
     worst_tools = worst_exp_tools + worst_search_tools
-    # Each enabled search tool is one bandit arm and could receive up to the full
-    # worst-case tool budget (the router may pick it every time).
+    # Split tools by routing role. First-hop (search) tools are bandit arms: each
+    # could receive up to the full per-attempt budget (the router may pick it every
+    # step). Follow-up tools (page_fetch/scrape) are NOT first-hop arms — they only
+    # fire after a search returns a URL, and they share the SAME budget, so they do
+    # not get the full first-hop search budget on top of it.
+    from regimes_probe.tools.metadata import first_hop_tools as _first_hop
+    from regimes_probe.tools.metadata import followup_tools as _followup
     tools = s.get("tools", [])
-    max_calls_by_tool = {t: (0 if t == "page_fetch" else worst_tools) for t in tools}
-    max_calls_by_tool["page_fetch"] = worst_tools if "page_fetch" in tools else 0
+    first_hop = s.get("first_hop_tools") or _first_hop(tools)
+    followup = s.get("followup_tools") or _followup(tools)
+    # A follow-up needs a prior first-hop search to yield a URL, so at most
+    # budget-1 of each attempt's calls can be follow-ups.
+    worst_followup_calls = max(0, worst_search_tools - n_con * len(search_conds) * len(budgets)) \
+        + max(0, worst_exp_tools - exp_attempts)
+    max_calls_by_tool = {t: worst_tools for t in first_hop}
+    # follow-up tools are capped by the follow-up budget, not the first-hop budget.
+    for t in followup:
+        max_calls_by_tool[t] = worst_followup_calls
     return {
         "conditions": list(conditions),
         "budgets": list(budgets),
@@ -82,6 +95,9 @@ def estimate_live(conditions, budgets, *, n_opt, n_con, passes, exp_budget, judg
         "web_search_context_size": s.get("web_search_context_size"),
         "provider_mode": s.get("provider_mode"),
         "enabled_tools": tools,
+        "all_enabled_tools": list(tools),
+        "first_hop_tools": list(first_hop),
+        "followup_tools": list(followup),
         "provider_classes": s.get("provider_classes", []),
         "tools_meta": s.get("tools_meta", {}),
         "openai_web_search_enabled": s.get("openai_web_search_enabled"),
@@ -93,8 +109,11 @@ def estimate_live(conditions, budgets, *, n_opt, n_con, passes, exp_budget, judg
         "grader_calls": total,
         "judge_calls": total if judge == "llm" else 0,
         "worst_case_tool_calls": worst_tools,
-        "worst_case_search_calls": worst_tools,
-        "worst_case_page_fetch_calls": worst_tools,
+        # First-hop (search) vs follow-up call caps. These SHARE the per-attempt
+        # budget; a follow-up call replaces a first-hop call, it is not extra.
+        "worst_case_first_hop_calls": worst_tools,
+        "worst_case_followup_calls": worst_followup_calls,
+        "worst_case_search_calls": worst_tools,  # back-compat alias of first-hop
         "max_calls_by_tool": max_calls_by_tool,
         "experience_attempts": exp_attempts,
         "closed_book_attempts": cb_attempts,

@@ -14,10 +14,17 @@ a **later strong/expensive baseline only** (rung F), not the default experiment.
 Conventions:
 - Run dir: `results/live/<run_id>/` (`run_id` is auto-derived or `--run-id`).
 - Default models: answerer + web_search tool both `gpt-5.4-mini`, context `low`.
-- Default tools (cheap mode): `page_fetch` + a low-cost external search adapter if
-  its key is present (Serper/Brave/Tavily/Exa). With **no** external key, the run
-  explains which env var to set — it does **not** fall back to OpenAI web_search.
-- `diverse` mode (the main experiment) makes each provider a separate bandit arm.
+- Default tools (cheap mode): a low-cost external **search** adapter if its key is
+  present (Serper/Brave/Tavily/Exa) as the first-hop bandit arm(s), plus
+  `page_fetch` as a **follow-up** tool (URL-only; not a bandit arm). With **no**
+  external key, the run explains which env var to set — it does **not** fall back
+  to OpenAI web_search.
+- `diverse` mode (the main experiment) makes each **search** provider a separate
+  first-hop bandit arm; follow-up tools (`page_fetch`/scrape) are not arms.
+- Dry-run prints `first-hop bandit arms`, `follow-up tools`, and `all enabled
+  tools` separately; the manifest records `first_hop_tools` / `followup_tools` /
+  `all_enabled_tools` (`tools_enabled` is a back-compat alias for the first-hop
+  search arms).
 - Estimated calls below are **worst case** (every attempt uses its full budget);
   the cache reduces real spend on reruns.
 - After any run: generate the audit ledger and conservative claims.
@@ -68,8 +75,10 @@ python scripts/run_live.py --dataset livebrowsecomp --dataset-path PATH \
     --optimize 10 --confirm 20 --budgets 1,3 --search-provider-mode diverse \
     --recording-cache results/live/cache.json --execute
 ```
-- Each enabled provider (Serper/Brave/Tavily/Exa/OpenAI/page_fetch) is a separate
-  bandit arm — this is what regimes-probe is actually testing.
+- Each enabled **search** provider (Serper/Brave/Tavily/Exa/OpenAI) is a separate
+  first-hop bandit arm — this is what regimes-probe is actually testing.
+  `page_fetch` is a **follow-up** tool (runs on a URL from evidence), not a bandit
+  arm, and is not given the first-hop search budget in the cost estimate.
 - Env: `OPENAI_API_KEY` + the search-provider keys you want as arms.
 
 ## D. Small credible run — all four, budgets 1,3,5, 25/50

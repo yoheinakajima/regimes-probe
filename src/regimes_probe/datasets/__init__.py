@@ -8,7 +8,7 @@ from regimes_probe.datasets.base import (
     Item,
     items_to_jsonl,
 )
-from regimes_probe.datasets.browsecomp import BrowseCompAdapter, decrypt, encrypt
+from regimes_probe.datasets.browsecomp import BrowseCompAdapter, decrypt, derive_key, encrypt
 from regimes_probe.datasets.livebrowsecomp import LiveBrowseCompAdapter
 from regimes_probe.datasets.synthetic import SyntheticBrowseAdapter
 
@@ -19,6 +19,7 @@ __all__ = [
     "items_to_jsonl",
     "BrowseCompAdapter",
     "decrypt",
+    "derive_key",
     "encrypt",
     "LiveBrowseCompAdapter",
     "SyntheticBrowseAdapter",

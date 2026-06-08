@@ -25,33 +25,43 @@ from typing import Iterable, Optional
 from regimes_probe.datasets.base import DatasetAdapter, DatasetUnavailable, Item
 
 
-def _derive_keystream(password: str, length: int) -> bytes:
-    """Reproduce simple-evals' keystream: repeated SHA256(password) blocks."""
-    out = bytearray()
-    counter = 0
-    while len(out) < length:
-        block = hashlib.sha256(f"{password}{counter}".encode()).digest()
-        out.extend(block)
-        counter += 1
-    return bytes(out[:length])
+def derive_key(password: str, length: int) -> bytes:
+    """Derive a fixed-length key from ``password`` — EXACTLY as openai/simple-evals.
+
+    key = sha256(password).digest() (32 bytes), repeated/truncated to ``length``::
+
+        key = sha256(password.encode()).digest()
+        return key * (length // len(key)) + key[: length % len(key)]
+
+    (The earlier implementation used per-block ``sha256(f"{password}{counter}")``,
+    which does NOT match the official BrowseComp CSV and would fail to decode it.)
+    """
+    key = hashlib.sha256(password.encode()).digest()
+    return key * (length // len(key)) + key[: length % len(key)]
+
+
+#: Backwards-compatible alias (kept for any external callers).
+_derive_keystream = derive_key
 
 
 def decrypt(ciphertext_b64: str, canary: str) -> str:
-    """Decrypt one base64 XOR-obfuscated field using the row ``canary``.
+    """Decrypt one base64 XOR-obfuscated field using the row ``canary`` (password).
 
-    Raises ``ValueError`` if the payload is not valid base64 / not decodable as
-    UTF-8 — callers convert that into a graceful per-row skip with a count.
+    Matches simple-evals: base64-decode, derive the repeated-SHA256 key, XOR, then
+    UTF-8 decode. Raises ``ValueError``/``UnicodeDecodeError`` if the payload is not
+    valid base64 / not decodable — callers convert that into a graceful per-row
+    skip with a count.
     """
     raw = base64.b64decode(ciphertext_b64)
-    key = _derive_keystream(canary, len(raw))
+    key = derive_key(canary, len(raw))
     plain = bytes(b ^ k for b, k in zip(raw, key))
     return plain.decode("utf-8")
 
 
 def encrypt(plaintext: str, canary: str) -> str:
-    """Inverse of :func:`decrypt` (used by tests for round-trips)."""
+    """Inverse of :func:`decrypt` (XOR is symmetric). Used by tests/fixtures."""
     raw = plaintext.encode("utf-8")
-    key = _derive_keystream(canary, len(raw))
+    key = derive_key(canary, len(raw))
     cipher = bytes(b ^ k for b, k in zip(raw, key))
     return base64.b64encode(cipher).decode("ascii")
 

@@ -56,6 +56,53 @@ def _as_list(v: Any) -> list:
     return list(v) if isinstance(v, (list, tuple)) else [v]
 
 
+#: key-pairs the LLM might use for a dependency edge object (prerequisite -> dependent).
+_EDGE_KEYS = (("from", "to"), ("source", "target"), ("parent", "child"),
+              ("prerequisite", "dependent"), ("src", "dst"), ("head", "tail"),
+              ("depends_on", "slot"))
+
+
+def _parse_edge(edge: Any) -> Optional[tuple[str, str]]:
+    """Extract a (prerequisite, dependent) id pair from any reasonable edge shape.
+
+    The LLM may emit edges as ``["I1","T1"]`` OR as an object
+    ``{"from":"I1","to":"T1"}`` (or source/target, parent/child, …). Returns the two
+    raw ids, or ``None`` if the shape is unrecognizable."""
+    if isinstance(edge, (list, tuple)) and len(edge) == 2:
+        return (str(edge[0]), str(edge[1]))
+    if isinstance(edge, dict):
+        for a, b in _EDGE_KEYS:
+            if a in edge and b in edge:
+                return (str(edge[a]), str(edge[b]))
+        vals = list(edge.values())
+        if len(vals) == 2:
+            return (str(vals[0]), str(vals[1]))
+    return None
+
+
+def _raw_slot_ids(payload: Any) -> tuple[list[str], set[str]]:
+    """All unique raw slot ids the parser emitted, in target-then-latent order."""
+    ordered: list[str] = []
+    if not isinstance(payload, dict):
+        return ordered, set()
+    for s in (payload.get("target_answer_slots") or []) + (payload.get("latent_slots") or []):
+        if isinstance(s, dict):
+            sid = s.get("slot_id")
+            if isinstance(sid, str) and sid and sid not in ordered:
+                ordered.append(sid)
+    return ordered, set(ordered)
+
+
+def _derive_raw_edges(payload: dict) -> list[tuple[str, str]]:
+    """Edges implied by per-slot ``depends_on`` (prerequisite -> dependent), raw ids."""
+    edges: list[tuple[str, str]] = []
+    for s in (payload.get("target_answer_slots") or []) + (payload.get("latent_slots") or []):
+        if isinstance(s, dict) and s.get("slot_id"):
+            for p in _as_list(s.get("depends_on")):
+                edges.append((str(p), str(s["slot_id"])))
+    return edges
+
+
 def _sha(s: str) -> str:
     return hashlib.sha256(s.encode("utf-8")).hexdigest()[:16]
 
@@ -120,6 +167,7 @@ class ParseMeta:
     validation_warnings: list[str] = field(default_factory=list)
     fallback_reason: str = ""
     cache_hit: bool = False
+    id_mapping: dict[str, str] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -136,6 +184,7 @@ class ParseMeta:
             "validation_warnings": list(self.validation_warnings)[:12],
             "fallback_reason": self.fallback_reason,
             "cache_hit": self.cache_hit,
+            "id_mapping": dict(self.id_mapping),
         }
 
 
@@ -266,10 +315,17 @@ def validate_payload(payload: Any, question: str) -> list[str]:
             if not (set(applies) & (target_ids | inter_ids)):
                 errors.append(f"required_constraint_no_target_or_intermediate_slot:{c.get('constraint_id')}")
 
-    for edge in payload.get("dependency_edges", []) or []:    # edges reference real slots
-        if (not isinstance(edge, (list, tuple)) or len(edge) != 2
-                or edge[0] not in slot_ids or edge[1] not in slot_ids):
-            errors.append("dependency_edge_refs_unknown_slot")
+    # Dependency edges may be lists OR objects (from/to, source/target, …); parse the
+    # endpoints flexibly and validate them against the RAW slot-id namespace. An
+    # unparseable SHAPE is not fatal (we fall back to per-slot depends_on); only a
+    # genuinely unknown endpoint id is an error.
+    for edge in payload.get("dependency_edges", []) or []:
+        pe = _parse_edge(edge)
+        if pe is None:
+            continue
+        a, b = pe
+        if a not in slot_ids or b not in slot_ids:
+            errors.append(f"dependency_edge_refs_unknown_slot:{a}->{b}")
 
     kct = payload.get("known_context_terms", []) or []        # known ctx not a target
     target_names = {_norm(str(s.get("slot_name", ""))) for s in targets if isinstance(s, dict)}
@@ -307,7 +363,26 @@ def parser_warnings(payload: Any, question: str) -> list[str]:
                 warns.append(f"unknown_affordance_dropped:{a}")
         if not bool(c.get("required")) and not str(c.get("testable_claim", "")).strip():
             warns.append(f"constraint_missing_testable_claim:{c.get('constraint_id')}")
-    # de-dup, keep order
+
+    # --- id / dependency-edge robustness (advisory; never a fallback) ---
+    _, raw_ids = _raw_slot_ids(payload)
+    for s in (targets + (payload.get("latent_slots") or [])):
+        if isinstance(s, dict):
+            for ref in _as_list(s.get("depends_on")):
+                if str(ref) not in raw_ids:
+                    warns.append(f"unknown_depends_on_ref_dropped:{ref}")
+    for c in (payload.get("constraints") or []):
+        if isinstance(c, dict):
+            for ref in _as_list(c.get("supports_answer_slot_ids")):
+                if str(ref) not in raw_ids:
+                    warns.append(f"unknown_supports_answer_ref_dropped:{ref}")
+    explicit = [pe for pe in (_parse_edge(e) for e in payload.get("dependency_edges") or [])
+                if pe is not None]
+    if any(_parse_edge(e) is None for e in payload.get("dependency_edges") or []):
+        warns.append("dependency_edge_malformed_shape_dropped")
+    derived = _derive_raw_edges(payload)
+    if derived and explicit and set(derived) != set(explicit):
+        warns.append("dependency_edges_inconsistent_with_depends_on:prefer_depends_on")
     return list(dict.fromkeys(warns))
 
 
@@ -315,25 +390,42 @@ def parser_warnings(payload: Any, question: str) -> list[str]:
 def _frame_from_payload(item_id: str, payload: dict, warnings: Optional[list[str]] = None) -> TaskFrame:
     """Construct a TaskFrame from a validated open-world payload.
 
-    Preserves the raw free-form semantics (``semantic_label``/``semantic_facets``/
-    ``raw_parser_output``) AND derives the closed-set ``affordances`` the planner
-    consumes. ``applies_to`` scalars are normalized to lists; unfamiliar slot roles
-    are coerced to "unknown" (recorded as a warning, not a rejection).
+    The parser emits its OWN slot-id namespace (e.g. T1/T2/I1/I2). Those raw ids are
+    validated (above) and then **remapped consistently** to a clean internal namespace
+    (``s0``, ``s1``, … in target-then-latent order); the mapping is applied to every
+    reference — ``slot_id``, ``depends_on``, ``applies_to``, ``supports_answer_slot_ids``,
+    and ``dependency_edges`` — and recorded as ``frame.id_mapping`` (raw -> internal).
+    ``dependency_edges`` are derived from per-slot ``depends_on`` when omitted, and
+    ``depends_on`` is preferred when the two disagree. Free-form semantics are
+    preserved; the closed-set ``affordances`` are derived.
     """
+    warnings = warnings or []
+    ordered_raw, raw_ids = _raw_slot_ids(payload)
+    id_map: dict[str, str] = {rid: f"s{i}" for i, rid in enumerate(ordered_raw)}
+
+    def _m(rid: Any) -> Optional[str]:           # raw id -> internal id (None if unknown)
+        return id_map.get(str(rid))
+
+    def _mlist(raw: Any) -> list[str]:           # remap a ref list, dropping unknowns
+        return [m for m in (_m(x) for x in _as_list(raw)) if m]
+
     def _slot(d: dict, *, target: bool) -> Slot:
         role = str(d.get("slot_role", "unknown"))
         if role not in VALID_ROLES:
             role = "unknown"
+        raw_id = str(d["slot_id"])
         return Slot(
-            slot_id=str(d["slot_id"]),
+            slot_id=id_map.get(raw_id, raw_id),
             slot_name=str(d.get("slot_name", "")).strip(),
             slot_role=role,
             is_target_answer_slot=bool(d.get("is_target_answer_slot", target)),
             is_intermediate_slot=bool(d.get("is_intermediate_slot", not target)),
-            depends_on=[str(x) for x in _as_list(d.get("depends_on"))],
-            expected_evidence_type=str(d.get("expected_evidence_type", role) or role))
+            depends_on=_mlist(d.get("depends_on")),
+            expected_evidence_type=str(d.get("expected_evidence_type", role) or role),
+            raw_slot_id=raw_id)
 
     frame = TaskFrame(item_id=item_id)
+    frame.id_mapping = dict(id_map)
     frame.target_answer_slots = [_slot(s, target=True) for s in payload["target_answer_slots"]]
     frame.latent_slots = [_slot(s, target=False) for s in payload.get("latent_slots", [])]
     target_ids = {s.slot_id for s in frame.target_answer_slots}
@@ -343,8 +435,8 @@ def _frame_from_payload(item_id: str, payload: dict, warnings: Optional[list[str
         terms = [str(t) for t in _as_list(c.get("normalized_terms"))][:10]
         label = str(c.get("semantic_label", "") or c.get("constraint_type", "") or "attribute")
         facets = normalize_facets(label, c.get("semantic_facets"))
-        applies = [str(x) for x in _as_list(c.get("applies_to"))]
-        sup = [str(x) for x in _as_list(c.get("supports_answer_slot_ids"))]
+        applies = _mlist(c.get("applies_to"))
+        sup = _mlist(c.get("supports_answer_slot_ids"))
         con = Constraint(
             constraint_id=str(c["constraint_id"]),
             text_span=str(c.get("text_span", "")).strip(),
@@ -387,16 +479,22 @@ def _frame_from_payload(item_id: str, payload: dict, warnings: Optional[list[str
             con.validation_warnings = [w for w in warnings
                                        if w.endswith(con.constraint_id) or w.startswith("novel_facet")]
         frame.constraints.append(con)
-    frame.dependency_edges = _build_edges(payload)
+
+    # Dependency edges: prefer per-slot depends_on (the more reliable signal); fall
+    # back to explicit edges when no depends_on was emitted. Remap to internal ids and
+    # drop any endpoint that did not survive remapping.
+    derived = _derive_raw_edges(payload)
+    explicit = [pe for pe in (_parse_edge(e) for e in payload.get("dependency_edges") or [])
+                if pe is not None]
+    chosen = derived if derived else explicit
+    seen: set[tuple[str, str]] = set()
+    for a, b in chosen:
+        ia, ib = _m(a), _m(b)
+        if ia and ib and (ia, ib) not in seen:
+            seen.add((ia, ib))
+            frame.dependency_edges.append((ia, ib))
+    frame.validation_warnings = list(warnings)
     return frame
-
-
-def _build_edges(payload: dict) -> list[tuple[str, str]]:
-    edges: list[tuple[str, str]] = []
-    for e in payload.get("dependency_edges", []) or []:
-        if isinstance(e, (list, tuple)) and len(e) == 2:
-            edges.append((str(e[0]), str(e[1])))
-    return edges
 
 
 def score_parse_quality(frame: TaskFrame, question: str) -> tuple[float, dict[str, float]]:
@@ -536,7 +634,7 @@ class LLMTaskFrameParser:
         warnings = parser_warnings(payload, question)
         meta.validation_warnings = warnings
         frame = _frame_from_payload(item_id, payload, warnings)
-        frame.dependency_edges = _build_edges(payload)
+        meta.id_mapping = dict(frame.id_mapping)
         frame.known_context_terms = [str(t) for t in _as_list(payload.get("known_context_terms"))]
         frame.answer_shape_hints = [str(t) for t in _as_list(payload.get("answer_shape_hints"))]
         frame.source_requirements = [str(t) for t in _as_list(payload.get("source_requirements"))]

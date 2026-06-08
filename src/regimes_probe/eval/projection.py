@@ -189,6 +189,7 @@ def build_graph_projection(
                     "prompt_version": pm.get("prompt_version", ""),
                     "prompt_hash": pm.get("prompt_hash", ""),
                     "fallback_reason": pm.get("fallback_reason", ""),
+                    "id_mapping": tf.get("id_mapping", {}),
                     "known_context_terms": tf.get("known_context_terms", [])[:8]})
                 g.rel(tf_node, a_node, Relations.FRAME_FOR_ATTEMPT)
                 # Epistemic escalation decision (front-door mode selection).
@@ -203,6 +204,7 @@ def build_graph_projection(
                 for s in (tf.get("target_answer_slots", []) + tf.get("latent_slots", [])):
                     s_node = g.obj(f"latent_slot#{aid}#{s['slot_id']}", Objects.LATENT_SLOT, {
                         "slot_name": s.get("slot_name"), "slot_role": s.get("slot_role"),
+                        "raw_slot_id": s.get("raw_slot_id", ""),
                         "is_target_answer_slot": s.get("is_target_answer_slot"),
                         "is_intermediate_slot": s.get("is_intermediate_slot")})
                     g.rel(s_node, tf_node, Relations.SLOT_IN_FRAME)

@@ -90,6 +90,8 @@ def main() -> int:
                 print(line)
                 if pm.get("validation_errors"):
                     print(f"    validation_errors: {pm.get('validation_errors')[:6]}")
+                if pm.get("id_mapping"):
+                    print(f"    id_mapping (raw->internal): {pm.get('id_mapping')}")
             print(f"  TASK FRAME: targets="
                   f"{[(s['slot_role'], s['slot_name']) for s in tf.get('target_answer_slots', [])]} "
                   f"latent={[(s['slot_role'], s['slot_name']) for s in tf.get('latent_slots', [])]}")

@@ -295,3 +295,15 @@ set — and the risk surface. Keep the experiment honest:
   `selected_epistemic_mode` vs. correctness and watch for items that were routed to
   direct/simple but should have escalated. Never read "cheaper" as "better" without
   checking the easy/hard split held.
+- **Ingestion bugs masquerade as model failure.** The first open-world live preview
+  fell back to the deterministic parser with `validation_failed`, which *looked* like
+  the model produced a bad frame — but the frame was semantically good; the harness
+  was rejecting the model's own slot-id namespace (`T1`/`I1`) and dict-form
+  `dependency_edges`. The lesson: when a parse falls back, read the raw output and the
+  `validation_errors`/`id_mapping` before blaming the model (the preview now surfaces
+  all of these). The remap (raw ids → internal `s*`) must stay **total and
+  consistent** across every reference — a partial remap would silently drop a
+  constraint's slot link and let the answer-support gate pass on an incomplete frame.
+  Guard: `id_mapping` is recorded and `raw_slot_id` is kept on every slot so a
+  reviewer can re-derive the mapping from the trace; references that do not survive
+  remap (genuinely unknown ids) still fall back rather than being quietly dropped.

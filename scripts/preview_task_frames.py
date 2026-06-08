@@ -30,6 +30,8 @@ from regimes_probe.agent.action_planner import ActionPlanner  # noqa: E402
 from regimes_probe.agent.epistemic_mode import decide_epistemic_mode  # noqa: E402
 from regimes_probe.agent.hypothesis_table import HypothesisTable  # noqa: E402
 from regimes_probe.agent.llm_task_frame import (  # noqa: E402
+    _parse_edge, _raw_slot_ids, _derive_raw_edges)
+from regimes_probe.agent.llm_task_frame import (  # noqa: E402
     LLMTaskFrameParser, ParserCache, build_task_frame)
 
 _SAMPLE = [
@@ -191,6 +193,32 @@ def _preview(question: str, *, use_llm: bool, parser, budget: int, show_raw: boo
                       f"applies_to={c.get('applies_to')} required={c.get('required')}")
         else:
             print("    LLM emitted: (no raw output available — replay miss / no model call)")
+        # ---- ID / DEPENDENCY-EDGE DIAGNOSTICS ----
+        if raw is not None:
+            ordered, raw_ids = _raw_slot_ids(raw)
+            # mapping actually applied (on accept) else the mapping that WOULD apply.
+            mapping = (meta.id_mapping if meta.id_mapping
+                       else {rid: f"s{i}" for i, rid in enumerate(ordered)})
+            raw_edges = [pe for pe in (_parse_edge(e) for e in raw.get("dependency_edges") or [])
+                         if pe is not None]
+            derived = _derive_raw_edges(raw)
+            print(f"    raw_slot_ids: {ordered}")
+            print(f"    id_mapping (raw->internal): {mapping}"
+                  + ("" if meta.id_mapping else "  [would-apply; frame fell back]"))
+            print(f"    dependency_edges_raw (explicit): {raw_edges or '(none)'}")
+            print(f"    dependency_edges_from_depends_on: {derived or '(none)'}")
+            print(f"    dependency_edges_remapped (frame): {frame.dependency_edges or '(none)'}")
+            ref_err = any(("constraint_refs_unknown_slot" in e
+                           or "dependency_edge_refs_unknown_slot" in e)
+                          for e in (meta.validation_errors or []))
+            if meta.parser_used == "llm":
+                stage = "none (accepted; remap is total so post-remap never fails)"
+            elif meta.fallback_reason == "validation_failed":
+                stage = ("raw_id_reference_validation" if ref_err
+                         else "open_world_usability_validation (pre-remap)")
+            else:
+                stage = f"{meta.fallback_reason} (not an id-validation fallback)"
+            print(f"    fallback_stage: {stage}")
     if show_raw:
         print("  RAW PARSER OUTPUT (bounded):")
         for line in _bounded_raw(parser, meta).splitlines():

@@ -103,13 +103,14 @@ def _interrogative_target_role(question: str) -> Optional[str]:
 
 @dataclass
 class Slot:
-    slot_id: str
+    slot_id: str                         # internal id (after remap)
     slot_name: str
     slot_role: str                       # one of ROLES + "number"
     is_target_answer_slot: bool = False
     is_intermediate_slot: bool = False
-    depends_on: list[str] = field(default_factory=list)
+    depends_on: list[str] = field(default_factory=list)   # internal ids
     expected_evidence_type: str = ""
+    raw_slot_id: str = ""                 # the id the parser emitted (pre-remap)
 
     def to_dict(self) -> dict[str, Any]:
         return {"slot_id": self.slot_id, "slot_name": self.slot_name,
@@ -117,7 +118,8 @@ class Slot:
                 "is_target_answer_slot": self.is_target_answer_slot,
                 "is_intermediate_slot": self.is_intermediate_slot,
                 "depends_on": list(self.depends_on),
-                "expected_evidence_type": self.expected_evidence_type}
+                "expected_evidence_type": self.expected_evidence_type,
+                "raw_slot_id": self.raw_slot_id}
 
 
 @dataclass
@@ -188,6 +190,7 @@ class TaskFrame:
     source_requirements: list[str] = field(default_factory=list)
     parse_quality: float = 0.0
     validation_warnings: list[str] = field(default_factory=list)
+    id_mapping: dict[str, str] = field(default_factory=dict)   # raw_slot_id -> internal_id
 
     @property
     def all_slots(self) -> list[Slot]:
@@ -212,6 +215,7 @@ class TaskFrame:
             "source_requirements": list(self.source_requirements),
             "parse_quality": round(self.parse_quality, 3),
             "validation_warnings": list(self.validation_warnings)[:12],
+            "id_mapping": dict(self.id_mapping),
         }
 
 

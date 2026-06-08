@@ -38,6 +38,8 @@ class AttemptOutcome:
     support_found: bool = True
     failed_tool_calls: int = 0
     failed_tools: list = field(default_factory=list)
+    contaminated_results: int = 0
+    total_results: int = 0
 
     def to_row(self) -> dict[str, Any]:
         return {
@@ -62,6 +64,7 @@ class AttemptOutcome:
             "contradiction": int(self.contradiction),
             "support_found": int(self.support_found),
             "failed_tool_calls": self.failed_tool_calls,
+            "contaminated_results": self.contaminated_results,
             "regime": "",  # filled by the regime detectors if run
         }
 
@@ -87,6 +90,8 @@ def compute_metrics(outcomes: list[AttemptOutcome]) -> dict[str, Any]:
     would_be_wrong = sum(1 for o in outcomes if not o.correct)
     correct_abstentions = sum(1 for o in abstained if not o.found_hit)
     failed_calls = sum(o.failed_tool_calls for o in outcomes)
+    contaminated = sum(o.contaminated_results for o in outcomes)
+    total_results = sum(o.total_results for o in outcomes)
     failed_by_tool: dict[str, int] = {}
     for o in outcomes:
         for t in o.failed_tools:
@@ -100,6 +105,8 @@ def compute_metrics(outcomes: list[AttemptOutcome]) -> dict[str, Any]:
         "failed_tool_calls_by_tool": failed_by_tool,
         "support_found_rate": _safe_div(sum(1 for o in outcomes if o.support_found), n),
         "evidence_score_mean": _safe_div(sum(o.evidence_score for o in outcomes), n),
+        "benchmark_contaminated_result_count": contaminated,
+        "contamination_rate": _safe_div(contaminated, total_results),
         "correct_per_tool_call": _safe_div(correct, calls),
         "correct_per_dollar": _safe_div(correct, cost) if cost else 0.0,
         "correct_per_second": _safe_div(correct, latency) if latency else 0.0,

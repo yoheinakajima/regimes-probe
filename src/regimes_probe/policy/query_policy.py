@@ -47,9 +47,12 @@ class QueryPlan:
     query: str
     opts: dict[str, Any] = field(default_factory=dict)
     explanation: dict[str, Any] = field(default_factory=dict)
+    clue_ids: list[str] = field(default_factory=list)
+    query_text_hash: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {"arm": self.arm, "query": self.query, "opts": self.opts,
+                "clue_ids": self.clue_ids, "query_text_hash": self.query_text_hash,
                 "explanation": self.explanation}
 
 
@@ -124,7 +127,18 @@ class QueryPolicy:
         known_domain: Optional[str] = None,
         arms: Optional[list[str]] = None,
         salt: str = "",
+        decompose: bool = False,
+        tool: Optional[str] = None,
     ) -> QueryPlan:
+        # Query decomposition (Level 2): emit several targeted candidate queries
+        # and let the bandit choose the query FORM, conditioned on the tool
+        # (tool x query_arm -> reward). Active only in the learned mode so the
+        # fixed/llm baselines are preserved. See docs/QUERY_POLICY.md.
+        if decompose and self.mode == "learned":
+            return self._formulate_decomposed(
+                sig, bandit=bandit, neighbor=neighbor, explore=explore,
+                tool=tool, salt=salt)
+
         arms = arms or list(QUERY_ARMS)
         if self.mode == "fixed":
             return apply_query_arm("direct_question", sig, known_domain=known_domain)
@@ -144,3 +158,30 @@ class QueryPolicy:
         plan = apply_query_arm(chosen, sig, known_domain=known_domain)
         plan.explanation["ranked"] = [s.to_dict() for s in ranked]
         return plan
+
+    def _formulate_decomposed(self, sig, *, bandit, neighbor, explore, tool, salt) -> QueryPlan:
+        from regimes_probe.policy.query_decomposition import decompose_queries
+        candidates = decompose_queries(sig.question)
+        if not candidates:                       # nothing to decompose -> compressed
+            plan = apply_query_arm("keyword_compressed", sig)
+            plan.explanation["decompose"] = "no_candidates"
+            return plan
+        by_arm = {c.arm: c for c in candidates}
+        arm_list = [c.arm for c in candidates]
+        # Condition the query bandit on the tool so it learns tool x query_arm.
+        ctx = sig.cluster_key if tool is None else f"{sig.cluster_key}|{tool}"
+        if bandit is None:
+            chosen = arm_list[0]                  # targeted arm first (never full-question)
+            ranked_dump = []
+        else:
+            ranked = bandit.choose_tool_plan(ctx, arm_list, k=len(arm_list),
+                                             explore=explore, neighbor=neighbor, salt=salt)
+            chosen = ranked[0].arm if ranked else arm_list[0]
+            ranked_dump = [s.to_dict() for s in ranked]
+        cand = by_arm[chosen]
+        return QueryPlan(
+            arm=cand.arm, query=cand.query, opts={},
+            clue_ids=list(cand.clue_ids), query_text_hash=cand.query_text_hash,
+            explanation={"decompose": True, "context": ctx, "tool": tool,
+                         "n_candidates": len(candidates),
+                         "candidate_arms": arm_list, "ranked": ranked_dump})

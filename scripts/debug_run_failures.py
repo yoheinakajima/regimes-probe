@@ -59,13 +59,26 @@ def main() -> int:
               f"n_results={r['n_results']}")
         print(f"  flags: support_found={r['support_found']} found_hit={r['found_hit']} "
               f"authority_ok={r['authority_ok']} contradiction={r['contradiction']} "
-              f"failed_tool_calls={r['failed_tool_calls']}")
+              f"failed_tool_calls={r['failed_tool_calls']} "
+              f"contaminated_results={r.get('contaminated_results', 0)}")
+        for c in r.get("calls", []):
+            print(f"  query [{c.get('tool')}/{c.get('query_arm')}]: "
+                  f"{c.get('query_preview', '')!r}  "
+                  f"(n_results={c.get('n_results', 0)}, "
+                  f"contaminated={c.get('contaminated_results', 0)}"
+                  + (f", clues={c.get('clue_ids')}" if c.get('clue_ids') else "") + ")")
         for e in r.get("failed_tool_errors", []):
             print(f"  ⚠ tool error [{e['tool']}]: {e.get('error_type')} "
                   f"{e.get('status_code')} — {e.get('message_preview')}")
         for ev in r.get("evidence", [])[:3]:
             mark = "✓" if ev.get("supports") else " "
-            print(f"  {mark} {ev.get('url','')}")
+            tags = []
+            if ev.get("contains_gold"):
+                tags.append("HAS-GOLD")
+            if ev.get("benchmark_contaminated"):
+                tags.append(f"CONTAMINATED({ev.get('contamination_reason')})")
+            tagstr = ("  [" + ", ".join(tags) + "]") if tags else ""
+            print(f"  {mark} {ev.get('url','')}{tagstr}")
             if ev.get("title_preview"):
                 print(f"      {ev['title_preview']}")
             if ev.get("snippet_preview"):

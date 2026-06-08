@@ -33,6 +33,7 @@ class AgentConfig:
     available_tools: list[str]
     query_mode: str = "learned"          # fixed | llm | learned
     stop_mode: str = "learned"           # always_full | first_candidate | learned
+    enable_query_decomposition: bool = False  # Level 2 multi-query decomposition
     as_of: str = "2026-06-01"
     router: RouterConfig = field(default_factory=RouterConfig)
     stop: StopConfig = field(default_factory=StopConfig)
@@ -75,6 +76,7 @@ class EpistemicAgent:
             explore=explore,
             as_of=self.config.as_of,
             verification=self.config.verification,
+            enable_query_decomposition=self.config.enable_query_decomposition,
         )
         return self.loop.run(
             item, sig, memory, invoker, providers, loop_cfg,

@@ -44,6 +44,9 @@ class EvidenceObservation:
     content_hash: str
     title: str = ""           # result title (for debug artifacts)
     fetchable: bool = False   # relevant doc whose assertion is hidden until fetched
+    # benchmark contamination: result mirrors the benchmark/question, not evidence
+    benchmark_contaminated: bool = False
+    contamination_reason: Optional[str] = None
     # failed tool-call observation (provider/API error, not a crash)
     failed: bool = False
     error_type: Optional[str] = None
@@ -62,6 +65,7 @@ class EvidenceObservation:
             "fresh": self.fresh,
             "supports": self.supports,
             "content_hash": self.content_hash,
+            "benchmark_contaminated": self.benchmark_contaminated,
         }
         if self.failed:
             d.update({"failed": True, "error_type": self.error_type,
@@ -112,6 +116,10 @@ def score_observation(
     today = _parse_date(as_of) or date.today()
     fresh = bool(pub is not None and (today - pub).days <= fresh_window_days)
 
+    from regimes_probe.eval.contamination import detect_contamination
+    cont = detect_contamination(url=result.url, title=result.title or "",
+                                snippet=result.snippet, question=item.question)
+
     return EvidenceObservation(
         fetchable=fetchable,
         call_index=call_index,
@@ -126,4 +134,6 @@ def score_observation(
         supports=supports,
         asserts=asserts,
         content_hash=result.content_hash(),
+        benchmark_contaminated=cont.contaminated,
+        contamination_reason=cont.reason,
     )

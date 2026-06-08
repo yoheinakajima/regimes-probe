@@ -105,6 +105,9 @@ def main() -> int:
                     help="enable browser-like tools (firecrawl_interact). Off by default.")
     ap.add_argument("--allow-stateful-or-paid-tools", action="store_true",
                     help="allow stateful/paid execution (monid_run). Off by default.")
+    ap.add_argument("--enable-query-decomposition", action="store_true",
+                    help="Level 2: decompose long questions into several targeted clue "
+                         "queries (query forms become bandit arms). Off by default.")
     ap.add_argument("--judge-model", default=None,
                     help="(reserved) LLM judge; grading currently uses exact/normalized match")
     ap.add_argument("--split-seed", default=None)
@@ -129,6 +132,10 @@ def main() -> int:
         print(f"unknown condition(s): {bad}; valid: {list(ALL_CONDITIONS)}")
         return 2
 
+    # Effective query-decomposition flag: CLI flag OR config default.
+    decompose_enabled = (args.enable_query_decomposition
+                         or bool(cfg.get("policy", {}).get("enable_query_decomposition", False)))
+
     # Resolve models + tools from mode/CLI/config/env (cheap-first; OpenAI hosted
     # web_search is opt-in, never a silent default).
     settings = resolve_live_settings(
@@ -143,7 +150,10 @@ def main() -> int:
         enable_scrape_tools=args.enable_scrape_tools,
         enable_browserish_tools=args.enable_browserish_tools,
         allow_stateful_or_paid_tools=args.allow_stateful_or_paid_tools,
+        enable_query_decomposition=decompose_enabled,
     )
+    # Stamp the effective flag into cfg.policy so the agent + manifest both see it.
+    cfg.setdefault("policy", {})["enable_query_decomposition"] = decompose_enabled
     tools = settings.tools
     search_tools = settings.search_tools
     answer_model = settings.answer_model
@@ -193,6 +203,7 @@ def main() -> int:
     print(f"follow-up tools (URL-only, not bandit arms)={settings.followup_tools}")
     print(f"all enabled tools={settings.tools}")
     print(f"provider_classes={settings.provider_classes()}")
+    print(f"query_decomposition_enabled={settings.query_decomposition_enabled}")
     print(f"flags: agentic_discovery={settings.agentic_tool_discovery_enabled} "
           f"scrape={settings.scrape_tools_enabled} browserish={settings.browserish_tools_enabled} "
           f"stateful_or_paid_allowed={settings.stateful_or_paid_tools_allowed}")
@@ -239,6 +250,7 @@ def main() -> int:
     agent_cfg = AgentConfig(available_tools=tools,
                             query_mode=cfg["policy"]["query_mode"],
                             stop_mode=cfg["policy"]["stop_mode"],
+                            enable_query_decomposition=decompose_enabled,
                             as_of=cfg.get("run", {}).get("as_of", "2026-06-01"))
     search_agent = EpistemicAgent(agent_cfg,
                                   answerer=build_live_answerer("search", model=answer_model,

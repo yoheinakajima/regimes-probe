@@ -38,9 +38,11 @@ def main() -> int:
     failures = defaultdict(int)
     empty = defaultdict(int)
     results_total = defaultdict(int)
+    contaminated = defaultdict(int)
     status_codes = defaultdict(Counter)
     error_types = defaultdict(Counter)
     domains = defaultdict(Counter)
+    contam_domains = Counter()
     snippet_have = defaultdict(int)
     snippet_total = defaultdict(int)
 
@@ -49,6 +51,7 @@ def main() -> int:
             t = c.get("tool", "?")
             calls[t] += 1
             results_total[t] += c.get("n_results", 0)
+            contaminated[t] += c.get("contaminated_results", 0)
             if c.get("failed"):
                 failures[t] += 1
                 if c.get("status_code") is not None:
@@ -64,6 +67,8 @@ def main() -> int:
             host = urlparse(ev.get("url", "")).hostname or ""
             if host:
                 domains["_all"][host] += 1
+            if ev.get("benchmark_contaminated") and host:
+                contam_domains[host] += 1
             snippet_total["_all"] += 1
             if ev.get("snippet_preview"):
                 snippet_have["_all"] += 1
@@ -75,13 +80,21 @@ def main() -> int:
     cache = manifest.get("cache", {})
 
     print(f"=== provider returns — {run_dir} ===\n")
-    print(f"{'provider':<24} {'calls':>6} {'fail':>5} {'fail%':>6} {'empty':>6} {'mean_res':>9}")
-    print("-" * 62)
+    print(f"{'provider':<24} {'calls':>6} {'fail':>5} {'fail%':>6} {'empty':>6} {'mean_res':>9} "
+          f"{'contam':>7}")
+    print("-" * 70)
     for t in sorted(calls, key=lambda x: -calls[x]):
         n = calls[t]
         fr = failures[t] / n if n else 0.0
         mean_res = results_total[t] / n if n else 0.0
-        print(f"{t:<24} {n:>6} {failures[t]:>5} {fr:>6.2f} {empty[t]:>6} {mean_res:>9.2f}")
+        print(f"{t:<24} {n:>6} {failures[t]:>5} {fr:>6.2f} {empty[t]:>6} {mean_res:>9.2f} "
+              f"{contaminated[t]:>7}")
+    print()
+    total_contam = sum(contaminated.values())
+    total_res = sum(results_total.values())
+    rate = (total_contam / total_res) if total_res else 0.0
+    print(f"benchmark contamination: {total_contam}/{total_res} results "
+          f"(rate={rate:.2f}); top contaminated domains: {contam_domains.most_common(8)}")
     print()
     for t in sorted(failures, key=lambda x: -failures[x]):
         if failures[t]:

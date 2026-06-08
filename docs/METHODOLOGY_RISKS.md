@@ -167,6 +167,24 @@ set — and the risk surface. Keep the experiment honest:
   tools only after a search returns URLs; a non-URL `page_fetch` call fails
   gracefully with `requires_url`. When auditing a run, check that
   `provider_failure_rate` is not dominated by one tool family.
+- **Searching the whole BrowseComp prompt is a trap.** The first clean BrowseComp
+  run was structurally headline-eligible but scored **0 accuracy**: search worked,
+  but feeding the entire long clue-dense question as one query surfaced
+  spam/benchmark-mirroring pages, so the exact answer was never in the snippets
+  (dominant seam: `exact_answer_missing`). Level 1 routing alone cannot fix this —
+  **Level 2 query decomposition** (multiple targeted clue queries, query form as a
+  bandit arm) is required first. Evaluate Firecrawl **scrape** only *after* search
+  targeting improves: scraping the wrong (contaminated) page just adds cost.
+- **Benchmark contamination inflates apparent relevance.** Pages that mirror the
+  benchmark (HF/GitHub/arXiv/simple-evals, or snippets reproducing the question)
+  look relevant but carry no independent evidence. They are detected
+  (`eval/contamination.py`), penalized in reward, and reported
+  (`contamination_rate`, per-domain/provider). Watch `contamination_rate` on any
+  real run — a high rate means the query form is fetching the benchmark, not
+  evidence.
+- **Debug artifacts contain a gold-in-result audit flag.** `debug_questions.jsonl`
+  marks whether a result contained the exact gold answer — an audit aid in the
+  debug layer only; policy memory remains answer-free.
 - **Offline forks are ablations, not measurements.** A forked run reuses a
   parent's cached outcomes and re-weights/re-routes over already-observed data;
   it can reveal which variant *would* have done better on the same evidence, but

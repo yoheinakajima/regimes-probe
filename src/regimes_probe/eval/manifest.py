@@ -112,6 +112,9 @@ def build_manifest(
         "scrape_tools_enabled": ls.get("scrape_tools_enabled"),
         "browserish_tools_enabled": ls.get("browserish_tools_enabled"),
         "stateful_or_paid_tools_allowed": ls.get("stateful_or_paid_tools_allowed"),
+        "query_decomposition_enabled": ls.get(
+            "query_decomposition_enabled",
+            bool(cfg.get("policy", {}).get("enable_query_decomposition", False))),
         "live_settings": ls,
         "prompts": prompts.registry_dict(),
         # Tool inventory, split by routing role:

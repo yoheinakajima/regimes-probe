@@ -57,6 +57,10 @@ bandit:
 policy:
   query_mode: "learned"           # fixed | llm | learned
   stop_mode: "learned"            # always_full | first_candidate | learned
+  # Level 2 query decomposition: emit several targeted clue queries per item and
+  # let the bandit choose the query form (tool x query_arm). Off by default;
+  # enable with --enable-query-decomposition. See docs/QUERY_POLICY.md.
+  enable_query_decomposition: false
 
 router:
   cost_weight: 0.5

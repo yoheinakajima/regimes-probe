@@ -87,6 +87,13 @@ class CallRecord:
     failed: bool = False
     error_type: Optional[str] = None
     status_code: Optional[int] = None
+    query_text_hash: str = ""
+    clue_ids: list[str] = field(default_factory=list)
+
+    @property
+    def contaminated_results(self) -> int:
+        return sum(1 for o in self.observations
+                   if getattr(o, "benchmark_contaminated", False))
 
     def public_dict(self) -> dict[str, Any]:
         return {
@@ -94,6 +101,8 @@ class CallRecord:
             "tool": self.tool,
             "query_arm": self.query_arm,
             "query": self.query,
+            "query_text_hash": self.query_text_hash,
+            "clue_ids": list(self.clue_ids),
             "cost": self.cost,
             "latency": self.latency,
             "stop_arm": self.stop_arm,
@@ -101,6 +110,7 @@ class CallRecord:
             "failed": self.failed,
             "error_type": self.error_type,
             "status_code": self.status_code,
+            "contaminated_results": self.contaminated_results,
             "observations": [o.to_public_dict() for o in self.observations],
         }
 
@@ -147,6 +157,7 @@ class SearchLoopConfig:
     explore: bool = False
     as_of: str = "2026-06-01"
     verification: VerificationConfig = field(default_factory=VerificationConfig)
+    enable_query_decomposition: bool = False
 
 
 class SearchLoop:
@@ -210,6 +221,7 @@ class SearchLoop:
         step = 0
 
         while len(calls) < config.budget:
+            query_text_hash, clue_ids = "", []
             if pending_fetch_url is not None and fetch_available:
                 tool = fetch_tool
                 query = pending_fetch_url
@@ -225,8 +237,11 @@ class SearchLoop:
                     explore=config.explore,
                     known_domain=known_domain,
                     salt=f"{attempt_id}:q{step}",
+                    decompose=config.enable_query_decomposition,
+                    tool=tool,
                 )
                 query, query_arm, opts = qplan.query, qplan.arm, qplan.opts
+                query_text_hash, clue_ids = qplan.query_text_hash, qplan.clue_ids
                 rec.on_query_plan(step, qplan.to_dict())
 
             response = invoker.call(tool, query, limit=5, **opts)
@@ -284,6 +299,8 @@ class SearchLoop:
                     failed=call_failed,
                     error_type=(response.error_meta or {}).get("error_type") if call_failed else None,
                     status_code=(response.error_meta or {}).get("status_code") if call_failed else None,
+                    query_text_hash=query_text_hash,
+                    clue_ids=clue_ids,
                 )
             )
 

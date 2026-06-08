@@ -161,6 +161,32 @@ def write_full_report(
     for fr in failure_regimes:
         regime_summary[fr["regime"]] = regime_summary.get(fr["regime"], 0) + 1
 
+    # Benchmark-contamination summary (from the bounded debug records).
+    from urllib.parse import urlparse
+    contam_count = 0
+    total_results = 0
+    contam_by_provider: dict[str, int] = {}
+    contam_by_domain: dict[str, int] = {}
+    for dr in (debug_records or []):
+        d = dr.to_dict() if hasattr(dr, "to_dict") else dict(dr)
+        for c in d.get("calls", []):
+            total_results += int(c.get("n_results", 0))
+            cc = int(c.get("contaminated_results", 0))
+            contam_count += cc
+            if cc:
+                contam_by_provider[c.get("tool", "?")] = \
+                    contam_by_provider.get(c.get("tool", "?"), 0) + cc
+        for ev in d.get("evidence", []):
+            if ev.get("benchmark_contaminated"):
+                host = urlparse(ev.get("url", "")).hostname or "?"
+                contam_by_domain[host] = contam_by_domain.get(host, 0) + 1
+    contamination = {
+        "benchmark_contaminated_result_count": contam_count,
+        "contamination_rate": round(contam_count / total_results, 4) if total_results else 0.0,
+        "by_provider": contam_by_provider,
+        "by_domain": contam_by_domain,
+    }
+
     report = {
         "run_id": run_id,
         "meta": meta,
@@ -181,6 +207,8 @@ def write_full_report(
         # Flat, first-class verdict object (mirrors eval/eligibility.py).
         "eligibility_verdict": eligibility_verdict,
         "failure_regime_summary": regime_summary,
+        "contamination": contamination,
+        "query_decomposition_enabled": bool(meta.get("query_decomposition_enabled", False)),
         "leakage_check_details": leakage_details or {},
         "same_conditions": same_conditions or {},
         "condition_specs": condition_specs or {},

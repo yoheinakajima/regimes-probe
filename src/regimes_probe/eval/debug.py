@@ -87,6 +87,7 @@ class DebugRecord:
     n_results: int
     failed_tool_calls: int
     failure_seam: str
+    contaminated_results: int = 0
     evidence_titles: list[str] = field(default_factory=list)
     evidence_urls: list[str] = field(default_factory=list)
     evidence_snippet_previews: list[str] = field(default_factory=list)
@@ -102,17 +103,34 @@ def build_debug_record(*, item, trace, grade, reward, condition: str, budget: in
                        max_evidence: int = _MAX_EVIDENCE) -> DebugRecord:
     """Assemble a bounded debug record from one attempt."""
     from regimes_probe.regimes.detectors import label_outcome
+    from regimes_probe.eval.grader import normalize_answer
+
+    # Gold tokens for an AUDIT-only "result contains the exact answer" flag. This
+    # is a debug artifact (may contain gold); policy memory stays answer-free.
+    _gold_audit = [normalize_answer(g) for g in
+                   (item.gold_answers() if hasattr(item, "gold_answers") else [])]
+    _gold_audit = [g for g in _gold_audit if g]
+
+    def _contains_gold(*parts: str) -> bool:
+        hay = normalize_answer(" ".join(p for p in parts if p))
+        return any(g and g in hay for g in _gold_audit)
 
     calls_info: list[dict[str, Any]] = []
     failed_errors: list[dict[str, Any]] = []
     evidence: list[dict[str, Any]] = []
     n_results = 0
+    contaminated_results = 0
     for c in trace.calls:
         n_ok = sum(1 for o in c.observations if not getattr(o, "failed", False))
         n_results += n_ok
+        c_cont = sum(1 for o in c.observations if getattr(o, "benchmark_contaminated", False))
+        contaminated_results += c_cont
         calls_info.append({
             "call_index": c.call_index, "tool": c.tool, "query_arm": c.query_arm,
-            "query_preview": _prev(c.query, preview), "n_results": n_ok,
+            "query_preview": _prev(c.query, preview),
+            "query_text_hash": getattr(c, "query_text_hash", ""),
+            "clue_ids": list(getattr(c, "clue_ids", [])),
+            "n_results": n_ok, "contaminated_results": c_cont,
             "failed": bool(getattr(c, "failed", False)),
             "error_type": getattr(c, "error_type", None),
             "status_code": getattr(c, "status_code", None),
@@ -133,6 +151,9 @@ def build_debug_record(*, item, trace, grade, reward, condition: str, budget: in
                 "snippet_preview": _prev(o.snippet, snippet_chars),
                 "supports": bool(o.supports),
                 "source_authority": round(float(o.source_authority), 3),
+                "benchmark_contaminated": bool(getattr(o, "benchmark_contaminated", False)),
+                "contamination_reason": getattr(o, "contamination_reason", None),
+                "contains_gold": _contains_gold(getattr(o, "title", ""), o.url, o.snippet),
             })
 
     gold_norms = [g for g in (grade.gold_norm or [])]
@@ -161,6 +182,7 @@ def build_debug_record(*, item, trace, grade, reward, condition: str, budget: in
         n_results=n_results,
         failed_tool_calls=sum(1 for c in trace.calls if getattr(c, "failed", False)),
         failure_seam=seam,
+        contaminated_results=contaminated_results,
         evidence_titles=[e["title_preview"] for e in evidence],
         evidence_urls=[e["url"] for e in evidence],
         evidence_snippet_previews=[e["snippet_preview"] for e in evidence])

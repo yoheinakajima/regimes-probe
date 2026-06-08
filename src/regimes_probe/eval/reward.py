@@ -45,6 +45,7 @@ class RewardWeights:
     contradiction_penalty: float = 0.3
     extra_call_penalty: float = 0.2
     tool_failure_penalty: float = 0.5  # extra penalty on a tool/query arm that errored
+    contamination_penalty: float = 0.5  # penalty per benchmark-contaminated result
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -59,6 +60,7 @@ class RewardWeights:
             "contradiction_penalty": self.contradiction_penalty,
             "extra_call_penalty": self.extra_call_penalty,
             "tool_failure_penalty": self.tool_failure_penalty,
+            "contamination_penalty": self.contamination_penalty,
         }
 
     @classmethod
@@ -134,6 +136,10 @@ def compute_rewards(
     needed = (hit_index + 1) if hit_index is not None else calls_used
     extra_calls = max(0, calls_used - needed)
 
+    # Benchmark-contaminated results (snippets mirroring the question / eval hosts)
+    # earn a penalty so the query/tool form that surfaces them learns to avoid it.
+    n_contaminated = sum(getattr(c, "contaminated_results", 0) for c in trace.calls)
+
     stale_error = bool(freshness_sensitive and vs.support_found and not vs.freshness_ok)
     stopped = bool(trace.calls and trace.calls[-1].stop_arm == "stop_now")
     false_stop = bool(stopped and not correct and calls_used < trace.budget)
@@ -151,6 +157,7 @@ def compute_rewards(
         "stale_penalty": -w.stale_penalty * (1.0 if stale_error else 0.0),
         "contradiction_penalty": -w.contradiction_penalty * (1.0 if vs.contradiction else 0.0),
         "extra_call_penalty": -w.extra_call_penalty * extra_calls,
+        "contamination_penalty": -w.contamination_penalty * n_contaminated,
     }
     R = sum(components.values())
 
@@ -197,6 +204,7 @@ def compute_rewards(
         "contradiction": vs.contradiction,
         "found_hit": hit_index is not None,
         "had_tool_failure": n_failed > 0,
+        "contaminated": n_contaminated > 0,
     }
     return RewardResult(
         attempt_reward=R,

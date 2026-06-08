@@ -123,3 +123,70 @@ function choose_query_plan(ctx, tool, snapshot, mode, now_tick, domain_known):
 | Regime | How query policy relates |
 |---|---|
 | `query_miss` | Poorly-formed query returns no usable evidence; corrected by learning `query_template_rewards` per signature (`query-fragile`, `evidence-sparse`). |
+
+---
+
+## Level 2: query decomposition (multi-query clue extraction)
+
+**Motivation (from the first clean BrowseComp run).** Level 1 routing alone
+produced **no accuracy gain** on BrowseComp: the dominant failure seam was
+`exact_answer_missing`, and searching the *whole* long clue-dense prompt as one
+query surfaced spam / benchmark-mirroring pages rather than the evidence page that
+carries the answer. The bottleneck was **query formulation**, not tool choice.
+
+`policy/query_decomposition.py` (deterministic v0; no model, no network) turns one
+long question into 3–6 **targeted candidate queries**, one per arm:
+
+| arm | what it sends |
+|---|---|
+| `exact_phrase_clue` | quoted phrases, as exact phrases |
+| `quoted_anchor_terms` | the 2–3 strongest entities/quotes, quoted |
+| `entity_clue` | the proper-noun entities |
+| `relation_clue` | two entities + the title/relation words connecting them |
+| `rare_terms_clue` | the rarest / most unusual content terms |
+| `date_range_clue` | entities + a year or year-range |
+| `source_type_query` | entities + a source hint (paper/patent/filing/…) when obvious |
+| `negative_noise_removed` | the question minus stop/meta-instruction words |
+| `full_question_compressed` | the whole question, compressed — **fallback only** |
+
+Clue extraction pulls quoted phrases, proper-noun entities (sentence-initial
+question words like *What* are filtered out), years/date ranges, rare terms,
+title/occupation and institution phrases, and source-type hints. Every query is
+**length-capped** (≤ `MAX_QUERY_TOKENS` tokens / `MAX_QUERY_CHARS` chars) so the
+whole prompt is never sent unless the `full_question_compressed` arm is explicitly
+selected. The fallback arms are always **last**, so the long arm is never the
+cold-start default.
+
+### Query forms as bandit arms (tool × query_arm)
+
+When decomposition is enabled, the learned query bandit chooses the **query
+form**, conditioned on the tool: the context key is `cluster|tool`, so the policy
+learns `tool × query_arm → reward`. Each tool call records `query_arm`,
+`query_text_hash`, `query_text_preview`, and the `clue_ids` it used; the reward
+attributes back to the chosen `(tool, query_arm)` pair.
+
+### Flag
+
+Off by default (preserves prior behavior). Enable with
+`--enable-query-decomposition` (or `policy.enable_query_decomposition: true`). The
+dry-run print, `run_manifest.json`, and `report.json` all record
+`query_decomposition_enabled`, and `debug_questions.jsonl` includes
+`query_text_preview` + `query_arm` per call.
+
+### Optional LLM decomposition (future)
+
+A model-based decomposer may be layered on later, but it MUST go through the
+existing answerer/model cache, be logged/replayable, carry a prompt-version hash,
+default to the cheap `answer_model`, and stay behind the same flag. v0 is heuristic
+and always available (no key, no spend).
+
+## Benchmark-contamination penalty
+
+`eval/contamination.py` flags results that mirror the benchmark rather than carry
+evidence: known eval/dataset hosts (HuggingFace / GitHub / arXiv / simple-evals /
+paperswithcode), `BrowseComp`-naming pages, or snippets that reproduce a long span
+of the question. Contaminated results earn a reward penalty
+(`RewardWeights.contamination_penalty`) so the query/tool form that surfaces them
+learns to avoid them. `report.json.contamination` reports
+`benchmark_contaminated_result_count`, `contamination_rate`, and per-provider /
+per-domain breakdowns.

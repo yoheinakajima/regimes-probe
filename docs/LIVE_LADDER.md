@@ -25,6 +25,20 @@ Conventions:
   tools` separately; the manifest records `first_hop_tools` / `followup_tools` /
   `all_enabled_tools` (`tools_enabled` is a back-compat alias for the first-hop
   search arms).
+- **`--enable-query-decomposition` (Level 2)**: decompose each long question into
+  several targeted clue queries and let the bandit learn the query form
+  (`tool × query_arm`). On BrowseComp this is **required** — Level 1 routing alone
+  scored 0 because searching the whole prompt missed the exact answer (see
+  `docs/METHODOLOGY_RISKS.md`). The flag is recorded as `query_decomposition_enabled`
+  in the dry-run print / manifest / report. **Tune search targeting before adding
+  Firecrawl scrape** — scraping a contaminated page just adds cost.
+  Recommended first real-query run:
+  ```bash
+  python scripts/run_live.py --dataset livebrowsecomp --dataset-path PATH \
+      --optimize 10 --confirm 20 --budgets 1,3 --search-provider-mode diverse \
+      --enable-query-decomposition \
+      --recording-cache results/live/cache.json --execute
+  ```
 - Estimated calls below are **worst case** (every attempt uses its full budget);
   the cache reduces real spend on reruns.
 - After any run: generate the audit ledger and conservative claims.

@@ -326,3 +326,22 @@ set — and the risk surface. Keep the experiment honest:
   reasons are `premature_bound_value`/`concrete_known_constant`, not descriptor
   overlap. The answer-support gate is unchanged and still evidence-based, so a
   descriptor that passes validation cannot by itself produce a supported answer.
+- **Candidate slates can manufacture false confidence.** Maintaining possible
+  mid-hop answers per slot (Level 5) is the right multi-hop pattern, but it adds
+  surface area for self-deception: (a) a candidate could be *confirmed* on weak
+  evidence — confirmation requires the slot's REQUIRED blocking constraints supported
+  by **non-contaminated** evidence above threshold and nothing contradicted, and the
+  final answer-support gate is unchanged, so a confirmed slate candidate still cannot
+  by itself produce a supported answer; (b) the frontier scheduler optimizes
+  *expected information gain*, which is a heuristic, not truth — watch
+  `read_on_candidate_rate` and `frontier_expected_gain_mean` vs. actual evidence
+  progress, and treat a high gain estimate with low realized progress as a mis-scored
+  frontier, not success; (c) over-merging distinct entities into one candidate hides
+  alternatives — merges require same normalized text / cross-provider identity and
+  preserve both provenances, and `candidate_merge_rate` should stay low; (d) the layer
+  is heavy and must be **skipped** for easy questions (the escalation controller gates
+  it) — if `skipped_candidate_slate_count` is ~0 on a mixed set, the agent is forcing
+  every question into research machinery. Because every candidate/status/merge/
+  promotion/frontier decision is an event in the projection, these are auditable from
+  traces rather than asserted; contamination still poisons confirmation, and nothing
+  from the slate layer is written to answer-free policy memory.

@@ -291,3 +291,22 @@ apart. Because raw descriptors, inferred `slot_status`, and the validation decis
 are all recorded in the trace/graph, "does the parser create good variable
 descriptors vs. prematurely bind answers?" becomes a measurable, learnable signal —
 not a hand judgment.
+
+### Level 5: candidate slates + frontier (multi-hop search behavior)
+
+Hard multi-hop questions need **possible mid-hop answers maintained per slot**, not a
+single global candidate (`QUERY_POLICY.md` Level 5). Evaluate this layer by its
+*process* metrics, since correctness on the final answer is downstream of many
+intermediate decisions: `candidate_slate_size_mean`, `active/confirmed/rejected_
+candidates_per_slot`, `candidate_promotion_rate`/`rejection_rate`/`merge_rate`,
+`hypothesis_branching_factor`, `frontier_action_counts`, `frontier_expected_gain_mean`,
+`read_on_candidate_rate`, and `answer_from_confirmed_hypothesis_rate`. Good behavior:
+candidates rejected when they contradict a constraint, upstream slots bound before
+downstream targets, cheap verification chosen before expensive reads, duplicates
+merged, and broad known-context terms NOT searched as if they were unresolved slots.
+The layer is **skipped** for easy questions (`skipped_candidate_slate_count` +
+`skipped_heavy_candidate_slate_reason_counts`), so a generic-agent run should show the
+heavy machinery firing only on the hard tail. Because the whole slate/frontier state
+is projected and replayable, an **offline fork** can re-score frontier actions under a
+different reward/priority setting without re-calling providers — letting you ask
+"which frontier strategy resolves slots with the least wasted work?" from traces.

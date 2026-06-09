@@ -81,7 +81,26 @@ def _outcome(trace, grade, reward, *, condition: str, budget: int) -> AttemptOut
         scrape=_scrape_stats(trace),
         frame=_frame_stats(trace),
         frame_parse=_frame_parse_stats(trace),
+        frontier=_frontier_stats(trace),
     )
+
+
+def _frontier_stats(trace) -> dict:
+    """Per-attempt candidate-slate / frontier stats (aggregated by compute_metrics)."""
+    cf = getattr(trace, "candidate_frontier", {}) or {}
+    if not cf:
+        return {}
+    if cf.get("skipped"):
+        return {"skipped": True,
+                "skipped_candidate_slate_reason": cf.get("skipped_candidate_slate_reason", "")}
+    m = dict(cf.get("metrics", {}) or {})
+    sel = cf.get("selected_frontier_action") or {}
+    m["read_on_candidate"] = 1 if any(
+        a.get("action_type") == "read_candidate_source" and a.get("selected")
+        for a in cf.get("frontier_actions", [])) else 0
+    m["answer_from_confirmed"] = sel.get("action_type") == "answer_from_confirmed_hypothesis"
+    m["skipped"] = False
+    return m
 
 
 def _frame_parse_stats(trace) -> dict:

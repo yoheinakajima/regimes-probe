@@ -592,3 +592,54 @@ overfitting** — it is how you describe an unknown.
 `answer_supported` still requires an evidence-backed candidate binding for the target
 slot, non-contaminated evidence, required blocking constraints satisfied, and the full
 answer → hypothesis → slot → evidence → constraint path.
+
+## Level 5: candidate slates + frontier scheduling (possible mid-hop answers)
+
+**Why.** A human solving a hard multi-hop question does not carry one global "best
+candidate." They keep a **candidate slate per unresolved variable** — possible
+hotels, possible museums, possible founders, possible birth years — test each
+candidate against *that slot's* constraints, reject bad ones, expand promising ones
+to dependent slots, and only answer from a supported hypothesis. `agent/candidate_frontier.py`
+makes that pattern first-class. It is generic (no fixed slot names / constraint
+labels / gold answers), **skipped** for direct/simple epistemic modes (Level 4d), and
+**ActiveGraph-native** (see `ACTIVEGRAPH_DESIGN.md`): every candidate, status change,
+merge, promotion, evidence link, and frontier decision is an event with a
+deterministic id, projected to `graph_projection.json`, so the slates are replayable,
+forkable, and learnable from traces — not a sidecar that only lives in the loop.
+
+**Candidate slates** (`CandidateSlate`, one per slot that needs binding). A
+`SlotCandidate` is a *per-slot assignment* (the same entity proposed for two slots is
+two assignments with their own score/status), carrying provenance (evidence/action
+ids, source domains), `constraints_supported`/`contradicted`/`unknown`, an
+`evidence_score`, and a lifecycle status. A candidate is **not** globally selected
+just because it appears often; it competes inside its slate. Known-context constants
+keep their isolated role and are admitted only when evidence binds them to a
+role-compatible slot (a given location never becomes a restaurant candidate).
+
+**Status lifecycle** (`active → rejected | confirmed | merged | stale`, all evented).
+**Reject** on `contradicted_constraint` (e.g. a constraint anchored "opened in 1955"
+vs. evidence "opened in 1972"), `repeated_no_progress`, `known_context_not_candidate`,
+`contaminated_source`, duplicate, etc. **Confirm/promote** when the slot's required
+blocking constraints are supported by non-contaminated evidence above threshold and
+nothing is contradicted. **Merge** duplicates (same normalized text / cross-provider
+identity), preserving provenance from both.
+
+**Hypotheses are combinations** of slot candidates (`FrontierHypothesis`: a partial
+slot→candidate assignment) scored by slot coverage, required-constraint coverage,
+**source diversity**, minus contradictions / no-progress / contaminated evidence,
+preferring hypotheses that unlock target-answer slots.
+
+**Frontier scheduler.** Each evidence update re-generates `FrontierAction`s
+(`generate_candidates_for_slot`, `verify_candidate_constraint`,
+`expand_candidate_to_dependent_slot`, `compare_candidates_for_slot`,
+`read_candidate_source`, `promote_candidate_to_confirmed`,
+`answer_from_confirmed_hypothesis`, `abstain_no_viable_hypothesis`, …) each with an
+`expected_information_gain` and `estimated_cost`. `select_frontier_action` picks by
+**expected information gain net of cost** — resolving high-priority blocking
+constraints first, binding upstream slots before downstream target answers,
+**cheap verification before expensive reads**, and distinguishing competing
+candidates — and avoids repeating equivalent tests, expanding failed candidates, or
+searching broad known-context terms. A **read** must name a `(candidate, slot,
+constraint)` triple it would affect; otherwise it is rejected
+(`no_candidate_slot_constraint_affected`), along with contaminated/no-progress/generic
+URLs. The answer-support gate is unchanged — slates feed it, they do not weaken it.

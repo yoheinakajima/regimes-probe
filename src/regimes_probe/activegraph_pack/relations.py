@@ -56,6 +56,22 @@ class Relations:
     CANDIDATE_SUPPORTED_BY_EVIDENCE = "candidate_supported_by_evidence"
     TARGET_SLOT_UNBOUND_UNTIL_EVIDENCE = "target_slot_unbound_until_evidence"
     KNOWN_CONTEXT_NOT_ANSWER = "known_context_not_answer"
+    # Candidate-slate / frontier relations (Level 5)
+    SLATE_FOR_SLOT = "slate_for_slot"
+    CANDIDATE_IN_SLATE = "candidate_in_slate"
+    CANDIDATE_ASSIGNED_TO_SLOT = "candidate_assigned_to_slot"
+    CANDIDATE_SUPPORTS_CONSTRAINT = "candidate_supports_constraint"
+    CANDIDATE_CONTRADICTS_CONSTRAINT = "candidate_contradicts_constraint"
+    CANDIDATE_REJECTED_BY_EVIDENCE = "candidate_rejected_by_evidence"
+    CANDIDATE_CONFIRMED_BY_EVIDENCE = "candidate_confirmed_by_evidence"
+    CANDIDATE_MERGED_INTO = "candidate_merged_into"
+    HYPOTHESIS_USES_CANDIDATE = "hypothesis_uses_candidate"
+    HYPOTHESIS_REJECTED_BY_CONSTRAINT = "hypothesis_rejected_by_constraint"
+    ACTION_TESTS_CANDIDATE = "action_tests_candidate"
+    ACTION_EXPANDS_CANDIDATE = "action_expands_candidate"
+    FRONTIER_ACTION_SELECTED_BECAUSE = "frontier_action_selected_because"
+    EVIDENCE_UPDATES_CANDIDATE_STATUS = "evidence_updates_candidate_status"
+    CANDIDATE_UNLOCKS_DEPENDENT_SLOT = "candidate_unlocks_dependent_slot"
     UPDATE_FROM_REWARD = "update_from_reward"
     REGIME_FOR_FAILURE = "regime_for_failure"
     PROMOTION_FOR_UPDATE = "promotion_for_update"
@@ -120,4 +136,19 @@ PROJECTION_RELATIONS: tuple[str, ...] = (
     Relations.CANDIDATE_SUPPORTED_BY_EVIDENCE,
     Relations.TARGET_SLOT_UNBOUND_UNTIL_EVIDENCE,
     Relations.KNOWN_CONTEXT_NOT_ANSWER,
+    Relations.SLATE_FOR_SLOT,
+    Relations.CANDIDATE_IN_SLATE,
+    Relations.CANDIDATE_ASSIGNED_TO_SLOT,
+    Relations.CANDIDATE_SUPPORTS_CONSTRAINT,
+    Relations.CANDIDATE_CONTRADICTS_CONSTRAINT,
+    Relations.CANDIDATE_REJECTED_BY_EVIDENCE,
+    Relations.CANDIDATE_CONFIRMED_BY_EVIDENCE,
+    Relations.CANDIDATE_MERGED_INTO,
+    Relations.HYPOTHESIS_USES_CANDIDATE,
+    Relations.HYPOTHESIS_REJECTED_BY_CONSTRAINT,
+    Relations.ACTION_TESTS_CANDIDATE,
+    Relations.ACTION_EXPANDS_CANDIDATE,
+    Relations.FRONTIER_ACTION_SELECTED_BECAUSE,
+    Relations.EVIDENCE_UPDATES_CANDIDATE_STATUS,
+    Relations.CANDIDATE_UNLOCKS_DEPENDENT_SLOT,
 )

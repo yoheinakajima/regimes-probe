@@ -187,6 +187,19 @@ class CallRecord:
         }
 
 
+def _frontier_trace(frontier, mode: str, skip_reason: str, *, uses_layer: bool,
+                    had_frame: bool) -> dict[str, Any]:
+    """Candidate-frontier trace payload: the slate debug, or a bounded skip record."""
+    if frontier is not None:
+        return frontier.to_debug()
+    if uses_layer and mode in ("direct_answer_possible", "simple_lookup"):
+        return {"skipped": True, "skipped_candidate_slate_reason": f"epistemic_mode={mode}"}
+    if had_frame:
+        return {"skipped": True,
+                "skipped_candidate_slate_reason": skip_reason or "no_frontier"}
+    return {}
+
+
 @dataclass
 class AttemptTrace:
     attempt_id: str
@@ -204,6 +217,7 @@ class AttemptTrace:
     frame_coverage: dict[str, Any] = field(default_factory=dict)
     task_frame_parse: dict[str, Any] = field(default_factory=dict)
     epistemic_mode: dict[str, Any] = field(default_factory=dict)
+    candidate_frontier: dict[str, Any] = field(default_factory=dict)
 
     @property
     def tool_calls(self) -> int:
@@ -379,6 +393,18 @@ class SearchLoop:
                 clue_terms = [t for c in frame.constraints for t in c.normalized_terms]
             if not answer_shape:
                 answer_shape = list(frame.answer_shape_hints)
+
+        # Candidate-slate / frontier layer (multi-hop): maintain per-slot candidate
+        # pools + frontier scheduling. Skipped for easy/direct/simple epistemic modes.
+        frontier = None
+        slate_skipped_reason = ""
+        if task_frame and frame is not None:
+            _mode = epistemic_decision.selected_epistemic_mode
+            if _mode in ("direct_answer_possible", "simple_lookup"):
+                slate_skipped_reason = f"epistemic_mode={_mode}"
+            else:
+                from regimes_probe.agent.candidate_frontier import CandidateFrontier
+                frontier = CandidateFrontier(frame, attempt_id=attempt_id, item_id=item.id)
 
         calls: list[CallRecord] = []
         observations: list[EvidenceObservation] = []
@@ -657,12 +683,26 @@ class SearchLoop:
                     action_id=task_action_info.get("action_id"))
                 htable.reject_contradicted()
                 evidence_record_info = ev.to_dict()
-                if not getattr(ev, "_progressed", False):
+                progressed = getattr(ev, "_progressed", False)
+                if not progressed:
                     if scrape_info and ev.domain:
                         no_progress_domains.add(ev.domain)
                     best = htable.best_hypothesis()
                     if best is not None:
                         htable.note_no_progress(best.hypothesis_id)
+                # Fold the same evidence into the candidate-slate frontier (multi-hop)
+                # and let the frontier scheduler record its next action by info gain.
+                if frontier is not None:
+                    frontier.ingest_evidence(
+                        obs, source_tool=tool, stage=ci + 1,
+                        read_depth=(2 if scrape_info.get("is_scrape") else (1 if scrape_info else 0)),
+                        action_id=task_action_info.get("action_id"))
+                    if not progressed:
+                        for s in frontier.slates:
+                            frontier.note_no_progress_for_slate(s)
+                    frontier.select_frontier_action(
+                        budget_remaining=config.budget - len(calls),
+                        reading_available=bool(reading_tools))
 
             calls.append(
                 CallRecord(
@@ -750,4 +790,9 @@ class SearchLoop:
             frame_coverage=frame_coverage,
             task_frame_parse=(frame_parse_meta if task_frame else {}),
             epistemic_mode=epistemic_decision.to_dict(),
+            candidate_frontier=_frontier_trace(
+                frontier, epistemic_decision.selected_epistemic_mode, slate_skipped_reason,
+                uses_layer=(config.enable_task_frame or config.auto_epistemic_mode
+                            or config.force_task_frame),
+                had_frame=(task_frame and frame is not None)),
         )

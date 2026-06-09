@@ -58,6 +58,85 @@ class _GraphBuilder:
                                "target": target, "type": type_, "data": data or {}})
 
 
+def _project_frontier(g: "_GraphBuilder", aid: str, tf_node: str, cf: dict[str, Any]) -> None:
+    """Project the candidate-slate / frontier subgraph (Level 5)."""
+    cand_node = {}  # candidate_id -> node id
+    for slate in cf.get("slates", []):
+        sl_id = g.obj(f"candidate_slate#{aid}#{slate['slate_id']}", Objects.CANDIDATE_SLATE, {
+            "slot_id": slate.get("slot_id"), "slot_role": slate.get("slot_role"),
+            "slot_descriptor": slate.get("slot_descriptor"),
+            "slate_confidence": slate.get("slate_confidence"),
+            "n_active": len(slate.get("active_candidate_ids", [])),
+            "n_confirmed": len(slate.get("confirmed_candidate_ids", [])),
+            "n_rejected": len(slate.get("rejected_candidate_ids", []))})
+        g.rel(sl_id, f"latent_slot#{aid}#{slate['slot_id']}", Relations.SLATE_FOR_SLOT)
+        for c in slate.get("top_candidates", []):
+            cid = g.obj(f"slot_candidate#{aid}#{c['candidate_id']}", Objects.SLOT_CANDIDATE, {
+                "candidate_text_preview": c.get("candidate_text_preview"),
+                "normalized_text_hash": c.get("normalized_text_hash"),
+                "inferred_role": c.get("inferred_role"), "slot_id": c.get("slot_id"),
+                "status": c.get("status"), "status_reason": c.get("status_reason"),
+                "evidence_score": c.get("evidence_score"),
+                "source_domains": c.get("source_domains", []),
+                "constraints_supported": c.get("constraints_supported", []),
+                "constraints_contradicted": c.get("constraints_contradicted", [])})
+            cand_node[c["candidate_id"]] = cid
+            g.rel(cid, sl_id, Relations.CANDIDATE_IN_SLATE)
+            g.rel(cid, f"latent_slot#{aid}#{c['slot_id']}", Relations.CANDIDATE_ASSIGNED_TO_SLOT)
+            st = g.obj(f"candidate_status#{aid}#{c['candidate_id']}", Objects.CANDIDATE_STATUS,
+                       {"status": c.get("status"), "status_reason": c.get("status_reason")})
+            g.rel(cid, st, Relations.EVIDENCE_UPDATES_CANDIDATE_STATUS)
+            for con in c.get("constraints_supported", []):
+                g.rel(cid, f"constraint#{aid}#{con}", Relations.CANDIDATE_SUPPORTS_CONSTRAINT)
+            for con in c.get("constraints_contradicted", []):
+                g.rel(cid, f"constraint#{aid}#{con}", Relations.CANDIDATE_CONTRADICTS_CONSTRAINT)
+            if c.get("status") == "rejected":
+                rj = g.obj(f"candidate_rejection#{aid}#{c['candidate_id']}",
+                           Objects.CANDIDATE_REJECTION, {"reason": c.get("status_reason")})
+                g.rel(cid, rj, Relations.CANDIDATE_REJECTED_BY_EVIDENCE)
+            if c.get("status") == "confirmed":
+                pr = g.obj(f"candidate_promotion#{aid}#{c['candidate_id']}",
+                           Objects.CANDIDATE_PROMOTION, {"reason": c.get("status_reason")})
+                g.rel(cid, pr, Relations.CANDIDATE_CONFIRMED_BY_EVIDENCE)
+            if c.get("duplicate_of"):
+                mg = g.obj(f"candidate_merge#{aid}#{c['candidate_id']}", Objects.CANDIDATE_MERGE,
+                           {"merged_into": c.get("duplicate_of")})
+                g.rel(cid, mg, Relations.CANDIDATE_MERGED_INTO)
+    for h in cf.get("top_hypotheses", []):
+        hid = g.obj(f"hypothesis_state#{aid}#{h['hypothesis_id']}", Objects.HYPOTHESIS_STATE, {
+            "support_score": h.get("support_score"), "coverage_score": h.get("coverage_score"),
+            "source_diversity_score": h.get("source_diversity_score"),
+            "confidence_score": h.get("confidence_score"), "active": h.get("active")})
+        g.rel(hid, tf_node, Relations.FRAME_FOR_ATTEMPT)
+        if not h.get("active"):
+            g.rel(hid, tf_node, Relations.HYPOTHESIS_REJECTED_BY_CONSTRAINT)
+    for a in cf.get("frontier_actions", []):
+        an = g.obj(f"frontier_action#{aid}#{a['action_id']}", Objects.FRONTIER_ACTION, {
+            "action_type": a.get("action_type"), "target_slot_id": a.get("target_slot_id"),
+            "candidate_id": a.get("candidate_id"),
+            "expected_information_gain": a.get("expected_information_gain"),
+            "estimated_cost": a.get("estimated_cost"), "selected": a.get("selected"),
+            "selected_reason": a.get("selected_reason"),
+            "rejected_reason": a.get("rejected_reason")})
+        if a.get("target_slot_id"):
+            g.rel(an, f"latent_slot#{aid}#{a['target_slot_id']}", Relations.ACTION_TARGETS_SLOT)
+        if a.get("candidate_id") and a["candidate_id"] in cand_node:
+            rel = (Relations.ACTION_EXPANDS_CANDIDATE
+                   if a.get("action_type") == "expand_candidate_to_dependent_slot"
+                   else Relations.ACTION_TESTS_CANDIDATE)
+            g.rel(an, cand_node[a["candidate_id"]], rel)
+        for con in a.get("constraint_ids", []):
+            g.rel(an, f"constraint#{aid}#{con}", Relations.ACTION_TESTS_CONSTRAINT)
+        if a.get("selected"):
+            fd = g.obj(f"frontier_decision#{aid}#{a['action_id']}", Objects.FRONTIER_DECISION,
+                       {"selected_reason": a.get("selected_reason")})
+            g.rel(an, fd, Relations.FRONTIER_ACTION_SELECTED_BECAUSE)
+            fs = g.obj(f"frontier_score#{aid}#{a['action_id']}", Objects.FRONTIER_SCORE,
+                       {"expected_information_gain": a.get("expected_information_gain"),
+                        "estimated_cost": a.get("estimated_cost")})
+            g.rel(an, fs, Relations.FRONTIER_ACTION_SELECTED_BECAUSE)
+
+
 def build_graph_projection(
     run_id: str,
     *,
@@ -326,6 +405,11 @@ def build_graph_projection(
                     hr = g.obj(f"hypothesis#{aid}#{h['hypothesis_id']}", Objects.HYPOTHESIS,
                                {"active": False, "rejection_reason": h.get("rejection_reason")})
                     g.rel(hr, tf_node, Relations.HYPOTHESIS_REJECTED_BY_EVIDENCE)
+
+                # --- Level 5 candidate-slate / frontier subgraph ---
+                cf = d.get("candidate_frontier") or {}
+                if cf and not cf.get("skipped"):
+                    _project_frontier(g, aid, tf_node, cf)
 
     # --- run-level objects: memory_snapshot + policy_fragment lineage ---
     fragments = snapshot.get("fragments", {}) if snapshot else {}

@@ -217,3 +217,34 @@ is in the recording cache, a run can be **forked offline**: reuse the cached
 outcomes in `replay` mode and rerun policy variants without spending. Forks are
 marked `offline_fork=true` + `parent_run_id` and are never headline-eligible. See
 `OFFLINE_FORK_ABLATIONS.md`.
+
+## Candidate slates + frontier as native graph state (Level 5)
+
+The multi-hop candidate-slate / frontier layer (`agent/candidate_frontier.py`,
+`QUERY_POLICY.md` Level 5) is deliberately **not** a sidecar that only lives in the
+Python loop — it is event-sourced and projected so it is replayable, forkable, and
+learnable from traces. Lifecycle **events** (kept in `Events` + the `SLATE_EVENTS`
+tuple, recorded into the attempt trace + projection rather than the canonical 25-event
+log) cover the whole slate life: `candidate_slate.created`, `candidate.extracted`,
+`candidate.assigned_to_slot`, `candidate.status_changed`, `candidate.rejected`,
+`candidate.promoted`, `candidate.merged`, `hypothesis.created/updated/rejected`,
+`frontier_action.generated/selected/scored`, and the three `evidence.linked_to_*`
+edges — each with a deterministic id and an injected clock, no secrets, no unbounded
+page text (previews/hashes/ids only). The **projection** adds first-class objects
+(`candidate_slate`, `slot_candidate`, `candidate_status`, `candidate_rejection`,
+`candidate_promotion`, `candidate_merge`, `hypothesis_state`, `frontier_action`,
+`frontier_decision`, `frontier_score`, `candidate_evidence_link`,
+`candidate_constraint_status`) and relations (`slate_for_slot`, `candidate_in_slate`,
+`candidate_assigned_to_slot`, `candidate_supports_constraint`,
+`candidate_contradicts_constraint`, `candidate_rejected_by_evidence`,
+`candidate_confirmed_by_evidence`, `candidate_merged_into`, `hypothesis_uses_candidate`,
+`hypothesis_rejected_by_constraint`, `action_tests_candidate`,
+`action_expands_candidate`, `frontier_action_selected_because`,
+`evidence_updates_candidate_status`, `candidate_unlocks_dependent_slot`, …). Because
+the projection is a deterministic function of the trace (a pure function of the
+recorded tool/model outputs), candidate slates and frontier decisions **re-project
+identically**; an offline fork can re-score frontier actions under different
+reward/priority settings from the cached outcomes, and refuses rather than spends if a
+frontier action needs a missing provider output. This is what lets future learning ask
+which candidate/frontier strategies actually work, over many traces, rather than
+guessing.

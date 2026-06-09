@@ -55,6 +55,19 @@ class Objects:
     CANDIDATE_BINDING = "candidate_binding"
     SLOT_DESCRIPTOR = "slot_descriptor"
     BINDING_STATUS = "binding_status"
+    # Candidate-slate / frontier layer (Level 5)
+    CANDIDATE_SLATE = "candidate_slate"
+    SLOT_CANDIDATE = "slot_candidate"
+    CANDIDATE_STATUS = "candidate_status"
+    CANDIDATE_REJECTION = "candidate_rejection"
+    CANDIDATE_PROMOTION = "candidate_promotion"
+    CANDIDATE_MERGE = "candidate_merge"
+    HYPOTHESIS_STATE = "hypothesis_state"
+    FRONTIER_ACTION = "frontier_action"
+    FRONTIER_DECISION = "frontier_decision"
+    FRONTIER_SCORE = "frontier_score"
+    CANDIDATE_EVIDENCE_LINK = "candidate_evidence_link"
+    CANDIDATE_CONSTRAINT_STATUS = "candidate_constraint_status"
     POLICY_UPDATE = "policy_update"
     PROMOTION_DECISION = "promotion_decision"
     REPORT = "report"
@@ -125,6 +138,18 @@ PROJECTION_OBJECTS: tuple[str, ...] = (
     Objects.CANDIDATE_BINDING,
     Objects.SLOT_DESCRIPTOR,
     Objects.BINDING_STATUS,
+    Objects.CANDIDATE_SLATE,
+    Objects.SLOT_CANDIDATE,
+    Objects.CANDIDATE_STATUS,
+    Objects.CANDIDATE_REJECTION,
+    Objects.CANDIDATE_PROMOTION,
+    Objects.CANDIDATE_MERGE,
+    Objects.HYPOTHESIS_STATE,
+    Objects.FRONTIER_ACTION,
+    Objects.FRONTIER_DECISION,
+    Objects.FRONTIER_SCORE,
+    Objects.CANDIDATE_EVIDENCE_LINK,
+    Objects.CANDIDATE_CONSTRAINT_STATUS,
 )
 
 #: Map an event-log object type onto its standardized projection type.

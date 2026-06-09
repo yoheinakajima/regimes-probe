@@ -40,6 +40,39 @@ class Events:
     PROMOTION_ACCEPTED = "promotion.accepted"
     PROMOTION_REJECTED = "promotion.rejected"
     REPORT_CREATED = "report.created"
+    # Candidate-slate / frontier lifecycle (Level 5). These are recorded into the
+    # attempt trace + graph projection (NOT the canonical event log), so they are
+    # deliberately kept OUT of ALL_EVENTS (which the schema test pins at 25).
+    CANDIDATE_SLATE_CREATED = "candidate_slate.created"
+    CANDIDATE_EXTRACTED = "candidate.extracted"
+    CANDIDATE_ASSIGNED_TO_SLOT = "candidate.assigned_to_slot"
+    CANDIDATE_STATUS_CHANGED = "candidate.status_changed"
+    CANDIDATE_REJECTED = "candidate.rejected"
+    CANDIDATE_PROMOTED = "candidate.promoted"
+    CANDIDATE_MERGED = "candidate.merged"
+    HYPOTHESIS_CREATED = "hypothesis.created"
+    HYPOTHESIS_UPDATED = "hypothesis.updated"
+    HYPOTHESIS_REJECTED = "hypothesis.rejected"
+    FRONTIER_ACTION_GENERATED = "frontier_action.generated"
+    FRONTIER_ACTION_SELECTED = "frontier_action.selected"
+    FRONTIER_ACTION_EXECUTED = "frontier_action.executed"
+    FRONTIER_ACTION_SCORED = "frontier_action.scored"
+    EVIDENCE_LINKED_TO_CANDIDATE = "evidence.linked_to_candidate"
+    EVIDENCE_LINKED_TO_SLOT = "evidence.linked_to_slot"
+    EVIDENCE_LINKED_TO_CONSTRAINT = "evidence.linked_to_constraint"
+
+
+#: Candidate-slate / frontier event-type strings (trace + projection only).
+SLATE_EVENTS: tuple[str, ...] = (
+    Events.CANDIDATE_SLATE_CREATED, Events.CANDIDATE_EXTRACTED,
+    Events.CANDIDATE_ASSIGNED_TO_SLOT, Events.CANDIDATE_STATUS_CHANGED,
+    Events.CANDIDATE_REJECTED, Events.CANDIDATE_PROMOTED, Events.CANDIDATE_MERGED,
+    Events.HYPOTHESIS_CREATED, Events.HYPOTHESIS_UPDATED, Events.HYPOTHESIS_REJECTED,
+    Events.FRONTIER_ACTION_GENERATED, Events.FRONTIER_ACTION_SELECTED,
+    Events.FRONTIER_ACTION_EXECUTED, Events.FRONTIER_ACTION_SCORED,
+    Events.EVIDENCE_LINKED_TO_CANDIDATE, Events.EVIDENCE_LINKED_TO_SLOT,
+    Events.EVIDENCE_LINKED_TO_CONSTRAINT,
+)
 
 
 #: All canonical event-type strings, in causal order.

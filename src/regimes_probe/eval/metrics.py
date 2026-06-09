@@ -54,6 +54,8 @@ class AttemptOutcome:
     frame: dict = field(default_factory=dict)
     # Level 4 task-frame PARSER provenance (deterministic vs LLM)
     frame_parse: dict = field(default_factory=dict)
+    # Level 5 candidate-slate / frontier stats
+    frontier: dict = field(default_factory=dict)
 
     def to_row(self) -> dict[str, Any]:
         return {
@@ -220,6 +222,45 @@ def _frame_parser_metrics(stats: list[dict]) -> dict[str, Any]:
     }
 
 
+def _frontier_metrics(stats: list[dict]) -> dict[str, Any]:
+    """Aggregate Level-5 candidate-slate / frontier stats across a cell."""
+    from collections import Counter
+    used = [s for s in stats if s]
+    if not used:
+        return {}
+    active = [s for s in used if not s.get("skipped")]
+    skipped = [s for s in used if s.get("skipped")]
+    skip_reasons: Counter = Counter(s.get("skipped_candidate_slate_reason", "unknown")
+                                    for s in skipped)
+    action_counts: Counter = Counter()
+    for s in active:
+        for k, v in (s.get("frontier_action_counts") or {}).items():
+            action_counts[k] += int(v)
+
+    def avg(key: str) -> float:
+        vals = [float(s.get(key, 0.0)) for s in active]
+        return sum(vals) / len(vals) if vals else 0.0
+
+    return {
+        "candidate_slate_size_mean": avg("candidate_slate_size_mean"),
+        "active_candidates_per_slot": avg("active_candidates_per_slot"),
+        "confirmed_candidates_per_slot": avg("confirmed_candidates_per_slot"),
+        "rejected_candidates_per_slot": avg("rejected_candidates_per_slot"),
+        "candidate_promotion_rate": avg("candidate_promotion_rate"),
+        "candidate_rejection_rate": avg("candidate_rejection_rate"),
+        "candidate_merge_rate": avg("candidate_merge_rate"),
+        "hypothesis_branching_factor": avg("hypothesis_branching_factor"),
+        "frontier_action_counts": dict(action_counts),
+        "frontier_expected_gain_mean": avg("frontier_expected_gain_mean"),
+        "read_on_candidate_rate": _safe_div(
+            sum(int(s.get("read_on_candidate", 0)) for s in active), len(active)),
+        "answer_from_confirmed_hypothesis_rate": _safe_div(
+            sum(1 for s in active if s.get("answer_from_confirmed")), len(active)),
+        "skipped_candidate_slate_count": len(skipped),
+        "skipped_heavy_candidate_slate_reason_counts": dict(skip_reasons),
+    }
+
+
 def compute_metrics(outcomes: list[AttemptOutcome]) -> dict[str, Any]:
     """Aggregate metrics for one condition+budget cell."""
     n = len(outcomes)
@@ -271,6 +312,8 @@ def compute_metrics(outcomes: list[AttemptOutcome]) -> dict[str, Any]:
         **_frame_metrics([o.frame for o in outcomes]),
         # Level 4 task-frame parser provenance (deterministic vs LLM)
         **_frame_parser_metrics([o.frame_parse for o in outcomes]),
+        # Level 5 candidate-slate / frontier aggregates
+        **_frontier_metrics([o.frontier for o in outcomes]),
         "correct_per_tool_call": _safe_div(correct, calls),
         "correct_per_dollar": _safe_div(correct, cost) if cost else 0.0,
         "correct_per_second": _safe_div(correct, latency) if latency else 0.0,

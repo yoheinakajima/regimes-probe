@@ -30,6 +30,18 @@ def _prev(s: Optional[str], n: int = _PREVIEW) -> str:
     return s if len(s) <= n else s[: n - 1] + "…"
 
 
+def _bounded_frontier(cf: dict[str, Any], *, max_events: int = 80) -> dict[str, Any]:
+    """Bound the candidate-frontier debug dict (cap the event list)."""
+    if not cf:
+        return {}
+    out = dict(cf)
+    evs = out.get("events") or []
+    if len(evs) > max_events:
+        out["events"] = evs[:max_events]
+        out["events_truncated"] = len(evs)
+    return out
+
+
 #: Failure seams (ordered most-specific first).
 SEAMS = ("provider_error", "provider_returned_no_results", "evidence_absent",
          "evidence_not_selected", "answer_extraction", "grader_strictness",
@@ -96,6 +108,7 @@ class DebugRecord:
     frame_coverage: dict[str, Any] = field(default_factory=dict)
     task_frame_parse: dict[str, Any] = field(default_factory=dict)
     epistemic_mode: dict[str, Any] = field(default_factory=dict)
+    candidate_frontier: dict[str, Any] = field(default_factory=dict)
     evidence_titles: list[str] = field(default_factory=list)
     evidence_urls: list[str] = field(default_factory=list)
     evidence_snippet_previews: list[str] = field(default_factory=list)
@@ -238,6 +251,7 @@ def build_debug_record(*, item, trace, grade, reward, condition: str, budget: in
         frame_coverage=dict(getattr(trace, "frame_coverage", {}) or {}),
         task_frame_parse=dict(getattr(trace, "task_frame_parse", {}) or {}),
         epistemic_mode=dict(getattr(trace, "epistemic_mode", {}) or {}),
+        candidate_frontier=_bounded_frontier(getattr(trace, "candidate_frontier", {}) or {}),
         evidence_titles=[e["title_preview"] for e in evidence],
         evidence_urls=[e["url"] for e in evidence],
         evidence_snippet_previews=[e["snippet_preview"] for e in evidence])

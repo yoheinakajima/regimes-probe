@@ -118,6 +118,30 @@ def main() -> int:
                       f"support={h['support_score']} conf={h['confidence_score']} active={h['active']}")
             for h in (r.get("hypothesis_summary") or {}).get("rejected_hypotheses", []):
                 print(f"    ✗ hyp {h['hypothesis_id']}: {h['rejection_reason']}")
+        # Level 5 candidate slates + frontier.
+        cf = r.get("candidate_frontier") or {}
+        if cf.get("skipped"):
+            print(f"  CANDIDATE SLATES: skipped ({cf.get('skipped_candidate_slate_reason')})")
+        elif cf:
+            print(f"  CANDIDATE SLATES ({cf.get('n_slates')} slots):")
+            for sl in cf.get("slates", []):
+                tops = ", ".join(f"{c['candidate_text_preview']}[{c['status']}"
+                                 + (f":{c['status_reason']}" if c.get('status_reason') else "") + "]"
+                                 for c in sl.get("top_candidates", [])[:4]) or "(empty)"
+                print(f"    slate {sl.get('slot_role')}/{sl.get('slot_descriptor')!r}: {tops}")
+            for h in cf.get("top_hypotheses", [])[:3]:
+                print(f"    hyp* {h['hypothesis_id']}: {h.get('slot_candidate_assignments')} "
+                      f"support={h.get('support_score')} conf={h.get('confidence_score')} "
+                      f"active={h.get('active')}")
+            sel = cf.get("selected_frontier_action") or {}
+            if sel:
+                print(f"    frontier -> {sel.get('action_type')} (eig={sel.get('expected_information_gain')}, "
+                      f"{sel.get('selected_reason')})")
+            for a in cf.get("frontier_actions", [])[:5]:
+                tag = "SEL" if a.get("selected") else "   "
+                print(f"      [{tag}] {a.get('action_type')} slot={a.get('target_slot_id')} "
+                      f"eig={a.get('expected_information_gain')} "
+                      + (f"rej={a.get('rejected_reason')}" if a.get('rejected_reason') else ""))
         # Stage chain (iterative clue resolution): query -> results -> typed candidates.
         for c in r.get("calls", []):
             cands = c.get("candidate_entities", [])

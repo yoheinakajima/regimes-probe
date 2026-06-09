@@ -14,6 +14,7 @@
     "iterative_clue_resolution_enabled": false,
     "task_frame_enabled": false,
     "llm_task_frame_parser_enabled": false,
+    "frontier_controller_enabled": false,
     "dataset": "synthetic_browse",
     "dataset_version": "synthetic_browse@44963c46dfcf",
     "split": {
@@ -147,6 +148,7 @@
   "iterative_clue_resolution_enabled": false,
   "task_frame_enabled": false,
   "llm_task_frame_parser_enabled": false,
+  "frontier_controller_enabled": false,
   "task_frame_parser": {},
   "leakage_check_details": {
     "memory_snapshot_leakage_pass": true,

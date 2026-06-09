@@ -256,8 +256,30 @@ def _frontier_metrics(stats: list[dict]) -> dict[str, Any]:
             sum(int(s.get("read_on_candidate", 0)) for s in active), len(active)),
         "answer_from_confirmed_hypothesis_rate": _safe_div(
             sum(1 for s in active if s.get("answer_from_confirmed")), len(active)),
+        "answer_from_confirmed_hypothesis_count": sum(
+            1 for s in active if s.get("answer_from_confirmed")),
         "skipped_candidate_slate_count": len(skipped),
         "skipped_heavy_candidate_slate_reason_counts": dict(skip_reasons),
+        # --- Level 5b frontier controller (shadow vs active) ---
+        "frontier_controller_used_rate": _safe_div(
+            sum(1 for s in active if s.get("controller_used")), len(active)),
+        "frontier_planner_agreement_rate": _safe_div(
+            sum(int(s.get("shadow_agreements", 0)) for s in active),
+            sum(int(s.get("shadow_total", 0)) for s in active)),
+        "frontier_action_execution_success_rate": _safe_div(
+            sum(int(s.get("exec_success", 0)) for s in active),
+            sum(int(s.get("exec_success", 0)) + int(s.get("exec_failure", 0)) for s in active)),
+        "frontier_fallback_to_old_planner_count": sum(
+            int(s.get("fallback_count", 0)) for s in active),
+        "frontier_expected_gain_realized": avg("frontier_expected_gain_mean"),
+        "tool_calls_from_frontier_actions": sum(
+            int(s.get("tool_calls_from_frontier", 0)) for s in active),
+        "first_action_discriminative_constraint_rate": _safe_div(
+            sum(1 for s in active if s.get("first_action_discriminative") is True),
+            sum(1 for s in active if s.get("first_action_discriminative") is not None)),
+        "generic_first_query_rate": _safe_div(
+            sum(1 for s in active if s.get("first_query_generic") is True),
+            sum(1 for s in active if s.get("first_query_generic") is not None)),
     }
 
 

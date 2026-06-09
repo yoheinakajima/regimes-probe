@@ -148,6 +148,53 @@ class FrontierAction:
 
 
 @dataclass
+class StepPlan:
+    """A translated, executable (or not) frontier action for the controller loop."""
+    frontier_action_id: str
+    action_type: str
+    kind: str                                # search | read | answer | abstain | unexecutable
+    tool: Optional[str] = None
+    query: str = ""
+    query_arm: str = ""
+    target_slot_id: Optional[str] = None
+    candidate_id: Optional[str] = None
+    constraint_ids: list[str] = field(default_factory=list)
+    read_obs: Any = None
+    read_decision: Any = None
+    reason: str = ""
+    is_discriminative_constraint: bool = False
+    is_generic_query: bool = False
+
+    _PLANNER_KIND = {
+        "answer_from_confirmed_hypothesis": "answer_if_supported",
+        "abstain_no_viable_hypothesis": "abstain_if_blocked",
+        "read_candidate_source": "read_url_for_constraint",
+        "generate_candidates_for_slot": "search_to_bind_slot",
+        "verify_candidate_constraint": "search_to_test_constraint",
+        "expand_candidate_to_dependent_slot": "search_to_bind_slot",
+        "compare_candidates_for_slot": "compare_candidates"}
+
+    @property
+    def executable(self) -> bool:
+        return self.kind in ("search", "read", "answer", "abstain")
+
+    @property
+    def planner_kind(self) -> str:
+        return self._PLANNER_KIND.get(self.action_type, "search_to_bind_slot")
+
+    def action_info(self) -> dict[str, Any]:
+        return {"action_id": self.frontier_action_id,
+                "frontier_action_id": self.frontier_action_id,
+                "kind": self.planner_kind, "frontier_action_type": self.action_type,
+                "target_slot_id": self.target_slot_id, "candidate_id": self.candidate_id,
+                "tested_constraint_ids": list(self.constraint_ids),
+                "query_text_preview": self.query[:160], "query_arm": self.query_arm,
+                "selected_reason": self.reason, "driven_by": "frontier_controller",
+                "is_discriminative_constraint": self.is_discriminative_constraint,
+                "is_generic_query": self.is_generic_query}
+
+
+@dataclass
 class FrontierHypothesis:
     hypothesis_id: str
     slot_candidate_assignments: dict[str, str] = field(default_factory=dict)
@@ -484,18 +531,25 @@ class CandidateFrontier:
                         and (getattr(c, "blocks_answer_if_unresolved", False)
                              or getattr(c, "priority", "") == "high"
                              or "can_block_answer" in getattr(c, "affordances", []))]
+            blocking.sort(key=lambda c: -_disc(c))    # most discriminative first
             active = [c for c in slate.candidates.values() if c.status == "active"]
             confirmed = [c for c in slate.candidates.values() if c.status == "confirmed"]
             if blocking:
-                spec = max((getattr(c, "specificity_score", 0.0) for c in blocking), default=0.0)
+                top = blocking[0]
+                # Prefer DISCRIMINATIVE blocking constraints over generic answer-type
+                # ones, so the controller does not open with a generic target query.
+                disc_bonus = (0.6 if _is_discriminative_constraint(top)
+                              else (-0.6 if _is_generic_answer_constraint(top) else 0.0))
+                cons_ids = [c.constraint_id for c in blocking]
                 if active:
                     _add("verify_candidate_constraint", slot=slate.slot_id,
-                         cand=active[0].candidate_id, cons=[c.constraint_id for c in blocking],
-                         eig=3.0 + spec, cost=1.0, reason="resolve_blocking_constraint")
+                         cand=active[0].candidate_id, cons=cons_ids,
+                         eig=3.0 + 0.75 * _disc(top) + disc_bonus, cost=1.0,
+                         reason="resolve_blocking_constraint")
                 else:
-                    _add("generate_candidates_for_slot", slot=slate.slot_id,
-                         cons=[c.constraint_id for c in blocking], eig=2.5 + spec, cost=1.0,
-                         reason="bind_upstream_slot")
+                    _add("generate_candidates_for_slot", slot=slate.slot_id, cons=cons_ids,
+                         eig=2.5 + 0.75 * _disc(top) + disc_bonus, cost=1.0,
+                         reason="bind_slot_via_discriminative_constraint")
             elif not slate.candidates:
                 _add("generate_candidates_for_slot", slot=slate.slot_id, eig=2.0, cost=1.0,
                      reason="slot_unbound")
@@ -582,6 +636,138 @@ class CandidateFrontier:
         a.rejected_reason = "no_candidate_slot_constraint_affected"
         return a
 
+    # ---------- controller (optional: frontier drives tool selection) ----------
+    def propose_step_action(self, *, observations=(), budget_remaining: int = 99,
+                            reading_tools: bool = False, scraped_urls=frozenset(),
+                            no_progress_domains=frozenset(), page_fetch_available: bool = False,
+                            scrape_available: bool = False, allow_social: bool = False,
+                            force_page_fetch: bool = False) -> "StepPlan":
+        """Pick + TRANSLATE the next frontier action into an executable step plan.
+
+        Search-like actions build a query from the slot's most DISCRIMINATIVE blocking
+        constraint (never a bare repeat of the target descriptor); a read resolves a
+        candidate+slot+constraint URL from the observations; answer/abstain are
+        terminal. If a selected action cannot be executed it returns kind
+        ``unexecutable`` so the loop falls back to the old planner."""
+        self.generate_frontier_actions()
+        sel = self.select_frontier_action(budget_remaining=budget_remaining,
+                                          reading_available=reading_tools)
+        if sel is None:
+            return StepPlan("", "", "unexecutable", reason="no_frontier_action")
+        at = sel.action_type
+        if at == "answer_from_confirmed_hypothesis":
+            return StepPlan(sel.action_id, at, "answer", reason=sel.selected_reason)
+        if at == "abstain_no_viable_hypothesis":
+            return StepPlan(sel.action_id, at, "abstain", reason=sel.selected_reason)
+        if at == "read_candidate_source":
+            if not reading_tools:
+                return StepPlan(sel.action_id, at, "unexecutable", reason="no_reading_tool")
+            chosen = self._resolve_read(observations, scraped_urls, no_progress_domains,
+                                        page_fetch_available, scrape_available, allow_social,
+                                        force_page_fetch)
+            if chosen is None:
+                return StepPlan(sel.action_id, at, "unexecutable",
+                                reason="no_candidate_slot_constraint_url")
+            o, rd, tested = chosen
+            return StepPlan(sel.action_id, at, "read", read_obs=o, read_decision=rd,
+                            target_slot_id=sel.target_slot_id, candidate_id=sel.candidate_id,
+                            constraint_ids=tested, reason="read_candidate_source")
+        query, arm, disc, generic = self._build_query(sel)
+        if not query:
+            return StepPlan(sel.action_id, at, "unexecutable", reason="empty_query")
+        return StepPlan(sel.action_id, at, "search", query=query, query_arm=arm,
+                        target_slot_id=sel.target_slot_id, candidate_id=sel.candidate_id,
+                        constraint_ids=list(sel.constraint_ids), reason=sel.selected_reason,
+                        is_discriminative_constraint=disc, is_generic_query=generic)
+
+    def _resolve_read(self, observations, scraped_urls, no_progress_domains,
+                      page_fetch_available, scrape_available, allow_social, force_page_fetch):
+        from urllib.parse import urlparse as _up
+        from regimes_probe.agent.reading_policy import normalize_url, select_reading_tool
+        for o in observations:
+            if getattr(o, "failed", False) or not getattr(o, "url", ""):
+                continue
+            host = (_up(o.url).hostname or "").lower()
+            if normalize_url(o.url) in scraped_urls or host in no_progress_domains:
+                continue
+            rv = self.frontier_read_value(o)
+            if not rv.selected:
+                continue
+            rd = select_reading_tool(
+                url=o.url, title=getattr(o, "title", ""), snippet=getattr(o, "snippet", ""),
+                source_authority=float(getattr(o, "source_authority", 0.0)),
+                contaminated=False, unresolved_clue_terms=[], answer_shape=[],
+                cross_provider_domains=set(), page_fetch_available=page_fetch_available,
+                scrape_available=scrape_available, scraped_urls=scraped_urls,
+                no_progress_domains=no_progress_domains, allow_social=allow_social,
+                prefer_page_fetch=force_page_fetch, force_read=True)
+            if rd.tool:
+                return o, rd, list(rv.constraint_ids)
+        return None
+
+    def _head_noun(self, descriptor: str, slot) -> str:
+        from regimes_probe.agent.task_frame import _ROLE_TRIGGERS
+        toks = re.findall(r"[A-Za-z][A-Za-z'&]+", descriptor or "")
+        role = getattr(slot, "slot_role", "") if slot else ""
+        for t in toks:                                 # a role-type noun matching the slot
+            if _ROLE_TRIGGERS.get(t.lower()) == role:
+                return t
+        for t in reversed(toks):                       # else the last content word (the type)
+            if _ROLE_TRIGGERS.get(t.lower()):
+                return t
+        return toks[-1] if toks else ""
+
+    def _build_query(self, action) -> tuple[str, str, bool, bool]:
+        from regimes_probe.agent.action_planner import _distinctive_phrase
+        from regimes_probe.policy.query_decomposition import _cap, _is_rare
+        slot = self.frame.slot(action.target_slot_id) if action.target_slot_id else None
+        descriptor = (getattr(slot, "descriptor_text", "") or getattr(slot, "slot_name", "")) if slot else ""
+        cons = [self._con(cid) for cid in action.constraint_ids]
+        cons = [c for c in cons if c is not None]
+        cons.sort(key=lambda c: -_disc(c))
+        top = cons[0] if cons else None
+        phrase = _distinctive_phrase(top) if top is not None else ""
+        is_disc = bool(top is not None and _is_discriminative_constraint(top))
+        cand = self.candidate_text(action.candidate_id) if action.candidate_id else ""
+        head = self._head_noun(descriptor, slot)
+        parts: list[str] = []
+        if cand:
+            parts.append(f'"{cand}"')
+        if phrase:
+            parts.append(phrase)
+        words = set(re.findall(r"[a-z0-9]+", " ".join(parts).lower()))
+        # add the constraint's distinctive (rare/proper) terms not already present.
+        if top is not None:
+            for t in top.normalized_terms:
+                if len(t) >= 4 and t.lower() not in words and (_is_rare(t) or t[:1].isupper()):
+                    parts.append(t)
+                    words.add(t.lower())
+        if head and head.lower() not in words:
+            parts.append(head)
+        generic = not phrase                            # no discriminative clue used
+        if not parts:                                   # last resort: the descriptor once
+            parts.append(descriptor)
+            generic = True
+        return _cap(" ".join(p for p in parts if p).strip()), \
+            ("candidate_constraint" if cand else "frontier_search"), is_disc, generic
+
+    def _con(self, cid: str):
+        return next((c for c in self.frame.constraints if c.constraint_id == cid), None)
+
+    def record_execution(self, action_id: str, *, success: bool, kind: str = "",
+                         evidence_progress: float = 0.0) -> None:
+        for a in self.frontier_actions:
+            if a.action_id == action_id:
+                a.plan["executed"] = True
+                a.plan["execution_success"] = success
+        self._emit("frontier_action.executed", action_id=action_id,
+                   data={"success": success, "kind": kind,
+                         "evidence_progress": round(float(evidence_progress), 3)})
+
+    def record_unexecutable(self, action_id: str, *, reason: str) -> None:
+        self._emit("frontier_action_unexecutable", action_id=action_id,
+                   data={"reason": reason})
+
     # ---------- merge / promote (explicit) ----------
     def merge_candidates(self, keep_id: str, dup_id: str, *, reason: str = "duplicate") -> None:
         keep, dup = self.candidates_by_id.get(keep_id), self.candidates_by_id.get(dup_id)
@@ -641,6 +827,20 @@ class CandidateFrontier:
 def _union(lst: list, v) -> None:
     if v and v not in lst:
         lst.append(v)
+
+
+def _disc(con) -> float:
+    return float(getattr(con, "discriminative_score", 0.0)
+                 or getattr(con, "specificity_score", 0.0) or 0.0)
+
+
+def _is_discriminative_constraint(con) -> bool:
+    """A specific, distinguishing constraint — not a generic answer-type/scope clue."""
+    return (getattr(con, "constraint_type", "") != "answer_shape" and _disc(con) >= 1.0)
+
+
+def _is_generic_answer_constraint(con) -> bool:
+    return (getattr(con, "constraint_type", "") == "answer_shape" or _disc(con) < 1.0)
 
 
 def _supports(con, text_l: str) -> bool:

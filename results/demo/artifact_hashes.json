@@ -1,7 +1,7 @@
 {
   "run_dir": "results/demo",
   "sha256": {
-    "report.json": "a59ba470ae8df09c0c17e7b48807599462bb6108a0db21b266c254a4d2644273",
+    "report.json": "872b7b9ec6de345f2d4830d9b447246fa6096a2beb7d45ecc53d751d3221e727",
     "summary.md": "343de3562915dff524a283b24f2d7182eceb929e259d8bad478cc680ce905648",
     "per_question.csv": "b5a5c0897ce53a0640215191835a472aae95a7eb27edde6b14b3f9acc03d7d13",
     "budget_curve.csv": "1530c984bb2f70e8737c960043bac8cc5053cb3754c4c408e7dfbc7740d097fe",
@@ -10,11 +10,11 @@
     "stop_verify_rewards.csv": "de7bf88b1d4ad70a73120499e3b4903f8e52c55dcf7c30bc442fdde9d7626d4f",
     "memory_snapshot.json": "955a26b8e284b9b9c136eb0711313b5227c4a66e1b02f6233a0d670ad267a79e",
     "policy_updates.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-    "run_manifest.json": "f2683686d3630480985716007b4e66c049d80d5b11e3fdd68dd017a4cc80f761",
+    "run_manifest.json": "902ceacdc9dae6b7d1ca9faec409d2fc27dc1cb2b3b6f065c48ce728a3a1fcd0",
     "replay_check.md": "a67759c17be90dff137bbba7680bdf2f60101479dccf334b6459fa60b3198b2f",
-    "config_snapshot.yaml": "1db48016a5b0d73c35819d20f51c413859ede1064734475a1d16fdbf31b293f0",
-    "debug_questions.jsonl": "d76e4401d37822a0df800f0eb5113934dca5bab5cfb15aeea7d718e0b9e02020",
-    "graph_projection.json": "d5bc63760e3545e19ff4b4944008204b06b7dd4ad692ef8da785c74d896d2b00"
+    "config_snapshot.yaml": "62a6b2eaf48329aba30352cc5b71432dece14f0157eba95da873d6fedac19c4e",
+    "debug_questions.jsonl": "273195e0788666b2c599a4ef6f21fb711534202f2358ba9155e719d39e1a09bd",
+    "graph_projection.json": "8ba7c31916914ae521a6317ebed0dfcfaea646894658636576be3d6214af7afe"
   },
   "missing": []
 }

@@ -212,6 +212,7 @@ def write_full_report(
         "iterative_clue_resolution_enabled": bool(meta.get("iterative_clue_resolution_enabled", False)),
         "task_frame_enabled": bool(meta.get("task_frame_enabled", False)),
         "llm_task_frame_parser_enabled": bool(meta.get("llm_task_frame_parser_enabled", False)),
+        "frontier_controller_enabled": bool(meta.get("frontier_controller_enabled", False)),
         # LLM task-frame parser accounting (answer-free): model calls / cache / fallbacks.
         "task_frame_parser": dict(meta.get("task_frame_parser", {}) or {}),
         "leakage_check_details": leakage_details or {},

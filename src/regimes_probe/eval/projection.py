@@ -58,7 +58,8 @@ class _GraphBuilder:
                                "target": target, "type": type_, "data": data or {}})
 
 
-def _project_frontier(g: "_GraphBuilder", aid: str, tf_node: str, cf: dict[str, Any]) -> None:
+def _project_frontier(g: "_GraphBuilder", aid: str, tf_node: str, cf: dict[str, Any],
+                      calls: Optional[list] = None) -> None:
     """Project the candidate-slate / frontier subgraph (Level 5)."""
     cand_node = {}  # candidate_id -> node id
     for slate in cf.get("slates", []):
@@ -102,6 +103,7 @@ def _project_frontier(g: "_GraphBuilder", aid: str, tf_node: str, cf: dict[str, 
                 mg = g.obj(f"candidate_merge#{aid}#{c['candidate_id']}", Objects.CANDIDATE_MERGE,
                            {"merged_into": c.get("duplicate_of")})
                 g.rel(cid, mg, Relations.CANDIDATE_MERGED_INTO)
+    action_nodes: dict[str, str] = {}
     for h in cf.get("top_hypotheses", []):
         hid = g.obj(f"hypothesis_state#{aid}#{h['hypothesis_id']}", Objects.HYPOTHESIS_STATE, {
             "support_score": h.get("support_score"), "coverage_score": h.get("coverage_score"),
@@ -110,14 +112,23 @@ def _project_frontier(g: "_GraphBuilder", aid: str, tf_node: str, cf: dict[str, 
         g.rel(hid, tf_node, Relations.FRAME_FOR_ATTEMPT)
         if not h.get("active"):
             g.rel(hid, tf_node, Relations.HYPOTHESIS_REJECTED_BY_CONSTRAINT)
+        # which frontier action last updated this hypothesis.
+        lfa = h.get("last_frontier_action_id")
+        if lfa:
+            g.rel(hid, f"frontier_action#{aid}#{lfa}",
+                  Relations.HYPOTHESIS_UPDATED_AFTER_FRONTIER_ACTION)
     for a in cf.get("frontier_actions", []):
+        plan = a.get("plan") or {}
         an = g.obj(f"frontier_action#{aid}#{a['action_id']}", Objects.FRONTIER_ACTION, {
             "action_type": a.get("action_type"), "target_slot_id": a.get("target_slot_id"),
             "candidate_id": a.get("candidate_id"),
             "expected_information_gain": a.get("expected_information_gain"),
             "estimated_cost": a.get("estimated_cost"), "selected": a.get("selected"),
+            "executed": bool(plan.get("executed")),
+            "execution_success": plan.get("execution_success"),
             "selected_reason": a.get("selected_reason"),
             "rejected_reason": a.get("rejected_reason")})
+        action_nodes[a["action_id"]] = an
         if a.get("target_slot_id"):
             g.rel(an, f"latent_slot#{aid}#{a['target_slot_id']}", Relations.ACTION_TARGETS_SLOT)
         if a.get("candidate_id") and a["candidate_id"] in cand_node:
@@ -135,6 +146,23 @@ def _project_frontier(g: "_GraphBuilder", aid: str, tf_node: str, cf: dict[str, 
                        {"expected_information_gain": a.get("expected_information_gain"),
                         "estimated_cost": a.get("estimated_cost")})
             g.rel(an, fs, Relations.FRONTIER_ACTION_SELECTED_BECAUSE)
+    # Controller: each executed tool call links to the frontier action that drove it.
+    # The driving action may predate the final action list (the frontier regenerates
+    # every step), so materialize a node for it from the call's task_action.
+    for i, c in enumerate(calls or []):
+        fa_id = c.get("frontier_action_id")
+        if not fa_id:
+            continue
+        node = action_nodes.get(fa_id)
+        if node is None:
+            ta = c.get("task_action") or {}
+            node = g.obj(f"frontier_action#{aid}#{fa_id}", Objects.FRONTIER_ACTION, {
+                "action_type": ta.get("frontier_action_type"), "executed": True,
+                "target_slot_id": ta.get("target_slot_id"),
+                "selected_reason": ta.get("selected_reason"),
+                "driven_by": "frontier_controller"})
+            action_nodes[fa_id] = node
+        g.rel(f"epistemic_action#{aid}#{i}", node, Relations.TOOL_CALL_FROM_FRONTIER_ACTION)
 
 
 def build_graph_projection(
@@ -409,7 +437,7 @@ def build_graph_projection(
                 # --- Level 5 candidate-slate / frontier subgraph ---
                 cf = d.get("candidate_frontier") or {}
                 if cf and not cf.get("skipped"):
-                    _project_frontier(g, aid, tf_node, cf)
+                    _project_frontier(g, aid, tf_node, cf, d.get("calls", []))
 
     # --- run-level objects: memory_snapshot + policy_fragment lineage ---
     fragments = snapshot.get("fragments", {}) if snapshot else {}

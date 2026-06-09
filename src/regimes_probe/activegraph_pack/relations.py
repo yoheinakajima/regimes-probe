@@ -72,6 +72,9 @@ class Relations:
     FRONTIER_ACTION_SELECTED_BECAUSE = "frontier_action_selected_because"
     EVIDENCE_UPDATES_CANDIDATE_STATUS = "evidence_updates_candidate_status"
     CANDIDATE_UNLOCKS_DEPENDENT_SLOT = "candidate_unlocks_dependent_slot"
+    # Frontier controller (Level 5b)
+    TOOL_CALL_FROM_FRONTIER_ACTION = "tool_call_from_frontier_action"
+    HYPOTHESIS_UPDATED_AFTER_FRONTIER_ACTION = "hypothesis_updated_after_frontier_action"
     UPDATE_FROM_REWARD = "update_from_reward"
     REGIME_FOR_FAILURE = "regime_for_failure"
     PROMOTION_FOR_UPDATE = "promotion_for_update"
@@ -151,4 +154,6 @@ PROJECTION_RELATIONS: tuple[str, ...] = (
     Relations.FRONTIER_ACTION_SELECTED_BECAUSE,
     Relations.EVIDENCE_UPDATES_CANDIDATE_STATUS,
     Relations.CANDIDATE_UNLOCKS_DEPENDENT_SLOT,
+    Relations.TOOL_CALL_FROM_FRONTIER_ACTION,
+    Relations.HYPOTHESIS_UPDATED_AFTER_FRONTIER_ACTION,
 )

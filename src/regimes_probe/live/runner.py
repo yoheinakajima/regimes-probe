@@ -416,6 +416,9 @@ def run_live_pipeline(cfg, items, *, providers, search_agent, cb_agent, cache,
         "llm_task_frame_parser_enabled": ls.get(
             "llm_task_frame_parser_enabled",
             bool(cfg.get("policy", {}).get("enable_llm_task_frame_parser", False))),
+        "frontier_controller_enabled": ls.get(
+            "frontier_controller_enabled",
+            bool(cfg.get("policy", {}).get("enable_frontier_controller", False))),
         # LLM task-frame parser accounting (answer-free): model calls + cache + fallbacks.
         "task_frame_parser": (task_frame_parser.stats() if task_frame_parser is not None
                               else {}),

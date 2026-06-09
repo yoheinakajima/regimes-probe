@@ -143,6 +143,8 @@ class CallRecord:
     # Level 4 task-frame action + evidence record
     task_action: dict[str, Any] = field(default_factory=dict)
     evidence_record: dict[str, Any] = field(default_factory=dict)
+    # Level 5 frontier controller: the frontier_action this tool call executed
+    frontier_action_id: Optional[str] = None
 
     @property
     def contaminated_results(self) -> int:
@@ -175,6 +177,7 @@ class CallRecord:
             "scrape": self.scrape,
             "task_action": self.task_action,
             "evidence_record": self.evidence_record,
+            "frontier_action_id": self.frontier_action_id,
             "cost": self.cost,
             "latency": self.latency,
             "stop_arm": self.stop_arm,
@@ -188,10 +191,12 @@ class CallRecord:
 
 
 def _frontier_trace(frontier, mode: str, skip_reason: str, *, uses_layer: bool,
-                    had_frame: bool) -> dict[str, Any]:
+                    had_frame: bool, controller: Optional[dict[str, Any]] = None) -> dict[str, Any]:
     """Candidate-frontier trace payload: the slate debug, or a bounded skip record."""
     if frontier is not None:
-        return frontier.to_debug()
+        out = frontier.to_debug()
+        out["controller"] = controller or {}
+        return out
     if uses_layer and mode in ("direct_answer_possible", "simple_lookup"):
         return {"skipped": True, "skipped_candidate_slate_reason": f"epistemic_mode={mode}"}
     if had_frame:
@@ -255,6 +260,7 @@ class SearchLoopConfig:
     auto_epistemic_mode: bool = False
     force_task_frame: bool = False
     disable_direct_answer: bool = False
+    enable_frontier_controller: bool = False
     scrape_fallback_to_page_fetch: bool = True
     allow_social_scrape: bool = False
 
@@ -398,6 +404,15 @@ class SearchLoop:
         # pools + frontier scheduling. Skipped for easy/direct/simple epistemic modes.
         frontier = None
         slate_skipped_reason = ""
+        # Frontier controller (optional): when enabled, the frontier scheduler DRIVES
+        # tool/action selection; otherwise it stays shadow (recommendation only).
+        frontier_controller = config.enable_frontier_controller and task_frame
+        ctrl = {"frontier_controller_used": False, "old_planner_fallback_count": 0,
+                "frontier_action_execution_success_count": 0,
+                "frontier_action_execution_failure_count": 0,
+                "tool_calls_from_frontier_actions": 0,
+                "shadow_agreements": 0, "shadow_total": 0, "shadow_disagree_reasons": [],
+                "first_action_discriminative": None, "first_query_generic": None}
         if task_frame and frame is not None:
             _mode = epistemic_decision.selected_epistemic_mode
             if _mode in ("direct_answer_possible", "simple_lookup"):
@@ -405,6 +420,7 @@ class SearchLoop:
             else:
                 from regimes_probe.agent.candidate_frontier import CandidateFrontier
                 frontier = CandidateFrontier(frame, attempt_id=attempt_id, item_id=item.id)
+                ctrl["frontier_controller_used"] = bool(config.enable_frontier_controller)
 
         calls: list[CallRecord] = []
         observations: list[EvidenceObservation] = []
@@ -451,7 +467,53 @@ class SearchLoop:
                     read_dec = None
             beam_sel = beam.select() if (iterative and beam is not None and calls) else None
             read_target_obs = None
-            if task_frame:
+
+            # Frontier CONTROLLER step: when enabled, the frontier scheduler drives this
+            # step's tool/action (every executed call links to a frontier_action id).
+            controller_handled = False
+            step_plan = None
+            if frontier is not None:
+                step_plan = frontier.propose_step_action(
+                    observations=observations, budget_remaining=config.budget - len(calls),
+                    reading_tools=bool(reading_tools), scraped_urls=scraped_urls,
+                    no_progress_domains=no_progress_domains,
+                    page_fetch_available=page_fetch_available, scrape_available=scrape_available,
+                    allow_social=config.allow_social_scrape, force_page_fetch=force_page_fetch)
+            if frontier_controller and step_plan is not None and step_plan.executable:
+                if ctrl["first_action_discriminative"] is None and step_plan.kind == "search":
+                    ctrl["first_action_discriminative"] = step_plan.is_discriminative_constraint
+                    ctrl["first_query_generic"] = step_plan.is_generic_query
+                if step_plan.kind in ("answer", "abstain"):
+                    task_action_info = step_plan.action_info()
+                    task_actions.append(task_action_info)
+                    terminal_action = task_action_info
+                    frontier.record_execution(step_plan.frontier_action_id, success=True,
+                                              kind=step_plan.kind)
+                    break
+                if step_plan.kind == "search":
+                    tool = step_plan.tool or (tool_seq[step] if step < len(tool_seq) else tool_seq[-1])
+                    query, query_arm, opts = step_plan.query, step_plan.query_arm, {}
+                    task_action_info = step_plan.action_info()
+                    task_actions.append(task_action_info)
+                    controller_handled = True
+                elif step_plan.kind == "read":
+                    o, rd = step_plan.read_obs, step_plan.read_decision
+                    tool, query, query_arm, opts = rd.tool, o.url, rd.query_arm, {}
+                    read_target_obs = o
+                    force_page_fetch = False
+                    scrape_info = {"read_tool": tool, "scrape_url": query, "scrape_provider": tool,
+                                   "scrape_selected_reason": rd.reason, "is_scrape": rd.is_scrape}
+                    task_action_info = step_plan.action_info()
+                    task_actions.append(task_action_info)
+                    controller_handled = True
+            elif frontier_controller and step_plan is not None and not step_plan.executable:
+                frontier.record_unexecutable(step_plan.frontier_action_id or "n/a",
+                                             reason=step_plan.reason)
+                ctrl["old_planner_fallback_count"] += 1
+
+            if controller_handled:
+                pass                                    # tool/query set by the controller
+            elif task_frame:
                 from urllib.parse import urlparse as _up
                 from regimes_probe.agent.reading_policy import (
                     normalize_url as _nurl, select_reading_tool as _srt)
@@ -573,6 +635,24 @@ class SearchLoop:
                         "query_candidates": ex.get("candidate_queries", [])}
                 rec.on_query_plan(step, qplan.to_dict())
 
+            # SHADOW comparison (controller OFF): record the frontier's recommendation
+            # vs. the planner's actual action for this task-frame step.
+            if (task_frame and frontier is not None and not frontier_controller
+                    and step_plan is not None and not controller_handled):
+                actual_kind = task_action_info.get("kind", "")
+                rec_kind = step_plan.planner_kind
+                agree = (actual_kind == rec_kind
+                         or (actual_kind.startswith("search") and rec_kind.startswith("search")))
+                ctrl["shadow_total"] += 1
+                if agree:
+                    ctrl["shadow_agreements"] += 1
+                else:
+                    ctrl["shadow_disagree_reasons"].append(f"{rec_kind}!={actual_kind or 'none'}")
+                if task_action_info:
+                    task_action_info["frontier_recommended_action"] = step_plan.action_type
+                    task_action_info["planner_actual_action"] = actual_kind
+                    task_action_info["action_agreement"] = agree
+
             response = invoker.call(tool, query, limit=5, **opts)
             ci = len(calls)
             obs = [
@@ -693,13 +773,26 @@ class SearchLoop:
                 # Fold the same evidence into the candidate-slate frontier (multi-hop)
                 # and let the frontier scheduler record its next action by info gain.
                 if frontier is not None:
-                    frontier.ingest_evidence(
+                    fev = frontier.ingest_evidence(
                         obs, source_tool=tool, stage=ci + 1,
                         read_depth=(2 if scrape_info.get("is_scrape") else (1 if scrape_info else 0)),
                         action_id=task_action_info.get("action_id"))
                     if not progressed:
                         for s in frontier.slates:
                             frontier.note_no_progress_for_slate(s)
+                    # When the controller drove this call, record its execution outcome
+                    # (success = the tool ran AND produced evidence progress).
+                    if controller_handled and step_plan is not None:
+                        ok = (not call_failed) and float(
+                            getattr(fev, "evidence_progress_score", 0.0)) > 0
+                        frontier.record_execution(step_plan.frontier_action_id, success=ok,
+                                                  kind=step_plan.kind,
+                                                  evidence_progress=getattr(fev, "evidence_progress_score", 0.0))
+                        ctrl["tool_calls_from_frontier_actions"] += 1
+                        if ok:
+                            ctrl["frontier_action_execution_success_count"] += 1
+                        else:
+                            ctrl["frontier_action_execution_failure_count"] += 1
                     frontier.select_frontier_action(
                         budget_remaining=config.budget - len(calls),
                         reading_available=bool(reading_tools))
@@ -737,6 +830,7 @@ class SearchLoop:
                     no_progress=no_progress_flag,
                     scrape=scrape_info,
                     task_action=task_action_info,
+                    frontier_action_id=task_action_info.get("frontier_action_id"),
                     evidence_record=evidence_record_info,
                 )
             )
@@ -794,5 +888,5 @@ class SearchLoop:
                 frontier, epistemic_decision.selected_epistemic_mode, slate_skipped_reason,
                 uses_layer=(config.enable_task_frame or config.auto_epistemic_mode
                             or config.force_task_frame),
-                had_frame=(task_frame and frame is not None)),
+                had_frame=(task_frame and frame is not None), controller=ctrl),
         )

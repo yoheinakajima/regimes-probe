@@ -310,3 +310,17 @@ heavy machinery firing only on the hard tail. Because the whole slate/frontier s
 is projected and replayable, an **offline fork** can re-score frontier actions under a
 different reward/priority setting without re-calling providers — letting you ask
 "which frontier strategy resolves slots with the least wasted work?" from traces.
+
+**Shadow vs. controller is a clean A/B (Level 5b).** Run the frontier in shadow
+(default) and in `--enable-frontier-controller` with everything else fixed. In shadow
+mode read `frontier_planner_agreement_rate` — how often the frontier's recommendation
+matched the old planner's actual action — to see where the two diverge before handing
+over control. In controller mode read `frontier_controller_used_rate`,
+`frontier_action_execution_success_rate`, `frontier_fallback_to_old_planner_count`, and
+`tool_calls_from_frontier_actions`. Two planning-quality signals matter most for the
+"don't open with a generic query" requirement: `first_action_discriminative_constraint_rate`
+(should be high — the first action targets an actor/casting-style discriminative
+constraint, not the generic answer-type target constraint) and `generic_first_query_rate`
+(should be near zero). A controller win is "same/better accuracy with fewer wasted
+tool calls and a higher discriminative-first rate," audited from the per-call
+`frontier_action_id` links — not a black-box accuracy delta.

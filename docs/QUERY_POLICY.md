@@ -643,3 +643,27 @@ searching broad known-context terms. A **read** must name a `(candidate, slot,
 constraint)` triple it would affect; otherwise it is rejected
 (`no_candidate_slot_constraint_affected`), along with contaminated/no-progress/generic
 URLs. The answer-support gate is unchanged — slates feed it, they do not weaken it.
+
+### Level 5b: frontier controller (optionally drives tool selection)
+
+Level 5 (above) is **shadow/projection** by default: the candidate-slate frontier
+records its recommended next action every step, but the Level-4 `ActionPlanner` still
+drives the actual tool calls. `--enable-frontier-controller` (requires
+`--enable-task-frame`; a hard config error otherwise) **promotes** the frontier from
+shadow to controller: `FrontierScheduler.propose_step_action` selects the next action
+by expected information gain and **translates** it into the executed step —
+`generate_candidates_for_slot`/`verify_candidate_constraint`/`compare_candidates_for_slot`/
+`expand_candidate_to_dependent_slot` → a search query built from the slot's most
+**discriminative** blocking constraint (never a bare repeat of the target descriptor —
+e.g. it opens the TV-series frame on "actor born Tennessee", not `"90s TV series" 90s
+TV series`); `read_candidate_source` → a page read **only** when a `(candidate, slot,
+constraint)` URL can be resolved from the observations; `answer_from_confirmed_hypothesis`/
+`abstain_no_viable_hypothesis` → terminal. **Every executed tool call links to a
+`frontier_action` id** (`CallRecord.frontier_action_id`, `tool_call_from_frontier_action`
+edge). If a selected action cannot be executed safely it records
+`frontier_action_unexecutable` and **falls back to the old planner for that step**, so
+the controller can never get stuck. Shadow mode (default) records, per step,
+`frontier_recommended_action` / `planner_actual_action` / `action_agreement`; active
+mode records `frontier_controller_used`, `old_planner_fallback_count`,
+`frontier_action_execution_success/failure_count`, and `tool_calls_from_frontier_actions`.
+Easy questions bypass the whole layer via the escalation controller (Level 4d).

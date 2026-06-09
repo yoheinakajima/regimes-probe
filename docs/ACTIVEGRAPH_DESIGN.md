@@ -248,3 +248,16 @@ reward/priority settings from the cached outcomes, and refuses rather than spend
 frontier action needs a missing provider output. This is what lets future learning ask
 which candidate/frontier strategies actually work, over many traces, rather than
 guessing.
+
+When the **frontier controller** is enabled (Level 5b, `QUERY_POLICY.md`), the same
+source-of-truth discipline holds for the *control* decisions: the selected action is
+recorded (`frontier_action.selected`/`scored`), its outcome is recorded
+(`frontier_action.executed` with success/evidence-progress, or
+`frontier_action_unexecutable` on a safe fallback), every executed tool call carries a
+`frontier_action_id` and projects a `tool_call_from_frontier_action` edge to its
+driving action, and a hypothesis update projects
+`hypothesis_updated_after_frontier_action`. So a reviewer can reconstruct, purely from
+`graph_projection.json`, *which* frontier action drove *which* tool call and *what* it
+achieved — and an offline fork can replay the cached tool outputs while re-scoring the
+frontier under a different EIG/reward setting, refusing to spend if a needed output is
+absent. Controller decisions are never hidden Python state.

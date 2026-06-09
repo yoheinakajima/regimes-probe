@@ -48,22 +48,28 @@ def build_synthetic(cfg: dict[str, Any]):
     return items, providers, tools, search_tools
 
 
-#: Human-readable error for the LLM-parser-without-task-frame misconfiguration.
+#: Human-readable errors for task-frame-layer misconfiguration.
 LLM_PARSER_REQUIRES_TASK_FRAME = (
     "--enable-llm-task-frame-parser requires --enable-task-frame")
+FRONTIER_CONTROLLER_REQUIRES_TASK_FRAME = (
+    "--enable-frontier-controller requires --enable-task-frame")
 
 
-def validate_task_frame_flags(*, task_frame: bool, llm_parser: bool) -> None:
-    """Fail fast on an LLM-parser-without-task-frame request (never downgrade)."""
+def validate_task_frame_flags(*, task_frame: bool, llm_parser: bool,
+                              frontier_controller: bool = False) -> None:
+    """Fail fast on a task-frame-dependent flag requested without the task frame."""
     if llm_parser and not task_frame:
         raise ValueError(LLM_PARSER_REQUIRES_TASK_FRAME)
+    if frontier_controller and not task_frame:
+        raise ValueError(FRONTIER_CONTROLLER_REQUIRES_TASK_FRAME)
 
 
 def build_agent(cfg: dict[str, Any], tools: list[str], *, task_frame_parser=None) -> EpistemicAgent:
     pol = cfg.get("policy", {})
     enable_llm_parser = bool(pol.get("enable_llm_task_frame_parser", False))
     validate_task_frame_flags(task_frame=bool(pol.get("enable_task_frame", False)),
-                              llm_parser=enable_llm_parser)
+                              llm_parser=enable_llm_parser,
+                              frontier_controller=bool(pol.get("enable_frontier_controller", False)))
     agent_cfg = AgentConfig(
         available_tools=tools,
         query_mode=pol.get("query_mode", "learned"),
@@ -75,6 +81,7 @@ def build_agent(cfg: dict[str, Any], tools: list[str], *, task_frame_parser=None
         auto_epistemic_mode=bool(pol.get("auto_epistemic_mode", False)),
         force_task_frame=bool(pol.get("force_task_frame", False)),
         disable_direct_answer=bool(pol.get("disable_direct_answer", False)),
+        enable_frontier_controller=bool(pol.get("enable_frontier_controller", False)),
         scrape_fallback_to_page_fetch=bool(pol.get("scrape_fallback_to_page_fetch", True)),
         allow_social_scrape=bool(pol.get("allow_social_scrape", False)),
         as_of=cfg.get("run", {}).get("as_of", "2026-06-01"),
@@ -330,6 +337,8 @@ def full_pipeline(
         "task_frame_enabled": bool(cfg.get("policy", {}).get("enable_task_frame", False)),
         "llm_task_frame_parser_enabled": bool(
             cfg.get("policy", {}).get("enable_llm_task_frame_parser", False)),
+        "frontier_controller_enabled": bool(
+            cfg.get("policy", {}).get("enable_frontier_controller", False)),
         "dataset": dataset_label,
         "dataset_version": dataset_version,
         "split": split.to_dict() | {"optimize_ids": "...", "confirm_ids": "..."},

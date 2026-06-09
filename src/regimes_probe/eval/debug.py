@@ -189,6 +189,7 @@ def build_debug_record(*, item, trace, grade, reward, condition: str, budget: in
             # Level 4 task-frame action + evidence record
             "task_action": dict(getattr(c, "task_action", {})),
             "evidence_record": dict(getattr(c, "evidence_record", {})),
+            "frontier_action_id": getattr(c, "frontier_action_id", None),
             "n_results": n_ok, "contaminated_results": c_cont,
             "failed": bool(getattr(c, "failed", False)),
             "error_type": getattr(c, "error_type", None),

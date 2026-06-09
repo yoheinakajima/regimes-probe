@@ -100,6 +100,17 @@ def _frontier_stats(trace) -> dict:
         for a in cf.get("frontier_actions", [])) else 0
     m["answer_from_confirmed"] = sel.get("action_type") == "answer_from_confirmed_hypothesis"
     m["skipped"] = False
+    # controller (Level 5b): shadow-vs-active comparison + execution accounting.
+    ctrl = cf.get("controller", {}) or {}
+    m["controller_used"] = bool(ctrl.get("frontier_controller_used"))
+    m["shadow_agreements"] = int(ctrl.get("shadow_agreements", 0))
+    m["shadow_total"] = int(ctrl.get("shadow_total", 0))
+    m["exec_success"] = int(ctrl.get("frontier_action_execution_success_count", 0))
+    m["exec_failure"] = int(ctrl.get("frontier_action_execution_failure_count", 0))
+    m["fallback_count"] = int(ctrl.get("old_planner_fallback_count", 0))
+    m["tool_calls_from_frontier"] = int(ctrl.get("tool_calls_from_frontier_actions", 0))
+    m["first_action_discriminative"] = ctrl.get("first_action_discriminative")
+    m["first_query_generic"] = ctrl.get("first_query_generic")
     return m
 
 

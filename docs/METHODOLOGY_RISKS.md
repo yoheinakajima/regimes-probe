@@ -345,3 +345,21 @@ set — and the risk surface. Keep the experiment honest:
   promotion/frontier decision is an event in the projection, these are auditable from
   traces rather than asserted; contamination still poisons confirmation, and nothing
   from the slate layer is written to answer-free policy memory.
+- **Handing control to the frontier can quietly change the comparison.** Promoting the
+  frontier from shadow to **controller** (`--enable-frontier-controller`) changes which
+  queries/reads run, so a controller-vs-shadow A/B is only fair if everything else is
+  pinned (same frame, parser, tools, budget, answerer) — the controller is OFF by
+  default and shadow stays available precisely so the two are comparable. Risks: (a) a
+  controller that *looks* better because it issues more (or cheaper) calls, not better
+  ones — read `frontier_action_execution_success_rate` (success requires real evidence
+  progress, not merely that a tool ran) and watch `tool_calls_from_frontier_actions`
+  vs. accuracy; (b) the EIG heuristic is a *guess at value*, not truth — a high
+  `first_action_discriminative_constraint_rate` is necessary but not sufficient, and a
+  query that is discriminative-by-label can still retrieve nothing, so check realized
+  evidence progress per selected action; (c) silent stalling — an action the frontier
+  cannot execute records `frontier_action_unexecutable` and **falls back to the old
+  planner** (counted by `frontier_fallback_to_old_planner_count`); a high fallback rate
+  means the controller is not actually in control and the result is really the old
+  planner's. The answer-support gate is unchanged, so the controller cannot make an
+  unsupported answer "supported"; and every controller decision is event/trace-backed,
+  so none of this is taken on faith.

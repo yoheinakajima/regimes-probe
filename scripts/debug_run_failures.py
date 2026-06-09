@@ -123,6 +123,17 @@ def main() -> int:
         if cf.get("skipped"):
             print(f"  CANDIDATE SLATES: skipped ({cf.get('skipped_candidate_slate_reason')})")
         elif cf:
+            ctrl = cf.get("controller", {}) or {}
+            if ctrl.get("frontier_controller_used"):
+                print(f"  FRONTIER CONTROLLER: active  tool_calls_from_frontier="
+                      f"{ctrl.get('tool_calls_from_frontier_actions')} "
+                      f"exec_success={ctrl.get('frontier_action_execution_success_count')} "
+                      f"fallback={ctrl.get('old_planner_fallback_count')} "
+                      f"first_discriminative={ctrl.get('first_action_discriminative')} "
+                      f"first_generic={ctrl.get('first_query_generic')}")
+            elif ctrl.get("shadow_total"):
+                print(f"  FRONTIER CONTROLLER: shadow  agreement="
+                      f"{ctrl.get('shadow_agreements')}/{ctrl.get('shadow_total')}")
             print(f"  CANDIDATE SLATES ({cf.get('n_slates')} slots):")
             for sl in cf.get("slates", []):
                 tops = ", ".join(f"{c['candidate_text_preview']}[{c['status']}"

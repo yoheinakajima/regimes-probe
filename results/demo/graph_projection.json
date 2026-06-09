@@ -103,7 +103,9 @@
     "action_expands_candidate",
     "frontier_action_selected_because",
     "evidence_updates_candidate_status",
-    "candidate_unlocks_dependent_slot"
+    "candidate_unlocks_dependent_slot",
+    "tool_call_from_frontier_action",
+    "hypothesis_updated_after_frontier_action"
   ],
   "detail_limit": 60,
   "event_log": {

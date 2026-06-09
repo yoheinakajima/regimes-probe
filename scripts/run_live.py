@@ -130,6 +130,11 @@ def main() -> int:
                     help="Always escalate to task-frame mode (overrides the controller).")
     ap.add_argument("--disable-direct-answer", action="store_true",
                     help="Never use the direct-answer mode (always search at least once).")
+    ap.add_argument("--enable-frontier-controller", action="store_true",
+                    help="Level 5: the candidate-slate FrontierScheduler DRIVES tool "
+                         "selection (each call links to a frontier_action id; falls back "
+                         "to the old planner per step). Requires --enable-task-frame. "
+                         "Off by default (shadow mode: recommendations recorded only).")
     ap.add_argument("--judge-model", default=None,
                     help="(reserved) LLM judge; grading currently uses exact/normalized match")
     ap.add_argument("--split-seed", default=None)
@@ -166,12 +171,16 @@ def main() -> int:
     # downgrade a user-requested flag.
     llm_parser_requested = (args.enable_llm_task_frame_parser
                             or bool(cfg.get("policy", {}).get("enable_llm_task_frame_parser", False)))
+    frontier_controller_requested = (args.enable_frontier_controller
+                                     or bool(cfg.get("policy", {}).get("enable_frontier_controller", False)))
     try:
-        validate_task_frame_flags(task_frame=task_frame_enabled, llm_parser=llm_parser_requested)
+        validate_task_frame_flags(task_frame=task_frame_enabled, llm_parser=llm_parser_requested,
+                                  frontier_controller=frontier_controller_requested)
     except ValueError as exc:
         print(f"=== run_live: REFUSING (configuration error) ===\n{exc}")
         return 2
     llm_parser_enabled = llm_parser_requested
+    frontier_controller_enabled = frontier_controller_requested
 
     # Resolve models + tools from mode/CLI/config/env (cheap-first; OpenAI hosted
     # web_search is opt-in, never a silent default).
@@ -191,6 +200,7 @@ def main() -> int:
         enable_iterative_clue_resolution=iterative_enabled,
         enable_task_frame=task_frame_enabled,
         enable_llm_task_frame_parser=llm_parser_enabled,
+        enable_frontier_controller=frontier_controller_enabled,
     )
     # Stamp the effective flags into cfg.policy so the agent + manifest both see them.
     cfg.setdefault("policy", {})["enable_query_decomposition"] = decompose_enabled
@@ -203,6 +213,7 @@ def main() -> int:
         args.force_task_frame or cfg.get("policy", {}).get("force_task_frame", False))
     cfg["policy"]["disable_direct_answer"] = bool(
         args.disable_direct_answer or cfg.get("policy", {}).get("disable_direct_answer", False))
+    cfg["policy"]["enable_frontier_controller"] = frontier_controller_enabled
     # Parser model defaults to the answer model unless explicitly overridden.
     task_frame_parser_model = (args.task_frame_parser_model
                                or cfg.get("policy", {}).get("task_frame_parser_model")
@@ -319,6 +330,7 @@ def main() -> int:
                             enable_llm_task_frame_parser=llm_parser_enabled,
                             auto_epistemic_mode=cfg["policy"]["auto_epistemic_mode"],
                             force_task_frame=cfg["policy"]["force_task_frame"],
+                            enable_frontier_controller=cfg["policy"]["enable_frontier_controller"],
                             disable_direct_answer=cfg["policy"]["disable_direct_answer"],
                             scrape_fallback_to_page_fetch=bool(
                                 cfg["policy"].get("scrape_fallback_to_page_fetch", True)),

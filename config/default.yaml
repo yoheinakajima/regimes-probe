@@ -80,6 +80,11 @@ policy:
   auto_epistemic_mode: false
   force_task_frame: false        # always escalate to task-frame mode
   disable_direct_answer: false   # never use the direct-answer mode
+  # Frontier controller (Level 5): when on, the candidate-slate FrontierScheduler
+  # drives tool/action selection (each call links to a frontier_action id, with
+  # fallback to the old planner per step). Requires enable_task_frame. Default off
+  # => shadow mode (frontier records recommendations only). --enable-frontier-controller.
+  enable_frontier_controller: false
   # Level 3 evidence reading: if firecrawl_scrape fails (e.g. 402/quota), fall
   # back to the basic page_fetch on the same URL. Social pages are not scraped
   # unless allow_social_scrape is set.

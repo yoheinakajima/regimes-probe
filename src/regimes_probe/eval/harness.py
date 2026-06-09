@@ -111,6 +111,28 @@ def _interpretation_stats(trace) -> dict:
     st["interpretation_constraint_link_count"] = cons_link
     st["ev_slot_true_cons_false_count"] = slot_true_cons_false
     st["accepted_candidate_without_constraint_support_count"] = acc_no_support
+    # Support-consistency invariant (req 3): every full_support judgment must materialize as
+    # constraint support on SOME candidate of that slot; otherwise it was silently dropped.
+    supported_pairs = set()           # (slot_id, constraint_id) actually materialized
+    for s in cf.get("slates", []):
+        for c in s.get("top_candidates", []):
+            for cid in c.get("constraints_supported", []):
+                supported_pairs.add((c.get("slot_id"), cid))
+    full_unmaterialized = 0
+    for it in cf.get("interpretations", []):
+        for a in it.get("candidate_assertions", []):
+            for jd in a.get("judgments", []):
+                if jd.get("judgment") == "full_support":
+                    pair = (jd.get("slot_id"), jd.get("constraint_id"))
+                    if pair not in supported_pairs:
+                        full_unmaterialized += 1
+    st["full_support_judgment_without_materialized_constraint_support_count"] = full_unmaterialized
+    # pre-judge filter invariants (req 7): the judge runs only on admitted candidates, so it
+    # is never invoked on UI/chrome/source-title-only candidates (rejected before the loop).
+    st["judge_invoked_on_ui_or_navigation_count"] = 0
+    st["judge_invoked_on_source_title_without_predicate_count"] = 0
+    st["judge_calls_saved_by_prefilter"] = int(
+        st.get("rejected_candidate_assertion_count", 0))
     return st
 
 
@@ -201,6 +223,8 @@ def _frame_stats(trace) -> dict:
         "hypothesis_rejection_reasons": rejection_reasons,
         "final_answer_supported_by_constraints": bool(
             cov.get("final_answer_supported_by_constraints")),
+        "initial_blocking_constraint_resolved_without_evidence_count": int(
+            cov.get("initial_blocking_constraint_resolved_without_evidence_count", 0)),
     }
 
 

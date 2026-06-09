@@ -506,3 +506,23 @@ set — and the risk surface. Keep the experiment honest:
   these hardenings raise *precision* of support, which can lower apparent accuracy on hard
   items by abstaining more — that is the intended, honest trade, not a regression to fix by
   loosening the gate.
+
+- **Level 5g — read-intent honesty and "prompt text is not evidence".** Two consistency
+  hazards are closed in this layer. First, a loop that *says* it needs a read but only ever
+  runs searches is dishonest: when a read is desired and the candidate has a clean,
+  non-contaminated URL the read now executes against that URL, and a read whose candidate
+  carries only a query string is recorded as `read_blocked_no_url` instead of silently
+  becoming a search (`selected_read_action_translated_to_search_count` = 0). Second, and more
+  dangerous for accuracy claims: the question itself states the constraints to be verified, so
+  resolving a blocking constraint from the prompt's own wording would manufacture support out
+  of thin air. A blocking constraint may therefore resolve only from a clean source carrying a
+  distinctive anchor (a year, or a proper-cased term taken from the constraint's `text_span`) —
+  a clean snippet that merely echoes generic question terms ("driving distance in miles") does
+  not resolve it, and `initial_blocking_constraint_resolved_without_evidence_count` is pinned to
+  0. Support is also made to materialize end to end
+  (`full_support_judgment_without_materialized_constraint_support_count` = 0) so the answer gate
+  and the judgment can never disagree. These are precision hardenings: like the 5f gates they
+  can lower apparent accuracy by abstaining more, which is the intended trade, not a regression.
+  Deferred (and explicitly not yet claimed): a generic `bind_target_answer_slot` action, a
+  parser-fallback variable/constant classifier, exa/firecrawl alternate-URL read fallback, and
+  projecting read-intent states as first-class graph objects.

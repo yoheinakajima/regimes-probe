@@ -20,6 +20,18 @@ from regimes_probe.agent.clue_resolution import (
 from regimes_probe.agent.task_frame import _ROLE_TRIGGERS
 from regimes_probe.policy.query_decomposition import _tokens
 
+#: a distinctive term carries a real anchor (a year or a rare/proper token), so a blocking
+#: constraint cannot resolve from generic glue-word overlap with a question-echo (req 4).
+_YEAR_RE = re.compile(r"\b(1[5-9]\d{2}|20\d{2})\b")
+
+
+def _is_rare_term(t: str) -> bool:
+    try:
+        from regimes_probe.policy.query_decomposition import _is_rare
+        return bool(_is_rare(t))
+    except Exception:
+        return False
+
 
 def _host(url: str) -> str:
     return (urlparse(url or "").hostname or "").lower()
@@ -228,18 +240,37 @@ class HypothesisTable:
                 if hint.lower() in text_l and hint not in ev.answer_shape_hints_found:
                     ev.answer_shape_hints_found.append(hint)
             # constraint support: most normalized terms present in this evidence text.
+            # SAFETY (Level 5g/req 4): never resolve a blocking constraint from a
+            # contaminated source (a benchmark mirror echoing the question is NOT evidence),
+            # and require at least one DISTINCTIVE term (proper noun / year), so a generic
+            # question-echo cannot resolve a constraint by glue-word overlap alone.
+            contaminated_ev = bool(getattr(o, "benchmark_contaminated", False))
             for con in self.frame.constraints:
                 if con.status == "contradicted":
                     continue
                 terms = [t for t in con.normalized_terms if len(t) >= 4]
-                if terms and sum(1 for t in terms if t in text_l) >= max(2, (len(terms) + 1) // 2):
-                    if con.constraint_id not in ev.supports_constraint_ids:
-                        ev.supports_constraint_ids.append(con.constraint_id)
-                    if ev.evidence_id not in con.supporting_evidence_ids:
-                        con.supporting_evidence_ids.append(ev.evidence_id)
-                    if con.status != "resolved":
-                        con.status = "resolved"
-                        progressed = True
+                if not (terms and sum(1 for t in terms if t in text_l) >= max(2, (len(terms) + 1) // 2)):
+                    continue
+                # a distinctive anchor = a year, or a term that is PROPER-CASED in the
+                # constraint's own text_span (a named entity), present in this evidence.
+                proper = {w.lower() for w in re.findall(r"[A-Z][A-Za-z'&]{3,}",
+                                                        getattr(con, "text_span", "") or "")}
+                distinctive = any(
+                    t in text_l and (bool(_YEAR_RE.search(t)) or t.lower() in proper)
+                    for t in con.normalized_terms if len(t) >= 4)
+                blocking = bool(getattr(con, "blocks_answer_if_unresolved", False)
+                                or getattr(con, "required", False)
+                                or getattr(con, "priority", "") == "high")
+                if con.constraint_id not in ev.supports_constraint_ids:
+                    ev.supports_constraint_ids.append(con.constraint_id)
+                # a blocking constraint resolves only from clean evidence with a real anchor.
+                if blocking and (contaminated_ev or not distinctive):
+                    continue
+                if ev.evidence_id not in con.supporting_evidence_ids:
+                    con.supporting_evidence_ids.append(ev.evidence_id)
+                if con.status != "resolved":
+                    con.status = "resolved"
+                    progressed = True
         ev.evidence_progress_score = float(
             len(ev.newly_introduced_candidates) + len(ev.supports_constraint_ids)
             + len(ev.answer_shape_hints_found))

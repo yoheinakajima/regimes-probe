@@ -443,3 +443,25 @@ rejected as no-progress (`supported_candidate_rejected_no_progress_count` = 0). 
 per item should drop materially versus the smoke run (`judge_calls_saved_by_pregate` +
 `judge_calls_saved_by_contradiction_stop`). Accuracy is **not** the success criterion — these
 invariants and the strict-abstain behaviour are.
+
+**Level 5g — reads that execute + prompt-text-is-not-evidence.** The 5g smoke must show the
+read-intent lifecycle is internally consistent. When the judge or frontier *desires* a read
+(`read_desired_count` > 0) and the candidate carries a clean, non-contaminated URL, a read must
+actually execute (`read_selected_count` > 0, and the provider summary contains `page_fetch`
+or `firecrawl_scrape`) — a read whose candidate has only a query string is recorded as
+`read_blocked_no_url` rather than silently degrading into a search, so the invariant
+`selected_read_action_translated_to_search_count` must be **0**. Prompt text supplies claims
+to test, not evidence: a blocking constraint may only resolve from a clean source carrying a
+distinctive anchor (a year, or a proper-cased term drawn from the constraint's own
+`text_span`), and a freshly-built frame has no evidence-free resolved blockers, so
+`initial_blocking_constraint_resolved_without_evidence_count` must be **0**. Support must
+materialize end to end: a `full_support` judgment that never reaches the slate's supported
+constraints is a bug, pinned by
+`full_support_judgment_without_materialized_constraint_support_count` = 0. Finally the judge
+is gated before invocation — `judge_invoked_on_ui_or_navigation_count` and
+`judge_invoked_on_source_title_without_predicate_count` must be 0, and
+`judge_calls_saved_by_prefilter` records the savings. As before, accuracy is **not** the
+success criterion; loop consistency and these pinned-0 invariants are. Deferred items
+(`bind_target_answer_slot`, parser-fallback variable/constant classifier, exa/firecrawl
+alternate-URL fallback, read-intent graph-object projection) are tracked but not gated this
+iteration.

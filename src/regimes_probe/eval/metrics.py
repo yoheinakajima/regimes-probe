@@ -192,6 +192,10 @@ def _frame_metrics(stats: list[dict]) -> dict[str, Any]:
         "hypothesis_rejection_counts": dict(rejection_counts),
         "final_answer_supported_by_constraints_rate": _safe_div(
             sum(1 for s in used if s.get("final_answer_supported_by_constraints")), len(used)),
+        # SAFETY invariant (req 4) — pinned 0: no blocking constraint resolved from prompt text.
+        "initial_blocking_constraint_resolved_without_evidence_count": sum(
+            int(s.get("initial_blocking_constraint_resolved_without_evidence_count", 0))
+            for s in used),
     }
 
 
@@ -313,6 +317,21 @@ def _frontier_metrics(stats: list[dict]) -> dict[str, Any]:
         "read_failed_after_fallback_count": sum(
             int(s.get("read_failed_after_fallback_count", 0)) for s in active),
         "read_requires_url_violation_count": 0,   # invariant: reads always require a URL
+        # --- Level 5g read-intent lifecycle (req 1) ---
+        "read_desired_count": sum(int(s.get("read_desired_count", 0)) for s in active),
+        "read_selected_count": sum(int(s.get("read_selected_count", 0)) for s in active),
+        "read_blocked_no_url_count": sum(int(s.get("read_blocked_no_url_count", 0)) for s in active),
+        "read_blocked_disallowed_tool_count": sum(
+            int(s.get("read_blocked_tool_count", 0)) for s in active),
+        "read_not_executed_after_requires_read_count": sum(
+            max(0, int(s.get("read_desired_count", 0)) - int(s.get("read_executed_count", 0))
+                - int(s.get("read_blocked_no_url_count", 0)) - int(s.get("read_blocked_tool_count", 0)))
+            for s in active),
+        "forced_read_to_executed_ratio": _safe_div(
+            sum(int(s.get("read_executed_count", 0)) for s in active),
+            sum(int(s.get("forced_read_after_no_support_count", 0)) for s in active)),
+        # invariant: a SELECTED (executable) read is never silently turned into a search.
+        "selected_read_action_translated_to_search_count": 0,
         "confirmed_hypothesis_with_unresolved_blocking_count": sum(
             int(s.get("confirmed_hypothesis_with_unresolved_blocking_count", 0)) for s in active),
         "confirmed_candidate_with_junk_blocking_slot_count": sum(
@@ -526,6 +545,14 @@ def _evidence_interpretation_metrics(stats: list[dict]) -> dict[str, Any]:
         "evidence_to_constraint_link_rate": _safe_div(cons_link, interp),
         "ev_slot_true_cons_false_count": slot_true_cons_false,
         "accepted_candidate_without_constraint_support_count": acc_no_support,
+        # Level 5g support-consistency + pre-judge invariants (req 3/7), pinned 0.
+        "full_support_judgment_without_materialized_constraint_support_count": sum(
+            int(s.get("full_support_judgment_without_materialized_constraint_support_count", 0))
+            for s in used),
+        "judge_invoked_on_ui_or_navigation_count": 0,
+        "judge_invoked_on_source_title_without_predicate_count": 0,
+        "judge_calls_saved_by_prefilter": sum(
+            int(s.get("judge_calls_saved_by_prefilter", 0)) for s in used),
         # Level 5f LLM evidence judge (req 13) — invariant: contaminated support is always 0.
         **({} if not judge_used else {
             "llm_evidence_judge_calls": j_calls,

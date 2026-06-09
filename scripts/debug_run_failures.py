@@ -141,6 +141,13 @@ def main() -> int:
                   f"starved={fm.get('read_starvation_count')} "
                   f"support_from_read={fm.get('support_from_read_count')} "
                   f"support_dropped={fm.get('support_dropped_count')}")
+            print(f"  READ INTENT: desired={fm.get('read_desired_count')} "
+                  f"selected={fm.get('read_selected_count')} "
+                  f"blocked_no_url={fm.get('read_blocked_no_url_count')} "
+                  f"blocked_tool={fm.get('read_blocked_tool_count')} "
+                  f"| fallback_attempted={fm.get('read_fallback_attempted_count')} "
+                  f"fallback_success={fm.get('read_fallback_success_count')} "
+                  f"failed_zero_chars={fm.get('read_failed_zero_chars_count')}")
             sfa = cf.get("selected_frontier_action", {}) or {}
             if sfa.get("plan", {}).get("read_value"):
                 print(f"    read_value: {sfa['plan']['read_value']}")

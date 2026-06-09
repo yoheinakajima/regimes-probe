@@ -973,3 +973,42 @@ Deferred to the next increment (documented, not silently dropped): the finer rea
 taxonomy (`read_desired`/`read_blocked_*`), `exa_search`/`firecrawl_search` alternate-URL
 fallback, full standalone source-subject extraction, and the `support_invalidated` lifecycle
 log — the strict answer gate, contamination safety, and replayability are unchanged.
+
+#### Level 5g: reads that actually execute + prompt-text-is-not-evidence
+
+The next smoke showed 5f improved *safety* but the critical **read path never executed**
+(`reads_executed=0` despite many forced reads), and the deterministic fallback **resolved
+blocking constraints from question text** — both fixed here, generically.
+
+- **Reads execute, with an explicit intent lifecycle (req 1).** A read needs a concrete,
+  clean, non-contaminated URL. Candidates now record the **clean source URLs** they were seen
+  at (`SlotCandidate.source_urls`), so a desired read can execute against the candidate's own
+  source even when its text isn't in the latest snippet — the previous behaviour silently let
+  an unresolvable read fall through to another search. The lifecycle is event-sourced:
+  `read_desired` → `read_selected`/`read_executed`, or `read_blocked_no_url` /
+  `read_blocked_disallowed_tool` with a recorded reason. A selected (executable) read is never
+  turned into a search (`selected_read_action_translated_to_search_count` pinned 0); a
+  `read_blocked_no_url` records the blocker and the loop runs an explicit source search
+  instead. Metrics: `read_desired_count`, `read_selected_count`, `read_executed_count`,
+  `read_blocked_no_url_count`, `forced_read_to_executed_ratio`,
+  `read_not_executed_after_requires_read_count`.
+- **Prompt text is not evidence (req 4, safety).** A blocking constraint resolves **only**
+  from a non-contaminated source and **only** when a *distinctive* anchor — a year, or a
+  proper-cased named entity from the constraint's own text — actually appears in the evidence.
+  A benchmark mirror echoing the question, or a SERP snippet that merely repeats the question's
+  generic glue words ("driving distance in miles"), can no longer resolve a blocking
+  constraint. Pinned-0 invariant `initial_blocking_constraint_resolved_without_evidence_count`;
+  fallback frames stay conservative (no constraint starts resolved).
+- **Support consistency + pre-judge cost (req 3/7).** A `full_support` judgment must
+  materialize as constraint support on some candidate of that slot, or it is counted by
+  `full_support_judgment_without_materialized_constraint_support_count` (pinned 0). The judge
+  is only ever invoked on admitted candidates (chrome/UI/source-titles are rejected first), so
+  `judge_invoked_on_ui_or_navigation_count` / `judge_invoked_on_source_title_without_predicate_count`
+  are pinned 0 and `judge_calls_saved_by_prefilter` counts the saved calls.
+
+Deferred to the next increment (documented, not silently dropped): the
+`bind_target_answer_slot` action (req 6), parser-fallback variable/constant diagnostics and
+classifier hardening (req 5), `exa_search`/`firecrawl_search` alternate-URL read fallback, and
+projecting every read-intent state as a graph object (the events are registered and emitted;
+object/relation projection is the follow-up). The strict answer gate, contamination safety,
+replayability, and policy-memory hygiene are unchanged.

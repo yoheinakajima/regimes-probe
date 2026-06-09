@@ -86,6 +86,12 @@ def _noise_kind(text: str) -> str:
     return ""
 
 
+def _is_clean_url(url: str) -> bool:
+    """A concrete, readable http(s) URL (not a query string / fragment) — req 1 read-backing."""
+    u = (url or "").strip()
+    return u.lower().startswith(("http://", "https://")) and " " not in u and len(u) > 12
+
+
 def _role_compatible(entity_role: str, slot_role: str) -> bool:
     """Whether an extracted-entity role may bind a slot. Permissive for free-form slot
     roles (a person entity binds a `graphic_designer`/`author`/`founder` slot), but never
@@ -137,6 +143,7 @@ class SlotCandidate:
     constraints_partial: list[str] = field(default_factory=list)   # 5f: partial (non-blocking)
     requires_read_constraint_ids: list[str] = field(default_factory=list)  # 5f: judge wants read
     aliases: list[str] = field(default_factory=list)               # 5f: judge-extracted aliases
+    source_urls: list[str] = field(default_factory=list)           # 5g: clean URLs to read
 
     def to_dict(self) -> dict[str, Any]:
         return {"candidate_id": self.candidate_id,
@@ -351,6 +358,11 @@ class CandidateFrontier:
         #: Level 5f: LLM-judge requires_read accounting.
         self.requires_read_total = 0
         self.requires_read_scheduled = 0
+        #: Level 5g read-intent lifecycle accounting (req 1).
+        self.read_desired_count = 0
+        self.read_selected_count = 0
+        self.read_blocked_no_url_count = 0
+        self.read_blocked_tool_count = 0
         self._cc = self._ec = self._hc = self._ac = self._evc = 0
         self._known = {_norm(t) for t in frame.known_context_terms}
         # one slate per slot that NEEDS binding (every unbound variable).
@@ -653,7 +665,7 @@ class CandidateFrontier:
                     source_tool, action_id, stage, _host(url), authority, contaminated,
                     a.from_ctx, f"{title} {ev.snippet_preview}".lower(), cons,
                     supported=list(sup), contradicted=list(con), source_role=a.source_role,
-                    read_depth=getattr(ev, "read_depth", 0),
+                    read_depth=getattr(ev, "read_depth", 0), source_url=url,
                     directed_slot_id=directed_slot_id,
                     directed_constraint_ids=directed_constraint_ids, proposal_id=proposal_id)
                 a.canonical_candidate_ids[sid] = cid
@@ -728,7 +740,7 @@ class CandidateFrontier:
     def _assign(self, slot, text, norm, role, ev, source_tool, action_id, stage,
                 domain, authority, contaminated, from_ctx, text_l, cons,
                 *, supported=None, contradicted=None, source_role="unknown", read_depth=0,
-                directed_slot_id=None, directed_constraint_ids=None,
+                source_url="", directed_slot_id=None, directed_constraint_ids=None,
                 proposal_id=None) -> str:
         slate = self.slates[slot.slot_id]
         existing = next((c for c in slate.candidates.values()
@@ -774,6 +786,10 @@ class CandidateFrontier:
             _union(cand.source_action_ids, action_id)
         if domain:
             _union(cand.source_domains, domain)
+        # remember a CLEAN, concrete URL so a read can execute against the candidate's
+        # source even if the candidate text isn't in a later snippet (5g req 1).
+        if _is_clean_url(source_url) and not contaminated:
+            _union(cand.source_urls, source_url)
         cand.source_authority_score = max(cand.source_authority_score, authority)
         if source_role and source_role != "unknown":
             cand.source_role = source_role
@@ -1151,15 +1167,35 @@ class CandidateFrontier:
         if at == "abstain_no_viable_hypothesis":
             return StepPlan(sel.action_id, at, "abstain", reason=sel.selected_reason)
         if at == "read_candidate_source":
+            self.read_desired_count += 1
+            self._emit("read_desired", action_id=sel.action_id, slot_id=sel.target_slot_id,
+                       candidate_id=sel.candidate_id, data={"reason": sel.selected_reason})
             if not reading_tools:
-                return StepPlan(sel.action_id, at, "unexecutable", reason="no_reading_tool")
+                self.read_blocked_tool_count += 1
+                self._emit("read_blocked_disallowed_tool", action_id=sel.action_id,
+                           data={"reason": "no_reading_tool_available"})
+                return StepPlan(sel.action_id, at, "unexecutable", reason="read_blocked_no_tool")
+            # 1) a URL among the observations that ties candidate+slot+constraint.
             chosen = self._resolve_read(observations, scraped_urls, no_progress_domains,
                                         page_fetch_available, scrape_available, allow_social,
                                         force_page_fetch)
+            # 2) fall back to a CLEAN URL stored on the selected candidate's provenance, so a
+            #    forced/judge read actually executes instead of silently becoming a search.
             if chosen is None:
-                return StepPlan(sel.action_id, at, "unexecutable",
-                                reason="no_candidate_slot_constraint_url")
+                chosen = self._read_candidate_url(
+                    sel.candidate_id, sel.constraint_ids, scraped_urls, no_progress_domains,
+                    page_fetch_available, scrape_available, allow_social, force_page_fetch)
+            if chosen is None:
+                self.read_blocked_no_url_count += 1
+                self._emit("read_blocked_no_url", action_id=sel.action_id,
+                           slot_id=sel.target_slot_id, candidate_id=sel.candidate_id,
+                           data={"reason": "no_clean_url_for_candidate_source"})
+                # NOT a silent search: record the blocker; the loop will run a source search.
+                return StepPlan(sel.action_id, at, "unexecutable", reason="read_blocked_no_url")
             o, rd, tested = chosen
+            self.read_selected_count += 1
+            self._emit("read_selected", action_id=sel.action_id, slot_id=sel.target_slot_id,
+                       candidate_id=sel.candidate_id, data={"url_host": _host(getattr(o, "url", ""))})
             return StepPlan(sel.action_id, at, "read", read_obs=o, read_decision=rd,
                             target_slot_id=sel.target_slot_id, candidate_id=sel.candidate_id,
                             constraint_ids=tested, reason="read_candidate_source")
@@ -1220,6 +1256,39 @@ class CandidateFrontier:
                 prefer_page_fetch=force_page_fetch, force_read=True)
             if rd.tool:
                 return o, rd, list(rv.constraint_ids)
+        return None
+
+    def _read_candidate_url(self, candidate_id, constraint_ids, scraped_urls,
+                            no_progress_domains, page_fetch_available, scrape_available,
+                            allow_social, force_page_fetch):
+        """Build a read from a CLEAN URL stored on the candidate's provenance, so a desired
+        read executes even when the candidate text isn't in the current snippets (req 1)."""
+        from types import SimpleNamespace
+        from urllib.parse import urlparse as _up
+        from regimes_probe.agent.reading_policy import normalize_url, select_reading_tool
+        cand = self.candidates_by_id.get(candidate_id) if candidate_id else None
+        if cand is None:
+            return None
+        for url in cand.source_urls:
+            if not _is_clean_url(url):
+                continue
+            host = (_up(url).hostname or "").lower()
+            if normalize_url(url) in scraped_urls or host in no_progress_domains:
+                continue
+            o = SimpleNamespace(url=url, title=cand.candidate_text, snippet=cand.candidate_text,
+                                source_authority=cand.source_authority_score, failed=False,
+                                benchmark_contaminated=False, fetchable=True)
+            rd = select_reading_tool(
+                url=url, title=cand.candidate_text, snippet=cand.candidate_text,
+                source_authority=float(cand.source_authority_score), contaminated=False,
+                unresolved_clue_terms=[], answer_shape=[], cross_provider_domains=set(),
+                page_fetch_available=page_fetch_available, scrape_available=scrape_available,
+                scraped_urls=scraped_urls, no_progress_domains=no_progress_domains,
+                allow_social=allow_social, prefer_page_fetch=force_page_fetch, force_read=True)
+            if rd.tool:
+                tested = list(cand.requires_read_constraint_ids or cand.constraints_unknown
+                              or constraint_ids or [])
+                return o, rd, tested
         return None
 
     def _head_noun(self, descriptor: str, slot) -> str:
@@ -1373,6 +1442,11 @@ class CandidateFrontier:
             "support_dropped_count": self.support_dropped_count,
             "requires_read_total": self.requires_read_total,
             "requires_read_scheduled": self.requires_read_scheduled,
+            # Level 5g read-intent lifecycle (req 1).
+            "read_desired_count": self.read_desired_count,
+            "read_selected_count": self.read_selected_count,
+            "read_blocked_no_url_count": self.read_blocked_no_url_count,
+            "read_blocked_tool_count": self.read_blocked_tool_count,
             # Level 5f confirm-gate invariants (computed; must stay 0 by construction).
             "confirmed_hypothesis_with_unresolved_blocking_count": sum(
                 1 for c in self.candidates_by_id.values() if c.status == "confirmed"

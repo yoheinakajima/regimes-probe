@@ -397,3 +397,16 @@ invariants (`full_support_without_named_candidate_count`,
 the projected slate/judgment state, so a reviewer can confirm from artifacts alone that no
 hypothesis confirmed with an unresolved blocking constraint and no support came from a
 generic descriptor or contaminated source.
+
+Level 5g makes the **read-intent lifecycle** event-sourced: `read_desired`, `read_selected`,
+`read_blocked_no_url`, `read_blocked_disallowed_tool`, and
+`read_blocked_unsafe_or_contaminated_url` are registered events emitted by the frontier, so a
+reviewer can reconstruct from the log *why* a read was desired, whether it had a clean URL, and
+whether it executed — closing the gap where forced reads silently became searches. The
+safety invariant that **prompt text is not evidence** is enforced at the projection level too:
+a blocking constraint carries `supporting_evidence_ids` only when a non-contaminated evidence
+event with a distinctive anchor supported it, so
+`initial_blocking_constraint_resolved_without_evidence_count` is a deterministic function of
+the projected constraint state and is pinned 0. Reads against a candidate's recorded clean
+`source_urls` re-project identically. (Projecting each read-intent state as its own graph
+*object* is the documented follow-up; the events are already in the log.)

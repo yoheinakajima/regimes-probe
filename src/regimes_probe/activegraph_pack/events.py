@@ -97,6 +97,12 @@ class Events:
     SUPPORT_DROPPED = "support_dropped"
     READ_SCHEDULED = "read_scheduled"
     READ_INTERPRETED = "read_interpreted"
+    # Level 5g read-intent lifecycle
+    READ_DESIRED = "read_desired"
+    READ_SELECTED = "read_selected"
+    READ_BLOCKED_NO_URL = "read_blocked_no_url"
+    READ_BLOCKED_DISALLOWED_TOOL = "read_blocked_disallowed_tool"
+    READ_BLOCKED_UNSAFE_OR_CONTAMINATED_URL = "read_blocked_unsafe_or_contaminated_url"
     # Level 5f LLM evidence judge
     LLM_EVIDENCE_JUDGMENT_CREATED = "llm_evidence_judgment.created"
     LLM_EVIDENCE_JUDGMENT_ACCEPTED = "llm_evidence_judgment.accepted"
@@ -150,6 +156,8 @@ EVIDENCE_INTERPRETATION_EVENTS: tuple[str, ...] = (
     Events.EVIDENCE_JUDGMENT_PARTIALLY_SUPPORTS_CANDIDATE_CONSTRAINT,
     Events.EVIDENCE_JUDGMENT_CONTRADICTS_CANDIDATE_CONSTRAINT,
     Events.EVIDENCE_JUDGMENT_REJECTED_REASON, Events.SKIPPED_READ_AFTER_REQUIRES_READ,
+    Events.READ_DESIRED, Events.READ_SELECTED, Events.READ_BLOCKED_NO_URL,
+    Events.READ_BLOCKED_DISALLOWED_TOOL, Events.READ_BLOCKED_UNSAFE_OR_CONTAMINATED_URL,
 )
 
 

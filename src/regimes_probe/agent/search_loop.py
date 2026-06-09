@@ -1011,13 +1011,21 @@ class SearchLoop:
             support = evaluate_answer_support(frame, htable)
         frame_coverage: dict[str, Any] = {}
         if task_frame and htable is not None:
+            # SAFETY invariant (req 4): a blocking constraint may be marked resolved ONLY
+            # when a provider/cached evidence event supports it — never from prompt text.
+            _resolved_no_ev = sum(
+                1 for c in frame.constraints
+                if c.status == "resolved" and not getattr(c, "supporting_evidence_ids", [])
+                and (getattr(c, "blocks_answer_if_unresolved", False)
+                     or getattr(c, "required", False) or getattr(c, "priority", "") == "high"))
             frame_coverage = dict(
                 htable.coverage(),
                 final_answer_supported_by_constraints=bool(support and support.supported),
                 answer_support_gate=bool(support and support.supported),
                 missing_support_reasons=(support.missing_support_reasons if support else []),
                 terminal_action=terminal_action.get("kind", ""),
-                n_actions=len(task_actions))
+                n_actions=len(task_actions),
+                initial_blocking_constraint_resolved_without_evidence_count=_resolved_no_ev)
         return AttemptTrace(
             attempt_id=attempt_id,
             item_id=item.id,

@@ -491,3 +491,18 @@ set — and the risk surface. Keep the experiment honest:
   `partial_support_from_contaminated_source_count` are invariants pinned at 0. A run with the
   judge on is still gated by the same same-conditions + headline-eligibility checks as any
   other.
+
+- **A reliable read path and a strict confirm gate are themselves correctness risks if
+  fudged.** Level 5f hardens both. Reads must be URL-backed (a query is not a read), a
+  zero-char fetch is a *failure* that falls back once to scrape (never counted as a success),
+  and `read_requires_url_violation_count` is pinned at 0 — otherwise "we read the page" can
+  silently mean "we fetched nothing". The confirm gate is tightened so a candidate is
+  `confirmed` only with **all** blocking constraints on **full** (not partial) support, a
+  **discriminative** blocking constraint among them, and a non-junk slot value — "plausible",
+  "has some biographical matches", or "is a founder/designer of *some* entity" is explicitly
+  not confirmation, and relational support needs the **exact** dependent object anchored.
+  These are enforced *after* the LLM judge by deterministic rules and pinned-0 invariants, so
+  an over-eager judge cannot promote a plausible-but-unproven candidate. The known limitation:
+  these hardenings raise *precision* of support, which can lower apparent accuracy on hard
+  items by abstaining more — that is the intended, honest trade, not a regression to fix by
+  loosening the gate.

@@ -24,6 +24,7 @@ Discipline (mirrors the other LLM hooks):
 from __future__ import annotations
 
 import json
+import re
 from collections import Counter
 from dataclasses import dataclass, field
 from typing import Any, Callable, Optional
@@ -101,9 +102,45 @@ def _det_to_judgment(det_status: str, *, has_url: bool, source_role: str) -> str
     return "irrelevant"
 
 
+_GENERIC_DESCRIPTORS = frozenset({
+    "kenyan", "east african", "african", "american", "british", "mexican", "christian",
+    "buddhist", "religious", "author", "novelist", "founder", "artist", "designer",
+    "graphic designer", "actor", "novel", "report", "publication", "restaurant", "hotel",
+    "museum", "tv shows", "tv series", "series", "book publishing", "annual report"})
+_IDENTITY_ROLES = frozenset({"person", "organization", "title_or_work", "publication_or_source"})
+
+
+def _is_named_entity(text: str) -> bool:
+    """A concrete named entity: a proper-cased token (or multiword phrase), not a lowercase
+    descriptor/role label. Generic, no benchmark strings."""
+    t = (text or "").strip()
+    if not t:
+        return False
+    if t.lower() in _GENERIC_DESCRIPTORS:
+        return False
+    words = [w for w in re.findall(r"[A-Za-z0-9'&.-]+", t)]
+    proper = [w for w in words if w[:1].isupper() or w[:1].isdigit()]
+    return len(proper) >= 1 and t.lower() not in _GENERIC_DESCRIPTORS
+
+
+def _quote_anchors(quote: str, candidate_text: str, aliases) -> bool:
+    q = (quote or "").lower()
+    names = [candidate_text] + list(aliases or [])
+    return any(n and n.lower() in q for n in names if len(n) >= 3)
+
+
 def enforce_hard_rules(j: EvidenceJudgment, *, contaminated: bool, source_role: str,
-                       has_quote: bool) -> EvidenceJudgment:
-    """Hard, non-negotiable rules applied AFTER the model so a stub cannot break them."""
+                       has_quote: bool, candidate_text: str = "", aliases=None,
+                       slot_role: str = "", relational: bool = False,
+                       object_anchored: bool = True, counters=None) -> EvidenceJudgment:
+    """Hard, non-negotiable rules applied AFTER the model so a stub cannot break them.
+
+    Beyond contamination + quote: full_support for an identity slot requires a concrete
+    NAMED candidate whose name (or a registered alias) appears in the quote; a generic
+    descriptor can never be full_support; a relational constraint needs both subject AND
+    object anchored. Downgrades are recorded, and ``counters`` (a Counter) tallies them."""
+    aliases = list(aliases or [])
+    bump = (lambda k: counters.update([k])) if counters is not None else (lambda k: None)
     if contaminated or source_role in _NOISE_SOURCE_ROLES:
         if j.judgment in _SUPPORT_JUDGMENTS:
             j.judgment = "contradiction" if j.contradicted_facets else "irrelevant"
@@ -111,8 +148,32 @@ def enforce_hard_rules(j: EvidenceJudgment, *, contaminated: bool, source_role: 
             j.source_role_fit = "unacceptable"
     # full support REQUIRES a quote tying candidate to the predicate.
     if j.judgment == "full_support" and not has_quote:
+        j.judgment, _ = "partial_support", j.safety_notes.append("downgraded_full_no_quote")
+    # generic descriptors can never be full support for an identity slot.
+    if j.judgment in _SUPPORT_JUDGMENTS and candidate_text and \
+            candidate_text.strip().lower() in _GENERIC_DESCRIPTORS:
+        if j.judgment == "full_support":
+            bump("full_support_from_generic_descriptor")
+        else:
+            bump("partial_support_from_generic_descriptor")
+        j.judgment = "irrelevant" if j.judgment == "full_support" else j.judgment
+        if j.judgment == "irrelevant":
+            j.safety_notes.append("generic_descriptor_not_full_support")
+    # full support for an identity slot requires a concrete NAMED candidate + quote anchor.
+    if j.judgment == "full_support" and (slot_role in _IDENTITY_ROLES or slot_role == ""
+                                         or slot_role not in _IDENTITY_ROLES):
+        if candidate_text and not _is_named_entity(candidate_text):
+            bump("full_support_without_named_candidate")
+            j.judgment = "partial_support"
+            j.safety_notes.append("downgraded_full_unnamed_candidate")
+        elif has_quote and candidate_text and not _quote_anchors(j.quote, candidate_text, aliases):
+            j.judgment = "partial_support"
+            j.safety_notes.append("downgraded_full_quote_does_not_anchor_candidate")
+    # relational constraints need BOTH subject and object anchored.
+    if j.judgment == "full_support" and relational and not object_anchored:
+        bump("relational_support_without_object_anchor")
         j.judgment = "partial_support"
-        j.safety_notes.append("downgraded_full_to_partial_no_quote")
+        j.safety_notes.append("downgraded_full_relational_object_not_anchored")
     return j
 
 
@@ -121,12 +182,14 @@ class EvidenceJudge:
 
     def __init__(self, model_fn: Optional[Callable[[str], str]] = None, *,
                  cache=None, model: str = "deterministic", replay_only: bool = False,
-                 enabled: bool = False, prompt_name: str = "evidence_judge") -> None:
+                 enabled: bool = False, prompt_name: str = "evidence_judge",
+                 max_calls_per_candidate: int = 6) -> None:
         self.model_fn = model_fn
         self.cache = cache
         self.model = model
         self.replay_only = replay_only
         self.enabled = enabled
+        self.max_calls_per_candidate = max_calls_per_candidate
         from regimes_probe.agent import prompts
         self._prompt = prompts.get(prompt_name) if prompt_name in prompts.registry_dict() else None
         self._jc = 0
@@ -135,6 +198,13 @@ class EvidenceJudge:
         self.replay_hits = 0
         self.judgment_counts: Counter = Counter()
         self.contaminated_support_blocked = 0
+        #: post-model hard-rule downgrade tallies (Level 5f-G) + budget savings (5f-H).
+        self.guard_counts: Counter = Counter()
+        self.calls_saved_by_pregate = 0
+        self.calls_saved_by_relevance_filter = 0
+        self.calls_saved_by_contradiction_stop = 0
+        self.contradiction_early_stop = 0
+        self.max_calls_cap_hit = 0
 
     def stats(self) -> dict[str, Any]:
         return {
@@ -149,7 +219,23 @@ class EvidenceJudge:
             "llm_irrelevant_count": self.judgment_counts.get("irrelevant", 0),
             "full_support_from_contaminated_source_count": 0,   # invariant: always 0
             "partial_support_from_contaminated_source_count": 0,
+            "full_or_partial_support_from_contaminated_source_count": 0,
             "contaminated_support_blocked_count": self.contaminated_support_blocked,
+            # post-model support-contract invariants (Level 5f-G) — must stay 0.
+            "full_support_without_named_candidate_count":
+                self.guard_counts.get("full_support_without_named_candidate", 0),
+            "full_support_from_generic_descriptor_count":
+                self.guard_counts.get("full_support_from_generic_descriptor", 0),
+            "partial_support_from_generic_descriptor_count":
+                self.guard_counts.get("partial_support_from_generic_descriptor", 0),
+            "relational_support_without_object_anchor_count":
+                self.guard_counts.get("relational_support_without_object_anchor", 0),
+            # judge-budget savings (Level 5f-H).
+            "judge_calls_saved_by_pregate": self.calls_saved_by_pregate,
+            "judge_calls_saved_by_relevance_filter": self.calls_saved_by_relevance_filter,
+            "judge_calls_saved_by_contradiction_stop": self.calls_saved_by_contradiction_stop,
+            "contradiction_early_stop_count": self.contradiction_early_stop,
+            "judge_max_calls_cap_hit_count": self.max_calls_cap_hit,
         }
 
     def _triple_hash(self, *, candidate_text, slot_id, slot_role, constraint, source_role,
@@ -167,7 +253,8 @@ class EvidenceJudge:
               slot_id: str, slot_role: str, slot_descriptor: str, constraint,
               source_id: str, source_title: str, source_url: str, source_domain: str,
               source_role: str, contaminated: bool, snippet: str,
-              det_status: str, det_quote: str) -> EvidenceJudgment:
+              det_status: str, det_quote: str, relational: bool = False,
+              object_anchored: bool = True) -> EvidenceJudgment:
         """Judge one (candidate, slot, constraint, source-excerpt) triple."""
         self._jc += 1
         has_url = bool((source_url or "").strip())
@@ -182,7 +269,10 @@ class EvidenceJudge:
             contaminated=contaminated, snippet=snippet, det_status=det_status,
             det_quote=det_quote, has_url=has_url)
         j = enforce_hard_rules(j, contaminated=contaminated, source_role=source_role,
-                               has_quote=bool((j.quote or "").strip()))
+                               has_quote=bool((j.quote or "").strip()),
+                               candidate_text=candidate_text, aliases=list(aliases or []),
+                               slot_role=slot_role, relational=relational,
+                               object_anchored=object_anchored, counters=self.guard_counts)
         if contaminated and j.judgment in _SUPPORT_JUDGMENTS:
             self.contaminated_support_blocked += 1     # belt-and-suspenders (should never hit)
             j.judgment = "irrelevant"

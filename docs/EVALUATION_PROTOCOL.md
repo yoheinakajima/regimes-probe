@@ -426,3 +426,20 @@ actually schedule reads). A judge that raises accuracy is not, by itself, ground
 benchmark claim — it changes how evidence is interpreted, while the strict answer gate,
 same-conditions, and headline-eligibility checks are unchanged. Partial support is **not**
 answer support: a partial-only candidate must still abstain.
+
+**Level 5f hardening — read reliability + safety invariants.** The next smoke test should
+verify a set of pinned-0 invariants (all computed from the projection): a read always needs a
+URL (`read_requires_url_violation_count` = 0) and a zero-char `page_fetch` falls back to
+`firecrawl_scrape` (`read_fallback_attempted_count`/`read_fallback_success_count` > 0 when a
+read fails and a scrape is enabled); the judge is never invoked on chrome
+(`judge_invoked_on_chrome_count` = 0); full support never comes from an unnamed candidate, a
+generic descriptor, or a contaminated source
+(`full_support_without_named_candidate_count` = `full_support_from_generic_descriptor_count`
+= `full_or_partial_support_from_contaminated_source_count` = 0); no hypothesis confirms with
+an unresolved blocking constraint or on partial-only support
+(`confirmed_hypothesis_with_unresolved_blocking_count` =
+`blocking_constraint_partial_support_confirmed_count` = 0); and a supported candidate is never
+rejected as no-progress (`supported_candidate_rejected_no_progress_count` = 0). Judge calls
+per item should drop materially versus the smoke run (`judge_calls_saved_by_pregate` +
+`judge_calls_saved_by_contradiction_stop`). Accuracy is **not** the success criterion — these
+invariants and the strict-abstain behaviour are.

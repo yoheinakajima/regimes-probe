@@ -192,6 +192,14 @@ class CallRecord:
         }
 
 
+def _with_read_accounting(cf: dict[str, Any], read_acct: dict[str, int]) -> dict[str, Any]:
+    """Attach Level-5f read-path accounting to the candidate-frontier trace (so metrics can
+    aggregate it). A no-op when the slate layer was skipped."""
+    if isinstance(cf, dict) and cf and not cf.get("skipped"):
+        cf["read_accounting"] = dict(read_acct)
+    return cf
+
+
 def _frontier_trace(frontier, mode: str, skip_reason: str, *, uses_layer: bool,
                     had_frame: bool, controller: Optional[dict[str, Any]] = None) -> dict[str, Any]:
     """Candidate-frontier trace payload: the slate debug, or a bounded skip record."""
@@ -437,6 +445,10 @@ class SearchLoop:
                                               and self.llm_frontier is not None) else None)
         lf_steps: list[dict[str, Any]] = []
         lf_no_progress_queries: list[str] = []
+        # Level 5f-A: read-path accounting (URL-backed reads + page_fetch->scrape fallback).
+        read_acct: dict[str, int] = {}
+        read_fallback_pending = False
+        _MIN_READ_CHARS = 1
         if task_frame and frame is not None:
             _mode = epistemic_decision.selected_epistemic_mode
             if _mode in ("direct_answer_possible", "simple_lookup"):
@@ -809,13 +821,42 @@ class SearchLoop:
                                             if call_failed else None),
                     "scrape_cost_estimate": float(response.cost),
                 })
+                # how many chars did the read actually return? a zero-byte/empty fetch is
+                # NOT a successful read (Level 5f-A).
+                read_chars = sum(len((getattr(o, "snippet", "") or ""))
+                                 + len((getattr(o, "title", "") or "")) for o in obs
+                                 if not getattr(o, "failed", False))
+                read_zero = (call_failed or read_chars < _MIN_READ_CHARS)
+                scrape_info["read_chars"] = read_chars
+                scrape_info["read_zero_chars"] = read_zero
+                if read_zero:
+                    read_acct["read_failed_zero_chars_count"] = \
+                        read_acct.get("read_failed_zero_chars_count", 0) + 1
+                # resolve the outcome of a previously-scheduled fallback read.
+                if read_fallback_pending:
+                    key = ("read_fallback_success_count" if not read_zero
+                           else "read_failed_after_fallback_count")
+                    read_acct[key] = read_acct.get(key, 0) + 1
+                    read_fallback_pending = False
                 if call_failed and scrape_info.get("is_scrape") and \
                         config.scrape_fallback_to_page_fetch and page_fetch_available:
                     # fail closed: retry the SAME url with the basic fetch next step.
-                    # Do NOT mark it read yet, so the page_fetch retry is allowed.
                     pending_read = read_target_obs
                     force_page_fetch = True
                     scrape_info["fallback_to_page_fetch"] = True
+                    read_fallback_pending = True
+                    read_acct["read_fallback_attempted_count"] = \
+                        read_acct.get("read_fallback_attempted_count", 0) + 1
+                elif read_zero and not scrape_info.get("is_scrape") and scrape_available \
+                        and read_target_obs is not None:
+                    # page_fetch returned zero chars -> fall back ONCE to firecrawl_scrape on
+                    # the SAME url (Level 5f-A read fallback policy).
+                    pending_read = read_target_obs
+                    force_page_fetch = False
+                    scrape_info["fallback_to_firecrawl_scrape"] = True
+                    read_fallback_pending = True
+                    read_acct["read_fallback_attempted_count"] = \
+                        read_acct.get("read_fallback_attempted_count", 0) + 1
                 else:
                     scraped_urls.add(normalize_url(query))
                     if (call_failed or not evidence_improved) and host:
@@ -993,11 +1034,11 @@ class SearchLoop:
             frame_coverage=frame_coverage,
             task_frame_parse=(frame_parse_meta if task_frame else {}),
             epistemic_mode=epistemic_decision.to_dict(),
-            candidate_frontier=_frontier_trace(
+            candidate_frontier=_with_read_accounting(_frontier_trace(
                 frontier, epistemic_decision.selected_epistemic_mode, slate_skipped_reason,
                 uses_layer=(config.enable_task_frame or config.auto_epistemic_mode
                             or config.force_task_frame),
-                had_frame=(task_frame and frame is not None), controller=ctrl),
+                had_frame=(task_frame and frame is not None), controller=ctrl), read_acct),
             llm_frontier=({"enabled": True, "mode": lf_mode,
                            "model": self.llm_frontier.model if self.llm_frontier else "",
                            "steps": lf_steps,

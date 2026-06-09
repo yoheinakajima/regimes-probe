@@ -928,3 +928,48 @@ weakens the answer-support gate.
 
 The deterministic recognizers remain the canonical fallback (behaviour with the flag off is
 unchanged); the judge *improves interpretation*, not benchmark-claim eligibility.
+
+#### Level 5f hardening: read-reliable, candidate-safe, support-aware
+
+The wiring smoke test confirmed the judge is the right abstraction; this hardening keeps it
+narrow while making the surrounding loop reliable and safe (generic mechanisms, no
+benchmark-specific patches):
+
+- **Read reliability (A).** `read_candidate_source` requires a concrete clean URL (resolved
+  from observations); a proposal with only a query becomes a search, not a read. A page-body
+  read that returns **zero chars** is not a success: it falls back **once** to
+  `firecrawl_scrape` on the same URL (the existing scrape→`page_fetch` fallback is the mirror
+  of this), and the outcome is accounted (`read_failed_zero_chars_count`,
+  `read_fallback_attempted_count`, `read_fallback_success_count`,
+  `read_failed_after_fallback_count`). `read_requires_url_violation_count` is a pinned-0
+  invariant; a `requires_read` with no URL records `skipped_read_after_requires_read` and the
+  slot's search proceeds instead.
+- **Stricter confirm gate (C/D).** A candidate is `confirmed` only when **every** blocking
+  constraint is supported by **full** support (partial never counts), the candidate text is
+  not junk/chrome, and — when a discriminative blocking constraint exists — at least one such
+  is supported. A single supported constraint can't confirm while other blocking constraints
+  are unresolved. Invariants pinned at 0:
+  `confirmed_hypothesis_with_unresolved_blocking_count`,
+  `confirmed_candidate_with_junk_blocking_slot_count`,
+  `blocking_constraint_partial_support_confirmed_count`.
+- **Post-model support contract (G/K).** After the model, deterministic hard rules apply:
+  full support for an identity slot requires a **concrete named** candidate whose name (or a
+  registered alias) appears in the **quote**; a generic descriptor ("graphic designer",
+  "founder", "Kenyan", "TV shows") can never be full support; a **relational** constraint
+  (binding ≥2 slots) needs both subject **and** object anchored or it is downgraded to
+  partial. Pinned-0: `full_support_without_named_candidate_count`,
+  `full_support_from_generic_descriptor_count`, `relational_support_without_object_anchor_count`,
+  `full_or_partial_support_from_contaminated_source_count`.
+- **Judge budget (H).** The judge isn't run on pre-gate-rejected candidates (chrome/generic
+  never reach it → `judge_invoked_on_chrome_count` = 0), a per-candidate call cap applies, and
+  a **blocking-constraint contradiction stops** judging that candidate for the result
+  (`contradiction_early_stop_count`, `judge_calls_saved_by_contradiction_stop`).
+- **Support-aware behaviour (I).** A candidate with clean support is a *working* candidate:
+  it is exempt from `repeated_no_progress` rejection
+  (`supported_candidate_rejected_no_progress_count` = 0); no-progress decay applies to
+  queries/actions, not to supported candidates.
+
+Deferred to the next increment (documented, not silently dropped): the finer read-event
+taxonomy (`read_desired`/`read_blocked_*`), `exa_search`/`firecrawl_search` alternate-URL
+fallback, full standalone source-subject extraction, and the `support_invalidated` lifecycle
+log — the strict answer gate, contamination safety, and replayability are unchanged.

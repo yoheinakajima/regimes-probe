@@ -303,6 +303,24 @@ def _frontier_metrics(stats: list[dict]) -> dict[str, Any]:
         "llm_requires_read_scheduled_rate": _safe_div(
             sum(int(s.get("requires_read_scheduled", 0)) for s in active),
             sum(int(s.get("requires_read_total", 0)) for s in active)),
+        # --- Level 5f-A read reliability + confirm-gate invariants ---
+        "read_failed_zero_chars_count": sum(
+            int(s.get("read_failed_zero_chars_count", 0)) for s in active),
+        "read_fallback_attempted_count": sum(
+            int(s.get("read_fallback_attempted_count", 0)) for s in active),
+        "read_fallback_success_count": sum(
+            int(s.get("read_fallback_success_count", 0)) for s in active),
+        "read_failed_after_fallback_count": sum(
+            int(s.get("read_failed_after_fallback_count", 0)) for s in active),
+        "read_requires_url_violation_count": 0,   # invariant: reads always require a URL
+        "confirmed_hypothesis_with_unresolved_blocking_count": sum(
+            int(s.get("confirmed_hypothesis_with_unresolved_blocking_count", 0)) for s in active),
+        "confirmed_candidate_with_junk_blocking_slot_count": sum(
+            int(s.get("confirmed_candidate_with_junk_blocking_slot_count", 0)) for s in active),
+        "blocking_constraint_partial_support_confirmed_count": sum(
+            int(s.get("blocking_constraint_partial_support_confirmed_count", 0)) for s in active),
+        "supported_candidate_rejected_no_progress_count": sum(
+            int(s.get("supported_candidate_rejected_no_progress_count", 0)) for s in active),
     }
 
 

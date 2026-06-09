@@ -226,7 +226,7 @@ def test_replay_uses_cached_judgment_with_zero_model_calls():
               contaminated=False, snippet="Dana Wu studied at Caltech.",
               det_status="insufficient", det_quote="Caltech")
     armed = EvidenceJudge(model_fn=lambda _p: json.dumps({"judgment": "full_support",
-                                                          "quote": "studied at Caltech"}),
+                                                          "quote": "Dana Wu studied at Caltech"}),
                           cache=cache, model="stub", enabled=True)
     j1 = armed.judge(**kw)
     assert j1.judgment == "full_support" and armed.calls == 1
@@ -239,10 +239,10 @@ def test_replay_uses_cached_judgment_with_zero_model_calls():
 def test_one_read_emits_multiple_constraint_supports():
     f = _frame(PERSON, PERSON_Q)
     fr, _ = _frontier_with_judge(f, _judge_fn({
-        "studied at Caltech": {"judgment": "full_support", "quote": "studied at Caltech",
-                               "confidence": 0.9},
-        "employed at Bell Labs": {"judgment": "full_support", "quote": "worked at Bell Labs",
-                                  "confidence": 0.9}}))
+        "studied at Caltech": {"judgment": "full_support",
+                               "quote": "Dana Wu studied at Caltech", "confidence": 0.9},
+        "employed at Bell Labs": {"judgment": "full_support",
+                                  "quote": "Dana Wu worked at Bell Labs", "confidence": 0.9}}))
     sid = _sid(f)
     fr.ingest_evidence([_obs("Dana Wu - Engineer", "Dana Wu studied at Caltech and worked at Bell Labs.",
                              "https://linkedin.com/in/dana-wu")],

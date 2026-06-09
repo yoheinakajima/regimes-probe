@@ -140,6 +140,9 @@ def _frontier_stats(trace) -> dict:
     m["tool_calls_from_frontier"] = int(ctrl.get("tool_calls_from_frontier_actions", 0))
     m["first_action_discriminative"] = ctrl.get("first_action_discriminative")
     m["first_query_generic"] = ctrl.get("first_query_generic")
+    # Level 5f-A read-path accounting (URL-backed reads + page_fetch->scrape fallback).
+    for k, v in (cf.get("read_accounting", {}) or {}).items():
+        m[k] = int(v)
     return m
 
 

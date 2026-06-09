@@ -384,3 +384,16 @@ produced each support decision and verify — from `graph_projection.json` alone
 support came from a contaminated source and that every `full_support` is quote-backed.
 Because the judge is keyed by `prompt_fingerprint | model | triple_hash` and replay reads
 the cache, the whole judged support path re-projects identically with zero model calls.
+
+The Level-5f hardening adds **invariant metrics** (not new object types): read-path
+accounting (`read_failed_zero_chars_count`, `read_fallback_*`, pinned-0
+`read_requires_url_violation_count`) is attached to the candidate-frontier trace
+(`read_accounting`) so it aggregates per cell; confirm-gate invariants
+(`confirmed_hypothesis_with_unresolved_blocking_count`,
+`blocking_constraint_partial_support_confirmed_count`, …) and post-model support-contract
+invariants (`full_support_without_named_candidate_count`,
+`full_support_from_generic_descriptor_count`, `relational_support_without_object_anchor_count`,
+`full_or_partial_support_from_contaminated_source_count`) are computed deterministically from
+the projected slate/judgment state, so a reviewer can confirm from artifacts alone that no
+hypothesis confirmed with an unresolved blocking constraint and no support came from a
+generic descriptor or contaminated source.

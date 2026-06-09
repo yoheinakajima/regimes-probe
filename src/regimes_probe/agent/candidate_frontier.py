@@ -826,7 +826,9 @@ class CandidateFrontier:
         new = cand.status
         if cand.constraints_contradicted:
             new, reason = "rejected", "contradicted_constraint"
-        elif cand.no_progress_count >= _REJECT_NO_PROGRESS:
+        elif cand.no_progress_count >= _REJECT_NO_PROGRESS and not cand.constraints_supported:
+            # repeated no-progress applies to QUERIES/actions, never to a candidate that
+            # already has clean support (Level 5f-I): a supported candidate is "working".
             new, reason = "rejected", "repeated_no_progress"
         elif self._confirmable(cand, contaminated):
             new, reason = "confirmed", "required_constraints_supported"
@@ -842,22 +844,44 @@ class CandidateFrontier:
                 self._emit("candidate.status_changed", candidate_id=cand.candidate_id,
                            slot_id=cand.slot_id, data={"status": new, "reason": reason})
 
+    def _slot_blocking_constraints(self, slot_id: str) -> list:
+        return [c for c in self._constraints_for_slot(slot_id)
+                if c.status != "resolved"
+                and (getattr(c, "blocks_answer_if_unresolved", False)
+                     or getattr(c, "required", False) or getattr(c, "priority", "") == "high"
+                     or "can_block_answer" in getattr(c, "affordances", []))]
+
     def _confirmable(self, cand: SlotCandidate, contaminated: bool) -> bool:
+        """A candidate may be CONFIRMED for its slot only when the answer-gate-style support
+        contract holds for that slot (Level 5f-C/D): every blocking constraint supported (by
+        FULL support, never partial), at least one DISCRIMINATIVE blocking constraint supported
+        when one exists, no contamination/contradiction, and the candidate text is not junk."""
         if contaminated or cand.constraints_contradicted:
             return False
-        required = [c for c in self._constraints_for_slot(cand.slot_id)
-                    if getattr(c, "required", False) or getattr(c, "priority", "") == "high"]
-        if required:
-            if not all(c.constraint_id in cand.constraints_supported for c in required):
-                return False
-        return len(cand.constraints_supported) >= _CONFIRM_SUPPORT
+        if _noise_kind(cand.candidate_text):           # never confirm a junk/chrome token
+            return False
+        blocking = self._slot_blocking_constraints(cand.slot_id)
+        # every blocking constraint must be supported by FULL support (partial never counts).
+        if not all(c.constraint_id in cand.constraints_supported for c in blocking):
+            return False
+        # a single supported constraint cannot confirm when other blocking ones are unresolved
+        # (already implied above); require at least one supported constraint overall.
+        if len(cand.constraints_supported) < _CONFIRM_SUPPORT:
+            return False
+        # if any blocking constraint is discriminative, at least one such must be supported.
+        disc_blocking = [c for c in blocking if _is_discriminative_constraint(c)]
+        if disc_blocking and not any(c.constraint_id in cand.constraints_supported
+                                     for c in disc_blocking):
+            return False
+        return True
 
     def note_no_progress_for_slate(self, slot_id: str) -> None:
         slate = self.slates.get(slot_id)
         if not slate:
             return
         for c in slate.candidates.values():
-            if c.status == "active":
+            # a supported "working" candidate is exempt from no-progress decay (5f-I).
+            if c.status == "active" and not c.constraints_supported:
                 c.no_progress_count += 1
                 self._update_status(c, contaminated=False)
 
@@ -1349,6 +1373,23 @@ class CandidateFrontier:
             "support_dropped_count": self.support_dropped_count,
             "requires_read_total": self.requires_read_total,
             "requires_read_scheduled": self.requires_read_scheduled,
+            # Level 5f confirm-gate invariants (computed; must stay 0 by construction).
+            "confirmed_hypothesis_with_unresolved_blocking_count": sum(
+                1 for c in self.candidates_by_id.values() if c.status == "confirmed"
+                and not all(b.constraint_id in c.constraints_supported
+                            for b in self._slot_blocking_constraints(c.slot_id))),
+            "confirmed_candidate_with_junk_blocking_slot_count": sum(
+                1 for c in self.candidates_by_id.values()
+                if c.status == "confirmed" and _noise_kind(c.candidate_text)),
+            "blocking_constraint_partial_support_confirmed_count": sum(
+                1 for c in self.candidates_by_id.values() if c.status == "confirmed"
+                and any(b.constraint_id in c.constraints_partial
+                        and b.constraint_id not in c.constraints_supported
+                        for b in self._slot_blocking_constraints(c.slot_id))),
+            "supported_candidate_rejected_no_progress_count": sum(
+                1 for c in self.candidates_by_id.values()
+                if c.status == "rejected" and c.status_reason == "repeated_no_progress"
+                and c.constraints_supported),
         }
 
 

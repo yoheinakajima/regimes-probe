@@ -380,6 +380,31 @@ def _hygiene_reason(text: str, role_e: str) -> str:
     return ""
 
 
+def _is_blocking(con) -> bool:
+    return bool(getattr(con, "blocks_answer_if_unresolved", False)
+                or getattr(con, "required", False)
+                or getattr(con, "priority", "") == "high"
+                or "can_block_answer" in getattr(con, "affordances", []))
+
+
+def _object_anchored(con, subject_slot, frame, frontier, text_l: str) -> bool:
+    """For a relational constraint (binds >=1 OTHER slot), is the dependent OBJECT anchored
+    in this evidence? Generic: a candidate or known-context term for another applies_to slot
+    appears in the text. No object candidate yet -> not anchored (full support must wait)."""
+    other_slots = [sid for sid in getattr(con, "applies_to", [])
+                   if sid != getattr(subject_slot, "slot_id", None)]
+    if not other_slots:
+        return True
+    for sid in other_slots:
+        slate = getattr(frontier, "slates", {}).get(sid)
+        if slate is None:
+            continue
+        for cand in slate.candidates.values():
+            if cand.candidate_text and cand.candidate_text.lower() in text_l:
+                return True
+    return False
+
+
 def _slot_compatible(role_e: str, slot_role: str) -> bool:
     """Stricter than ``_role_compatible``: unknown never fans out, and a date/time entity
     only binds a date/time (or untyped) slot."""
@@ -564,20 +589,36 @@ class EvidenceInterpreter:
                 cons += [c for c in (frontier._con(cid) for cid in sel_cons)
                          if c is not None and c not in cons]
             sup, con, partial, req_read = [], [], [], []
+            judge_on = self.judge is not None and getattr(self.judge, "enabled", False)
+            judge_cap = getattr(self.judge, "max_calls_per_candidate", 6) if judge_on else 0
+            judged_here = 0
+            stop_candidate = False                      # contradiction early-stop (5f-H)
             for c in cons:
                 status, q = recognize_constraint_support(
                     c, text, role_e, source_role, title, snippet, contaminated=contaminated)
                 # When the judge is enabled, it decides support fit for this triple; the
                 # deterministic recognizer is its fallback + input (req: prefer the judge).
-                if self.judge is not None and getattr(self.judge, "enabled", False):
+                if judge_on and not stop_candidate:
+                    if judged_here >= judge_cap:
+                        self.judge.max_calls_cap_hit += 1   # budget cap (5f-H): fall back to det
+                        if status == "supports":
+                            sup.append(c.constraint_id)
+                        elif status == "contradicts":
+                            con.append(c.constraint_id)
+                        continue
+                    judged_here += 1
+                    relational = len(getattr(c, "applies_to", []) or []) > 1
+                    obj_anchored = (not relational) or _object_anchored(c, slot, frame, frontier,
+                                                                        text_l)
                     jd = self.judge.judge(
-                        candidate_text=text, candidate_id=None, aliases=[],
+                        candidate_text=text, candidate_id=None, aliases=list(a.candidate_aliases),
                         slot_id=slot.slot_id, slot_role=slot.slot_role,
                         slot_descriptor=(getattr(slot, "descriptor_text", "") or slot.slot_name),
                         constraint=c, source_id=source_id, source_title=title,
                         source_url=source_url, source_domain=_host(source_url),
                         source_role=source_role, contaminated=contaminated, snippet=snippet,
-                        det_status=status, det_quote=q)
+                        det_status=status, det_quote=q, relational=relational,
+                        object_anchored=obj_anchored)
                     a.judgments.append(jd.to_dict())
                     for al in jd.candidate_aliases:
                         if al and al not in a.candidate_aliases:
@@ -586,10 +627,20 @@ class EvidenceInterpreter:
                         sup.append(c.constraint_id)
                     elif jd.judgment == "contradiction":
                         con.append(c.constraint_id)
+                        # stop judging this candidate for this result on a blocking contradiction.
+                        if _is_blocking(c):
+                            stop_candidate = True
+                            self.judge.contradiction_early_stop += 1
+                            self.judge.calls_saved_by_contradiction_stop += max(
+                                0, len(cons) - cons.index(c) - 1)
                     elif jd.judgment == "partial_support":
                         partial.append(c.constraint_id)
                     elif jd.judgment == "requires_read":
                         req_read.append(c.constraint_id)
+                elif judge_on and stop_candidate:
+                    # deterministic-only after a blocking contradiction (no more judge calls).
+                    if status == "contradicts":
+                        con.append(c.constraint_id)
                 else:
                     if status == "supports":
                         sup.append(c.constraint_id)

@@ -267,6 +267,7 @@ class SearchLoopConfig:
     enable_llm_frontier_repair: bool = False
     enable_llm_frontier_planner: bool = False
     enable_llm_evidence_interpreter: bool = False
+    enable_llm_evidence_judge: bool = False
     scrape_fallback_to_page_fetch: bool = True
     allow_social_scrape: bool = False
 
@@ -285,6 +286,7 @@ class SearchLoop:
         task_frame_parser=None,
         llm_frontier=None,
         evidence_interpreter=None,
+        evidence_judge=None,
     ) -> None:
         self.router = router
         self.query_policy = query_policy
@@ -296,6 +298,8 @@ class SearchLoop:
         #: optional shared (cache, model_fn) for the LLM evidence-interpreter hook; a fresh
         #: per-attempt EvidenceInterpreter is built from it so stats stay per-attempt.
         self.evidence_interpreter = evidence_interpreter
+        #: optional shared (cache, model_fn) for the LLM evidence JUDGE (Level 5f).
+        self.evidence_judge = evidence_judge
 
     def run(
         self,
@@ -443,13 +447,27 @@ class SearchLoop:
                 # LLM source-role re-classification only when enabled + a shared cache/model
                 # is injected, so replay/dry-run make no model call).
                 interp = None
-                if config.enable_llm_evidence_interpreter and self.evidence_interpreter is not None:
+                judge = None
+                # Level 5f: a per-attempt evidence JUDGE (decides candidate/slot/constraint
+                # support fit) built from the shared cache/model so stats stay per-attempt and
+                # replay/dry-run make no model call.
+                if config.enable_llm_evidence_judge and self.evidence_judge is not None:
+                    from regimes_probe.agent.evidence_judge import EvidenceJudge
+                    ej = self.evidence_judge
+                    judge = EvidenceJudge(
+                        model_fn=getattr(ej, "model_fn", None), cache=getattr(ej, "cache", None),
+                        model=getattr(ej, "model", "deterministic"),
+                        replay_only=getattr(ej, "replay_only", False), enabled=True)
+                if (config.enable_llm_evidence_interpreter or judge is not None):
                     from regimes_probe.agent.evidence_interpreter import EvidenceInterpreter
                     ei = self.evidence_interpreter
                     interp = EvidenceInterpreter(
                         model_fn=getattr(ei, "model_fn", None), cache=getattr(ei, "cache", None),
                         model=getattr(ei, "model", "deterministic"),
-                        replay_only=getattr(ei, "replay_only", False), enabled_llm=True)
+                        replay_only=getattr(ei, "replay_only", False),
+                        enabled_llm=bool(config.enable_llm_evidence_interpreter
+                                         and self.evidence_interpreter is not None),
+                        judge=judge)
                 frontier = CandidateFrontier(frame, attempt_id=attempt_id, item_id=item.id,
                                              interpreter=interp)
                 ctrl["frontier_controller_used"] = bool(config.enable_frontier_controller)

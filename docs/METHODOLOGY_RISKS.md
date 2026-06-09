@@ -472,3 +472,22 @@ set — and the risk surface. Keep the experiment honest:
   stays strict. Finally, **provider routing** learned from one run may not generalize —
   empty/contamination/support-yield rates are observations to score over many traces, never
   a hard-coded "provider X is best" rule.
+
+- **An LLM evidence judge over-credits evidence unless every guard holds.** The Level-5f
+  judge (`--enable-llm-evidence-judge`) decides whether a source excerpt supports a
+  candidate/slot/constraint — exactly the place an LLM will happily call a directory heading
+  or a title match "support". So the judge's output is **not trusted raw**: hard rules are
+  enforced *after* the model (a contaminated/noise source can never be full/partial support;
+  `full_support` requires a quote tying the candidate to the predicate; title overlap alone
+  is downgraded; chrome never reaches it), and those rules are unit-tested against a stub
+  that *tries* to over-credit. **Full support must stay quote-backed, source-clean,
+  candidate-specific, and constraint-specific.** **Partial support is not answer support** —
+  it moves EIG/scheduling only and can never resolve a blocking constraint, so the strict
+  answer gate is unchanged and a partial-only candidate abstains. The judge is **cached and
+  replayable** (keyed by `prompt_fingerprint | model | triple_hash`; replay makes zero model
+  calls) — mandatory for auditability and to keep runs reproducible. And the judge **improves
+  interpretation, not benchmark-claim eligibility**: it never answers, never sees gold, never
+  writes to policy memory; the metrics `full_support_from_contaminated_source_count` and
+  `partial_support_from_contaminated_source_count` are invariants pinned at 0. A run with the
+  judge on is still gated by the same same-conditions + headline-eligibility checks as any
+  other.

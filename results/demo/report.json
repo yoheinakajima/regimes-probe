@@ -17,6 +17,7 @@
     "frontier_controller_enabled": false,
     "llm_frontier_enabled": false,
     "llm_evidence_interpreter_enabled": false,
+    "llm_evidence_judge_enabled": false,
     "dataset": "synthetic_browse",
     "dataset_version": "synthetic_browse@44963c46dfcf",
     "split": {

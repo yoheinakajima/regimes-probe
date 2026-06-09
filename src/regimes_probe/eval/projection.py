@@ -301,6 +301,25 @@ def _project_evidence_interpretation(g: "_GraphBuilder", aid: str, cf: dict[str,
                               Relations.ASSERTION_MATERIALIZES_CANDIDATE)
                         g.rel(f"slot_candidate#{aid}#{cc}", f"latent_slot#{aid}#{sid}",
                               Relations.CANONICAL_CANDIDATE_FOR_SLOT)
+            # Level 5f: project each LLM evidence judgment for this assertion.
+            for ji, jd in enumerate(a.get("judgments", [])):
+                jn = g.obj(f"evidence_judgment#{aid}#{ii}#{ai}#{ji}", Objects.EVIDENCE_JUDGMENT, {
+                    "judgment_id": jd.get("judgment_id"), "judgment": jd.get("judgment"),
+                    "constraint_id": jd.get("constraint_id"), "candidate_role_fit": jd.get("candidate_role_fit"),
+                    "source_role_fit": jd.get("source_role_fit"), "quote": jd.get("quote"),
+                    "confidence": jd.get("confidence"), "mode": jd.get("mode"),
+                    "model": jd.get("model"), "prompt_hash": jd.get("prompt_hash"),
+                    "cache_hit": jd.get("cache_hit"),
+                    "requires_read_reason": jd.get("requires_read_reason")})
+                g.rel(inode, jn, Relations.EVIDENCE_JUDGMENT_FROM_SOURCE)
+                g.rel(an, jn, Relations.EVIDENCE_JUDGMENT_FOR_CANDIDATE_CONSTRAINT)
+                cid_j = jd.get("constraint_id")
+                rel = {"full_support": Relations.EVIDENCE_JUDGMENT_SUPPORTS_CONSTRAINT,
+                       "partial_support": Relations.EVIDENCE_JUDGMENT_PARTIAL_CONSTRAINT,
+                       "contradiction": Relations.EVIDENCE_JUDGMENT_CONTRADICTS_CONSTRAINT,
+                       }.get(jd.get("judgment"))
+                if rel and cid_j:
+                    g.rel(jn, f"constraint#{aid}#{cid_j}", rel)
         for ci, c in enumerate(interp.get("constraint_assertions", [])):
             cn = g.obj(f"constraint_assertion#{aid}#{ii}#{ci}", Objects.CONSTRAINT_ASSERTION, {
                 "constraint_id": c.get("constraint_id"), "status": c.get("status"),

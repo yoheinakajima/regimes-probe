@@ -80,6 +80,7 @@ class Objects:
     CONSTRAINT_ASSERTION = "constraint_assertion"
     SOURCE_ROLE_CLASSIFICATION = "source_role_classification"
     EVIDENCE_NOISE_CLASSIFICATION = "evidence_noise_classification"
+    EVIDENCE_JUDGMENT = "evidence_judgment"
     POLICY_UPDATE = "policy_update"
     PROMOTION_DECISION = "promotion_decision"
     REPORT = "report"
@@ -172,6 +173,7 @@ PROJECTION_OBJECTS: tuple[str, ...] = (
     Objects.CONSTRAINT_ASSERTION,
     Objects.SOURCE_ROLE_CLASSIFICATION,
     Objects.EVIDENCE_NOISE_CLASSIFICATION,
+    Objects.EVIDENCE_JUDGMENT,
 )
 
 #: Map an event-log object type onto its standardized projection type.

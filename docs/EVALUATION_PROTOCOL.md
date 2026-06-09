@@ -413,3 +413,16 @@ instead of failing). `read_after_search_rate` and the per-attempt `stage_depth`/
 counts should rise for `task_frame_required` cases as reads add depth. Because read-heavy
 policies cost more, weigh support yield **per read and per dollar**, and treat learned
 provider metrics as observations, not fixed truths.
+
+**The LLM evidence judge improves interpretation, not eligibility (Level 5f).** When
+`--enable-llm-evidence-judge` is on, audit it with: `llm_evidence_judge_calls` /
+`cache_hits` / `replay_hits` (replay must be all cache, zero calls);
+`llm_full_support_count` / `llm_partial_support_count` / `llm_contradiction_count` /
+`llm_requires_read_count` / `llm_irrelevant_count`; the **hard invariants**
+`full_support_from_contaminated_source_count` and
+`partial_support_from_contaminated_source_count` (both must be **0**);
+`support_from_llm_judge_rate` and `llm_requires_read_scheduled_rate` (requires-read should
+actually schedule reads). A judge that raises accuracy is not, by itself, grounds for any
+benchmark claim — it changes how evidence is interpreted, while the strict answer gate,
+same-conditions, and headline-eligibility checks are unchanged. Partial support is **not**
+answer support: a partial-only candidate must still abstain.

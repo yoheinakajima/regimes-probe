@@ -96,6 +96,10 @@ policy:
   # from structured assertions, not raw n-grams). This flag only adds an optional
   # cached/replayable LLM source-role re-classification. --enable-llm-evidence-interpreter.
   enable_llm_evidence_interpreter: false
+  # Level 5f: optional cached/replayable LLM evidence JUDGE — decides whether a source
+  # excerpt supports/partially-supports/contradicts a candidate/slot/constraint triple.
+  # Deterministic recognizer is the fallback. --enable-llm-evidence-judge.
+  enable_llm_evidence_judge: false
   # Level 3 evidence reading: if firecrawl_scrape fails (e.g. 402/quota), fall
   # back to the basic page_fetch on the same URL. Social pages are not scraped
   # unless allow_social_scrape is set.

@@ -5,7 +5,7 @@
   "parent_run_id": null,
   "git": {
     "branch": "claude/regimes-probe-setup-ILfr0",
-    "commit": "466751330360d7ff0abf05270f0085ef9dbc5256",
+    "commit": "c03f9c8a562970b8294430de561107e4c4ec5120",
     "dirty": true
   },
   "dataset": {
@@ -157,6 +157,14 @@
       "content_hash": "b9f8908713cf5547",
       "fingerprint": "frontier_planner@v1#b9f89087",
       "intended_use": "LLM frontier-action/query proposals from graph state (Level 5c; never answers)",
+      "allowed_to_vary": true
+    },
+    "evidence_judge": {
+      "name": "evidence_judge",
+      "version": "v1",
+      "content_hash": "10b9347e7c627d95",
+      "fingerprint": "evidence_judge@v1#10b9347e",
+      "intended_use": "LLM evidence-fit judge for candidate/slot/constraint support (Level 5f; never answers)",
       "allowed_to_vary": true
     }
   },

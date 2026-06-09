@@ -58,7 +58,8 @@
     "candidate_assertion",
     "constraint_assertion",
     "source_role_classification",
-    "evidence_noise_classification"
+    "evidence_noise_classification",
+    "evidence_judgment"
   ],
   "relation_types": [
     "attempt_for_item",
@@ -138,7 +139,12 @@
     "canonical_candidate_for_slot",
     "evidence_supports_selected_constraint",
     "proposal_resolves_candidate",
-    "weak_observation_not_candidate"
+    "weak_observation_not_candidate",
+    "evidence_judgment_for_candidate_constraint",
+    "evidence_judgment_supports_constraint",
+    "evidence_judgment_partial_constraint",
+    "evidence_judgment_contradicts_constraint",
+    "evidence_judgment_from_source"
   ],
   "detail_limit": 60,
   "event_log": {

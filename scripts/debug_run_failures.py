@@ -192,6 +192,24 @@ def main() -> int:
                                      f"supports={a.get('supports_constraint_ids')} "
                                      f"quote={a.get('evidence_quote_or_span')!r}")
                         print(line)
+                        # Level 5f LLM EVIDENCE JUDGE block (per candidate/constraint judgment).
+                        for jd in a.get("judgments", []):
+                            print(f"          JUDGE[{jd.get('judgment_id')}] "
+                                  f"{jd.get('judgment')} con={jd.get('constraint_id')} "
+                                  f"role_fit={jd.get('candidate_role_fit')} "
+                                  f"src_fit={jd.get('source_role_fit')} "
+                                  f"mode={jd.get('mode')} cache={jd.get('cache_hit')} "
+                                  f"prompt={str(jd.get('prompt_hash'))[:8]}")
+                            if jd.get("quote"):
+                                print(f"            quote={jd.get('quote')!r} "
+                                      f"({jd.get('rationale')})")
+                            if jd.get("requires_read_reason"):
+                                print(f"            requires_read: {jd.get('requires_read_reason')}")
+                        if a.get("partial_support_constraint_ids"):
+                            print(f"          partial_support={a.get('partial_support_constraint_ids')}"
+                                  " (NOT blocking)")
+                        if a.get("requires_read_constraint_ids"):
+                            print(f"          requires_read={a.get('requires_read_constraint_ids')}")
                     for c in it.get("constraint_assertions", []):
                         if c.get("status") in ("supports", "contradicts"):
                             print(f"        constraint {c.get('constraint_id')} [{c.get('status')}] "

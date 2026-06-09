@@ -97,6 +97,16 @@ class Events:
     SUPPORT_DROPPED = "support_dropped"
     READ_SCHEDULED = "read_scheduled"
     READ_INTERPRETED = "read_interpreted"
+    # Level 5f LLM evidence judge
+    LLM_EVIDENCE_JUDGMENT_CREATED = "llm_evidence_judgment.created"
+    LLM_EVIDENCE_JUDGMENT_ACCEPTED = "llm_evidence_judgment.accepted"
+    LLM_EVIDENCE_JUDGMENT_REJECTED = "llm_evidence_judgment.rejected"
+    EVIDENCE_JUDGMENT_REQUIRES_READ = "evidence_judgment_requires_read"
+    EVIDENCE_JUDGMENT_SUPPORTS_CANDIDATE_CONSTRAINT = "evidence_judgment_supports_candidate_constraint"
+    EVIDENCE_JUDGMENT_PARTIALLY_SUPPORTS_CANDIDATE_CONSTRAINT = "evidence_judgment_partially_supports_candidate_constraint"
+    EVIDENCE_JUDGMENT_CONTRADICTS_CANDIDATE_CONSTRAINT = "evidence_judgment_contradicts_candidate_constraint"
+    EVIDENCE_JUDGMENT_REJECTED_REASON = "evidence_judgment_rejected_reason"
+    SKIPPED_READ_AFTER_REQUIRES_READ = "skipped_read_after_requires_read"
 
 
 #: Candidate-slate / frontier event-type strings (trace + projection only).
@@ -134,6 +144,12 @@ EVIDENCE_INTERPRETATION_EVENTS: tuple[str, ...] = (
     Events.CANDIDATE_LOOKUP_RESOLVED, Events.CANDIDATE_LOOKUP_FAILED,
     Events.EV_SLOT_TRUE_CONS_FALSE_EXPLAINED,
     Events.SUPPORT_DROPPED, Events.READ_SCHEDULED, Events.READ_INTERPRETED,
+    Events.LLM_EVIDENCE_JUDGMENT_CREATED, Events.LLM_EVIDENCE_JUDGMENT_ACCEPTED,
+    Events.LLM_EVIDENCE_JUDGMENT_REJECTED, Events.EVIDENCE_JUDGMENT_REQUIRES_READ,
+    Events.EVIDENCE_JUDGMENT_SUPPORTS_CANDIDATE_CONSTRAINT,
+    Events.EVIDENCE_JUDGMENT_PARTIALLY_SUPPORTS_CANDIDATE_CONSTRAINT,
+    Events.EVIDENCE_JUDGMENT_CONTRADICTS_CANDIDATE_CONSTRAINT,
+    Events.EVIDENCE_JUDGMENT_REJECTED_REASON, Events.SKIPPED_READ_AFTER_REQUIRES_READ,
 )
 
 

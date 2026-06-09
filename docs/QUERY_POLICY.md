@@ -891,3 +891,40 @@ judge** returning graded support assertions (the deterministic recognizers + the
 source-role hook are the current canonical path), learned **provider routing**, and an
 explicit **Answer Support Contract** for a relaxed mode — default remains strict
 all-required support.
+
+### Level 5f: the LLM evidence judge (a narrow evidence-fit function)
+
+The Level-5e substrate made support candidate/slot/constraint-specific and auditable; 5f
+adds the optional component that *decides* fit. `agent/evidence_judge.py` is **not** a
+planner or answerer — it is an evidence-fit function over one
+`(candidate, slot, constraint, source-excerpt)` triple, returning a structured
+`EvidenceJudgment`: `full_support` / `partial_support` / `contradiction` / `irrelevant` /
+`requires_read`, with candidate/source role-fit, supported/unsupported/contradicted facets,
+a quote, rationale, confidence, `requires_read_reason`, and extracted candidate aliases. It
+never produces a final answer, never sees gold, never writes to policy memory, and never
+weakens the answer-support gate.
+
+- **Flags.** `--enable-llm-evidence-judge` + `--llm-evidence-judge-model`, requiring
+  `--enable-task-frame`; off by default. Easy/direct/simple questions skip it entirely.
+- **Cached + replayable.** Keyed by `prompt_fingerprint | model | triple_hash`; dry-run and
+  replay make **zero** model calls and fall back to the deterministic recognizer
+  (`recognize_constraint_support`). The judgment carries `judgment_id`, `model`,
+  `prompt_hash`, `input_hash`, `cache_hit`, and `mode`.
+- **Hard rules (enforced after the model, so a misbehaving model cannot break them).** A
+  contaminated or noise source can never be full/partial support (downgraded to irrelevant
+  or contradiction); `full_support` requires a quote tying the candidate to the constraint
+  predicate (title overlap alone is downgraded to partial); page chrome/navigation never
+  reaches the judge (the interpreter rejects it first).
+- **How support flows.** `full_support` → the candidate's `constraints_supported` (visible
+  in `supports_constraints` / hypothesis support / the answer gate); `contradiction` → a
+  candidate-specific contradiction that rejects the candidate; `partial_support` →
+  `constraints_partial` (raises ranking/EIG, **never** resolves a blocking constraint);
+  `requires_read` → marks the candidate's source for a `read_candidate_source` that now
+  outranks another snippet search (or records `skipped_read_after_requires_read` if no
+  source is available). Aliases the judge extracts enter the **canonical** alias registry,
+  so a later verifier proposal naming an alias resolves instead of failing as
+  `nonexistent_candidate`. When `full_support` materializes but doesn't land on the
+  evidence record, the 5e `support_dropped` invariant still records the drop.
+
+The deterministic recognizers remain the canonical fallback (behaviour with the flag off is
+unchanged); the judge *improves interpretation*, not benchmark-claim eligibility.

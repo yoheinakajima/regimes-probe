@@ -134,6 +134,9 @@ class SlotCandidate:
     next_test_action_ids: list[str] = field(default_factory=list)
     source_role: str = "unknown"             # best source role observed (read-value signal)
     read_done: bool = False                  # a page-body read has been interpreted for it
+    constraints_partial: list[str] = field(default_factory=list)   # 5f: partial (non-blocking)
+    requires_read_constraint_ids: list[str] = field(default_factory=list)  # 5f: judge wants read
+    aliases: list[str] = field(default_factory=list)               # 5f: judge-extracted aliases
 
     def to_dict(self) -> dict[str, Any]:
         return {"candidate_id": self.candidate_id,
@@ -345,6 +348,9 @@ class CandidateFrontier:
         self.read_executed_count = 0
         self.support_from_read_count = 0
         self.support_dropped_count = 0
+        #: Level 5f: LLM-judge requires_read accounting.
+        self.requires_read_total = 0
+        self.requires_read_scheduled = 0
         self._cc = self._ec = self._hc = self._ac = self._evc = 0
         self._known = {_norm(t) for t in frame.known_context_terms}
         # one slate per slot that NEEDS binding (every unbound variable).
@@ -660,6 +666,64 @@ class CandidateFrontier:
                     self._emit("evidence_constraint_support_attached", candidate_id=cid,
                                slot_id=sid, evidence_id=ev.evidence_id,
                                data={"constraint_ids": list(sup)})
+                # Level 5f: partial support is recorded (influences EIG/scheduling) but does
+                # NOT resolve a blocking constraint; requires_read marks a read target; the
+                # judge's aliases enter the canonical alias registry (not a parallel one).
+                cand = self.candidates_by_id.get(cid)
+                # Level 5f: project each LLM evidence judgment for this candidate (created +
+                # accepted/rejected + per-judgment support/contradiction/requires-read).
+                for jd in a.judgments:
+                    if jd.get("candidate_id") not in (None, cid) or jd.get("slot_id") not in (sid, ""):
+                        pass
+                    self._emit("llm_evidence_judgment.created", candidate_id=cid, slot_id=sid,
+                               evidence_id=ev.evidence_id, data={
+                                   "judgment_id": jd.get("judgment_id"),
+                                   "judgment": jd.get("judgment"),
+                                   "constraint_id": jd.get("constraint_id"),
+                                   "quote": (jd.get("quote") or "")[:120],
+                                   "model": jd.get("model"), "prompt_hash": jd.get("prompt_hash"),
+                                   "cache_hit": jd.get("cache_hit"), "mode": jd.get("mode")})
+                    jm = jd.get("judgment")
+                    if jm in ("full_support", "partial_support", "contradiction", "requires_read"):
+                        self._emit("llm_evidence_judgment.accepted",
+                                   evidence_id=ev.evidence_id, candidate_id=cid,
+                                   data={"judgment_id": jd.get("judgment_id"), "judgment": jm})
+                        if jm == "full_support":
+                            self._emit("evidence_judgment_supports_candidate_constraint",
+                                       candidate_id=cid, slot_id=sid, evidence_id=ev.evidence_id,
+                                       data={"constraint_id": jd.get("constraint_id")})
+                        elif jm == "contradiction":
+                            self._emit("evidence_judgment_contradicts_candidate_constraint",
+                                       candidate_id=cid, slot_id=sid, evidence_id=ev.evidence_id,
+                                       data={"constraint_id": jd.get("constraint_id")})
+                    elif jm == "irrelevant":
+                        self._emit("llm_evidence_judgment.rejected",
+                                   evidence_id=ev.evidence_id, candidate_id=cid,
+                                   data={"judgment_id": jd.get("judgment_id"),
+                                         "reason": "irrelevant"})
+                if cand is not None:
+                    for pc in a.slot_partial.get(sid, []):
+                        if pc not in cand.constraints_supported:
+                            _union(cand.constraints_partial, pc)
+                        self._emit("evidence_judgment_partially_supports_candidate_constraint",
+                                   candidate_id=cid, slot_id=sid, evidence_id=ev.evidence_id,
+                                   data={"constraint_id": pc})
+                    for rc in a.slot_requires_read.get(sid, []):
+                        if rc not in cand.requires_read_constraint_ids:
+                            self.requires_read_total += 1
+                        _union(cand.requires_read_constraint_ids, rc)
+                        self._emit("evidence_judgment_requires_read", candidate_id=cid,
+                                   slot_id=sid, evidence_id=ev.evidence_id,
+                                   data={"constraint_id": rc})
+                    for al in a.candidate_aliases:
+                        if al and al not in cand.aliases:
+                            cand.aliases.append(al)
+                        self.candidate_text_index.setdefault(sid, {}).setdefault(
+                            self._norm_key(al), cid)
+                    # partial support nudges ranking/EIG but never resolves a blocker.
+                    cand.evidence_score = (float(len(cand.constraints_supported))
+                                           + 0.5 * len(cand.constraints_partial)
+                                           + 0.25 * len(cand.source_domains))
 
     def _assign(self, slot, text, norm, role, ev, source_tool, action_id, stage,
                 domain, authority, contaminated, from_ctx, text_l, cons,
@@ -927,19 +991,31 @@ class CandidateFrontier:
             # read can close several constraints (cons = all unresolved for the candidate).
             forced = streak >= self.force_read_after_n
             for c in active:
-                if not (c.source_domains and c.constraints_unknown):
+                # the LLM judge explicitly asked to read this candidate's source (req: 5f).
+                judge_read = bool(c.requires_read_constraint_ids and not c.read_done)
+                if not (c.source_domains and (c.constraints_unknown or judge_read)):
+                    if judge_read and not c.source_domains:
+                        self._emit("skipped_read_after_requires_read", slot_id=slate.slot_id,
+                                   candidate_id=c.candidate_id,
+                                   data={"reason": "no_source_url_for_candidate"})
                     continue
                 src_val = 0.5 if c.source_role in _HIGH_VALUE_READ_ROLES else 0.0
                 convert = (not c.constraints_supported)     # snippets gave a candidate, no support
-                read_eig = 1.0 + (2.5 if forced else 0.0) + (1.0 if convert else 0.0) + src_val
-                reason = ("forced_read_after_no_support" if forced
-                          else ("read_to_convert_candidate" if convert
-                                else "deepen_candidate_evidence"))
+                # the judge explicitly asked to read THIS source: it should outrank another
+                # snippet search/verify for the slot (a read is the converting action).
+                read_eig = (1.0 + (2.5 if forced else 0.0) + (1.0 if convert else 0.0)
+                            + (3.5 if judge_read else 0.0) + src_val)
+                reason = ("evidence_judge_requires_read" if judge_read
+                          else ("forced_read_after_no_support" if forced
+                                else ("read_to_convert_candidate" if convert
+                                      else "deepen_candidate_evidence")))
+                read_cons = list(c.requires_read_constraint_ids or c.constraints_unknown)
                 ra = _add("read_candidate_source", slot=slate.slot_id, cand=c.candidate_id,
-                          cons=list(c.constraints_unknown), eig=read_eig, cost=2.0, reason=reason)
+                          cons=read_cons, eig=read_eig, cost=2.0, reason=reason)
                 ra.plan["read_value"] = {"forced": forced, "convert": convert,
+                                         "judge_requires_read": judge_read,
                                          "source_role": c.source_role, "streak": streak,
-                                         "n_unresolved": len(c.constraints_unknown)}
+                                         "n_unresolved": len(read_cons)}
                 if forced:
                     self.forced_read_count += 1
             for c in confirmed:
@@ -982,6 +1058,8 @@ class CandidateFrontier:
         if reads and best.action_type != "read_candidate_source":
             self.read_starvation_count += 1
         if best.action_type == "read_candidate_source":
+            if best.selected_reason == "evidence_judge_requires_read":
+                self.requires_read_scheduled += 1
             self._emit("read_scheduled", action_id=best.action_id,
                        data={"slot_id": best.target_slot_id, "candidate_id": best.candidate_id,
                              "reason": best.selected_reason})
@@ -1269,6 +1347,8 @@ class CandidateFrontier:
             "read_executed_count": self.read_executed_count,
             "support_from_read_count": self.support_from_read_count,
             "support_dropped_count": self.support_dropped_count,
+            "requires_read_total": self.requires_read_total,
+            "requires_read_scheduled": self.requires_read_scheduled,
         }
 
 

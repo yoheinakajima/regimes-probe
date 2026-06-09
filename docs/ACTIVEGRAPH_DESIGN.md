@@ -368,3 +368,19 @@ reason). The frontier's `metrics()` now projects `read_executed_count`,
 which step forced a read, whether that read produced support, and exactly where (if
 anywhere) support was dropped — the support path is auditable end to end, and the read/streak
 logic is a pure function of the recorded support deltas so it re-projects identically.
+
+**The LLM evidence judge is projected like any other judgment (Level 5f).** Each
+`EvidenceJudgment` is a first-class object (`evidence_judgment`) linked to its source
+interpretation (`evidence_judgment_from_source`), its candidate assertion
+(`evidence_judgment_for_candidate_constraint`), and the constraint it
+supports/partially-supports/contradicts (`evidence_judgment_supports_constraint` /
+`_partial_constraint` / `_contradicts_constraint`). New **events**:
+`llm_evidence_judgment.created/accepted/rejected`, `evidence_judgment_requires_read`,
+`evidence_judgment_supports/partially_supports/contradicts_candidate_constraint`,
+`evidence_judgment_rejected_reason`, `skipped_read_after_requires_read`. Each judgment node
+carries `judgment_id`, `model`, `prompt_hash`, `input_hash`, `cache_hit`, and `mode`
+(deterministic|llm), so a reviewer can replay exactly which model call (or cached entry)
+produced each support decision and verify — from `graph_projection.json` alone — that no
+support came from a contaminated source and that every `full_support` is quote-backed.
+Because the judge is keyed by `prompt_fingerprint | model | triple_hash` and replay reads
+the cache, the whole judged support path re-projects identically with zero model calls.

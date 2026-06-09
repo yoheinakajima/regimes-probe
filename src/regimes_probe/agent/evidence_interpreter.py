@@ -189,6 +189,12 @@ class CandidateAssertion:
     #: per-slot (supported, contradicted) constraint ids, computed by the support
     #: recognizers and APPLIED verbatim by the frontier (not recomputed from overlap).
     slot_support: dict[str, list[list[str]]] = field(default_factory=dict)
+    #: Level 5f LLM evidence judge: per-slot partial-support + requires-read constraint ids,
+    #: aliases the judge extracted, and the bounded judgment records (trace/projection).
+    slot_partial: dict[str, list[str]] = field(default_factory=dict)
+    slot_requires_read: dict[str, list[str]] = field(default_factory=dict)
+    candidate_aliases: list[str] = field(default_factory=list)
+    judgments: list[dict] = field(default_factory=list)
 
     @property
     def accepted(self) -> bool:
@@ -205,7 +211,13 @@ class CandidateAssertion:
                 "evidence_quote_or_span": _prev(self.evidence_quote_or_span, 160),
                 "source_role": self.source_role, "confidence": round(self.confidence, 3),
                 "rejection_reason": self.rejection_reason,
-                "canonical_candidate_ids": dict(self.canonical_candidate_ids)}
+                "canonical_candidate_ids": dict(self.canonical_candidate_ids),
+                "partial_support_constraint_ids": sorted(
+                    {c for v in self.slot_partial.values() for c in v}),
+                "requires_read_constraint_ids": sorted(
+                    {c for v in self.slot_requires_read.values() for c in v}),
+                "candidate_aliases": list(self.candidate_aliases)[:8],
+                "judgments": list(self.judgments)[:12]}
 
 
 @dataclass
@@ -391,12 +403,14 @@ class EvidenceInterpreter:
 
     def __init__(self, model_fn: Optional[Callable[[str], str]] = None, *,
                  cache=None, model: str = "deterministic", replay_only: bool = False,
-                 enabled_llm: bool = False) -> None:
+                 enabled_llm: bool = False, judge=None) -> None:
         self.model_fn = model_fn
         self.cache = cache
         self.model = model
         self.replay_only = replay_only
         self.enabled_llm = enabled_llm
+        #: Level 5f: optional LLM evidence judge for candidate/slot/constraint support fit.
+        self.judge = judge
         self._ic = 0
         self.interpretation_count = 0
         self.model_calls = 0
@@ -422,6 +436,9 @@ class EvidenceInterpreter:
             "candidate_assertion_rejection_counts": dict(self.rejection_counts),
             "constraint_assertion_support_count": self.constraint_support_count,
             "constraint_assertion_contradiction_count": self.constraint_contradiction_count,
+            "evidence_judge_enabled": bool(self.judge is not None
+                                           and getattr(self.judge, "enabled", False)),
+            **(self.judge.stats() if self.judge is not None else {}),
         }
 
     def _next_id(self) -> str:
@@ -470,7 +487,8 @@ class EvidenceInterpreter:
             assertion = self._assert_candidate(
                 e, norm, role_e, frame, frontier, dslot, sel_cons, role, noise_reasons,
                 text_l, title, snippet, is_known=is_known, from_ctx=from_ctx,
-                contaminated=contaminated)
+                contaminated=contaminated, source_url=url,
+                source_id=source_evidence_id)
             assertion.assertion_id = f"{interp.interpretation_id}_a{len(interp.candidate_assertions)}"
             interp.candidate_assertions.append(assertion)
         # constraint assertions: the SELECTED/tested constraints, reflecting whether an
@@ -503,7 +521,8 @@ class EvidenceInterpreter:
     def _assert_candidate(self, text, norm, role_e, frame, frontier, dslot, sel_cons,
                           source_role, noise_reasons, text_l, title, snippet,
                           *, is_known: bool, from_ctx: bool = False,
-                          contaminated: bool = False) -> CandidateAssertion:
+                          contaminated: bool = False, source_url: str = "",
+                          source_id: str = "") -> CandidateAssertion:
         a = CandidateAssertion(candidate_text=text, normalized_text_hash=_hash(norm),
                                inferred_role=role_e, source_role=source_role,
                                from_ctx=from_ctx)
@@ -544,18 +563,46 @@ class EvidenceInterpreter:
             if slot.slot_id == (dslot.slot_id if dslot else None):
                 cons += [c for c in (frontier._con(cid) for cid in sel_cons)
                          if c is not None and c not in cons]
-            sup, con = [], []
+            sup, con, partial, req_read = [], [], [], []
             for c in cons:
-                status, _q = recognize_constraint_support(
+                status, q = recognize_constraint_support(
                     c, text, role_e, source_role, title, snippet, contaminated=contaminated)
-                if status == "supports":
-                    sup.append(c.constraint_id)
-                elif status == "contradicts":
-                    con.append(c.constraint_id)
+                # When the judge is enabled, it decides support fit for this triple; the
+                # deterministic recognizer is its fallback + input (req: prefer the judge).
+                if self.judge is not None and getattr(self.judge, "enabled", False):
+                    jd = self.judge.judge(
+                        candidate_text=text, candidate_id=None, aliases=[],
+                        slot_id=slot.slot_id, slot_role=slot.slot_role,
+                        slot_descriptor=(getattr(slot, "descriptor_text", "") or slot.slot_name),
+                        constraint=c, source_id=source_id, source_title=title,
+                        source_url=source_url, source_domain=_host(source_url),
+                        source_role=source_role, contaminated=contaminated, snippet=snippet,
+                        det_status=status, det_quote=q)
+                    a.judgments.append(jd.to_dict())
+                    for al in jd.candidate_aliases:
+                        if al and al not in a.candidate_aliases:
+                            a.candidate_aliases.append(al)
+                    if jd.judgment == "full_support":
+                        sup.append(c.constraint_id)
+                    elif jd.judgment == "contradiction":
+                        con.append(c.constraint_id)
+                    elif jd.judgment == "partial_support":
+                        partial.append(c.constraint_id)
+                    elif jd.judgment == "requires_read":
+                        req_read.append(c.constraint_id)
+                else:
+                    if status == "supports":
+                        sup.append(c.constraint_id)
+                    elif status == "contradicts":
+                        con.append(c.constraint_id)
             if is_known and not sup:
                 continue                # a known constant binds a slot only via support
             proposed.append(slot.slot_id)
             a.slot_support[slot.slot_id] = [sorted(sup), sorted(con)]
+            if partial:
+                a.slot_partial[slot.slot_id] = sorted(partial)
+            if req_read:
+                a.slot_requires_read[slot.slot_id] = sorted(req_read)
             supports.update(sup)
             contradicts.update(con)
         if not proposed:

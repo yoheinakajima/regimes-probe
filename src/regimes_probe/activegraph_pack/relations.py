@@ -101,6 +101,12 @@ class Relations:
     EVIDENCE_SUPPORTS_SELECTED_CONSTRAINT = "evidence_supports_selected_constraint"
     PROPOSAL_RESOLVES_CANDIDATE = "proposal_resolves_candidate"
     WEAK_OBSERVATION_NOT_CANDIDATE = "weak_observation_not_candidate"
+    # Level 5f LLM evidence judge
+    EVIDENCE_JUDGMENT_FOR_CANDIDATE_CONSTRAINT = "evidence_judgment_for_candidate_constraint"
+    EVIDENCE_JUDGMENT_SUPPORTS_CONSTRAINT = "evidence_judgment_supports_constraint"
+    EVIDENCE_JUDGMENT_PARTIAL_CONSTRAINT = "evidence_judgment_partial_constraint"
+    EVIDENCE_JUDGMENT_CONTRADICTS_CONSTRAINT = "evidence_judgment_contradicts_constraint"
+    EVIDENCE_JUDGMENT_FROM_SOURCE = "evidence_judgment_from_source"
     UPDATE_FROM_REWARD = "update_from_reward"
     REGIME_FOR_FAILURE = "regime_for_failure"
     PROMOTION_FOR_UPDATE = "promotion_for_update"
@@ -205,4 +211,9 @@ PROJECTION_RELATIONS: tuple[str, ...] = (
     Relations.EVIDENCE_SUPPORTS_SELECTED_CONSTRAINT,
     Relations.PROPOSAL_RESOLVES_CANDIDATE,
     Relations.WEAK_OBSERVATION_NOT_CANDIDATE,
+    Relations.EVIDENCE_JUDGMENT_FOR_CANDIDATE_CONSTRAINT,
+    Relations.EVIDENCE_JUDGMENT_SUPPORTS_CONSTRAINT,
+    Relations.EVIDENCE_JUDGMENT_PARTIAL_CONSTRAINT,
+    Relations.EVIDENCE_JUDGMENT_CONTRADICTS_CONSTRAINT,
+    Relations.EVIDENCE_JUDGMENT_FROM_SOURCE,
 )

@@ -196,6 +196,22 @@ _VARIABLES_BLOCK = (
 _TASK_FRAME_PARSER_V3 = _TASK_FRAME_PARSER_V2.replace(
     "OUTPUT: one JSON object", _VARIABLES_BLOCK + "OUTPUT: one JSON object")
 
+_EVIDENCE_JUDGE_V1 = (
+    "You are an EVIDENCE JUDGE. Given ONE candidate, slot, constraint, and a single source "
+    "excerpt, decide ONLY whether the excerpt supports that triple. You do NOT answer the "
+    "user's question and you never see gold labels.\n"
+    "RULES:\n"
+    "- Output JSON only: judgment (full_support|partial_support|contradiction|irrelevant|"
+    "requires_read), candidate_role_fit, source_role_fit, supported_facets, unsupported_facets, "
+    "contradicted_facets, quote, rationale, confidence, requires_read_reason, candidate_aliases, "
+    "safety_notes.\n"
+    "- A contaminated or noise source can NEVER be full/partial support.\n"
+    "- full_support REQUIRES a quote tying the candidate to the constraint predicate; title "
+    "overlap alone is not enough.\n"
+    "- Prefer requires_read when the snippet hints support exists but cannot establish it.\n"
+    "- Page chrome / navigation / directory headers / generic listings are irrelevant.\n"
+    "- A role/type-compatible mention without the predicate is partial_support or irrelevant.\n")
+
 _FRONTIER_PLANNER_V1 = (
     "You are a RESEARCH PLANNER for a multi-hop question. You are given a bounded "
     "RESEARCH_STATE_CARD describing unknown variables (slots), known context terms, "
@@ -260,6 +276,11 @@ PROMPTS: dict[str, Prompt] = {
     "frontier_planner": Prompt(
         name="frontier_planner", version="v1", content=_FRONTIER_PLANNER_V1,
         intended_use="LLM frontier-action/query proposals from graph state (Level 5c; never answers)",
+        allowed_to_vary=True,
+    ),
+    "evidence_judge": Prompt(
+        name="evidence_judge", version="v1", content=_EVIDENCE_JUDGE_V1,
+        intended_use="LLM evidence-fit judge for candidate/slot/constraint support (Level 5f; never answers)",
         allowed_to_vary=True,
     ),
 }

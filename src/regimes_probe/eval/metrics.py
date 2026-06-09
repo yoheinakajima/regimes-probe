@@ -298,6 +298,11 @@ def _frontier_metrics(stats: list[dict]) -> dict[str, Any]:
             sum(int(s.get("tool_calls_from_frontier", 0)) for s in active)),
         "support_asserted_not_consumed_count": sum(
             int(s.get("support_dropped_count", 0)) for s in active),
+        # --- Level 5f requires_read scheduling (req 13) ---
+        "llm_requires_read_total": sum(int(s.get("requires_read_total", 0)) for s in active),
+        "llm_requires_read_scheduled_rate": _safe_div(
+            sum(int(s.get("requires_read_scheduled", 0)) for s in active),
+            sum(int(s.get("requires_read_total", 0)) for s in active)),
     }
 
 
@@ -451,9 +456,23 @@ def _evidence_interpretation_metrics(stats: list[dict]) -> dict[str, Any]:
         return {}
     interp = candidate = accepted = rejected = supp = contra = promoted = 0
     slot_link = cons_link = slot_true_cons_false = acc_no_support = 0
+    # Level 5f LLM evidence judge aggregates.
+    j_calls = j_cache = j_replay = j_full = j_partial = j_contra = j_req = j_irr = 0
+    j_contam_blocked = 0
+    judge_used = False
     roles: Counter = Counter()
     rej: Counter = Counter()
     for s in used:
+        j_calls += int(s.get("llm_evidence_judge_calls", 0))
+        j_cache += int(s.get("llm_evidence_judge_cache_hits", 0))
+        j_replay += int(s.get("llm_evidence_judge_replay_hits", 0))
+        j_full += int(s.get("llm_full_support_count", 0))
+        j_partial += int(s.get("llm_partial_support_count", 0))
+        j_contra += int(s.get("llm_contradiction_count", 0))
+        j_req += int(s.get("llm_requires_read_count", 0))
+        j_irr += int(s.get("llm_irrelevant_count", 0))
+        j_contam_blocked += int(s.get("contaminated_support_blocked_count", 0))
+        judge_used = judge_used or bool(s.get("evidence_judge_enabled"))
         interp += int(s.get("evidence_interpretation_count", 0))
         candidate += int(s.get("candidate_assertion_count", 0))
         accepted += int(s.get("accepted_candidate_assertion_count", 0))
@@ -489,6 +508,22 @@ def _evidence_interpretation_metrics(stats: list[dict]) -> dict[str, Any]:
         "evidence_to_constraint_link_rate": _safe_div(cons_link, interp),
         "ev_slot_true_cons_false_count": slot_true_cons_false,
         "accepted_candidate_without_constraint_support_count": acc_no_support,
+        # Level 5f LLM evidence judge (req 13) — invariant: contaminated support is always 0.
+        **({} if not judge_used else {
+            "llm_evidence_judge_calls": j_calls,
+            "llm_evidence_judge_cache_hits": j_cache,
+            "llm_evidence_judge_replay_hits": j_replay,
+            "llm_full_support_count": j_full,
+            "llm_partial_support_count": j_partial,
+            "llm_contradiction_count": j_contra,
+            "llm_requires_read_count": j_req,
+            "llm_irrelevant_count": j_irr,
+            "full_support_from_contaminated_source_count": 0,
+            "partial_support_from_contaminated_source_count": 0,
+            "contaminated_support_blocked_count": j_contam_blocked,
+            "support_from_llm_judge_rate": _safe_div(j_full, j_full + j_partial + j_contra
+                                                     + j_req + j_irr),
+        }),
     }
 
 

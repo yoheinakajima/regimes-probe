@@ -75,6 +75,14 @@ class Relations:
     # Frontier controller (Level 5b)
     TOOL_CALL_FROM_FRONTIER_ACTION = "tool_call_from_frontier_action"
     HYPOTHESIS_UPDATED_AFTER_FRONTIER_ACTION = "hypothesis_updated_after_frontier_action"
+    # LLM frontier proposer (Level 5c)
+    PROPOSAL_TARGETS_SLOT = "proposal_targets_slot"
+    PROPOSAL_TESTS_CONSTRAINT = "proposal_tests_constraint"
+    PROPOSAL_USES_CANDIDATE = "proposal_uses_candidate"
+    PROPOSAL_BASED_ON_STATE_CARD = "proposal_based_on_state_card"
+    PROPOSAL_SELECTED_FOR_ACTION = "proposal_selected_for_action"
+    PROPOSAL_REJECTED_BECAUSE = "proposal_rejected_because"
+    TOOL_CALL_FROM_LLM_FRONTIER_PROPOSAL = "tool_call_from_llm_frontier_proposal"
     UPDATE_FROM_REWARD = "update_from_reward"
     REGIME_FOR_FAILURE = "regime_for_failure"
     PROMOTION_FOR_UPDATE = "promotion_for_update"
@@ -156,4 +164,11 @@ PROJECTION_RELATIONS: tuple[str, ...] = (
     Relations.CANDIDATE_UNLOCKS_DEPENDENT_SLOT,
     Relations.TOOL_CALL_FROM_FRONTIER_ACTION,
     Relations.HYPOTHESIS_UPDATED_AFTER_FRONTIER_ACTION,
+    Relations.PROPOSAL_TARGETS_SLOT,
+    Relations.PROPOSAL_TESTS_CONSTRAINT,
+    Relations.PROPOSAL_USES_CANDIDATE,
+    Relations.PROPOSAL_BASED_ON_STATE_CARD,
+    Relations.PROPOSAL_SELECTED_FOR_ACTION,
+    Relations.PROPOSAL_REJECTED_BECAUSE,
+    Relations.TOOL_CALL_FROM_LLM_FRONTIER_PROPOSAL,
 )

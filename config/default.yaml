@@ -85,6 +85,13 @@ policy:
   # fallback to the old planner per step). Requires enable_task_frame. Default off
   # => shadow mode (frontier records recommendations only). --enable-frontier-controller.
   enable_frontier_controller: false
+  # LLM frontier proposer (Level 5c): a bounded LLM proposes constraint-grounded
+  # research actions from an ActiveGraph state card; deterministic code validates,
+  # scores, executes, records. Both require enable_task_frame. repair = call only
+  # when the deterministic query is generic; planner = ask for top-K proposals.
+  # Off by default; cache/replay-safe. --enable-llm-frontier-repair / -planner.
+  enable_llm_frontier_repair: false
+  enable_llm_frontier_planner: false
   # Level 3 evidence reading: if firecrawl_scrape fails (e.g. 402/quota), fall
   # back to the basic page_fetch on the same URL. Social pages are not scraped
   # unless allow_social_scrape is set.

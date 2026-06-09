@@ -261,3 +261,32 @@ driving action, and a hypothesis update projects
 achieved — and an offline fork can replay the cached tool outputs while re-scoring the
 frontier under a different EIG/reward setting, refusing to spend if a needed output is
 absent. Controller decisions are never hidden Python state.
+
+### LLM frontier proposer as native graph state (Level 5c)
+
+The optional LLM frontier proposer (`QUERY_POLICY.md` Level 5c, `agent/llm_frontier.py`)
+keeps the same discipline: **the LLM proposes, ActiveGraph records, deterministic code
+disposes.** The bounded state the model reasons over is itself a graph object — the
+`research_state_card` (projected from the `TaskFrame` + `CandidateFrontier`, never from
+gold) — and so is everything downstream of it. New **projection objects**
+(`activegraph_pack/objects.py:PROJECTION_OBJECTS`): `research_state_card`,
+`llm_frontier_prompt`, `llm_frontier_proposal`, `llm_frontier_validation`,
+`llm_frontier_selection`. New **events** (`LLM_FRONTIER_EVENTS`, kept out of the frozen
+`ALL_EVENTS` tuple): `llm_frontier_state_card_created`, `llm_frontier_repair_invoked`,
+`llm_frontier_proposals_generated`, `llm_frontier_proposal_validated`,
+`llm_frontier_proposal_rejected`, `llm_frontier_proposal_selected`,
+`llm_frontier_proposal_executed`, `llm_frontier_model_called`. New **projection relations**
+(`PROJECTION_RELATIONS`): `proposal_targets_slot`, `proposal_tests_constraint`,
+`proposal_uses_candidate`, `proposal_based_on_state_card`, `proposal_selected_for_action`,
+`proposal_rejected_because`, and `tool_call_from_llm_frontier_proposal` (the `lfp_`-prefixed
+`frontier_action_id` on a `CallRecord` links the executed tool call back to its proposal).
+
+A reviewer can therefore reconstruct, purely from `graph_projection.json`: the exact card
+the model saw (by hash), every proposal it returned, **why** each was accepted or rejected
+(reason on the `proposal_rejected_because` edge), which one was selected and scored, and
+which tool call it ultimately drove. Because each model call is keyed by
+`prompt_fingerprint | model | card_hash` and cached, the whole layer **re-projects
+identically** on replay and an offline fork can re-validate/re-score the cached proposals
+under a different policy **without any model call** — refusing to spend if the proposal
+cache is absent. The proposer's own settings are pinned into `ConditionSpec` so a
+comparison cannot silently differ in how queries were composed.

@@ -135,6 +135,13 @@ def _sha12(s: str) -> str:
 
 def _spec(cfg, search_tools, budget, split, memory_access) -> ConditionSpec:
     from regimes_probe.agent import prompts
+    pol = cfg.get("policy", {})
+    lf_on = bool(pol.get("enable_llm_frontier_repair") or pol.get("enable_llm_frontier_planner"))
+    lf_settings = "off"
+    if lf_on:
+        lf_mode = "planner" if pol.get("enable_llm_frontier_planner") else "repair"
+        lf_settings = (f"{lf_mode}|{pol.get('llm_frontier_model', 'answer_model')}|"
+                       f"{prompts.fingerprint('frontier_planner')}")
     return ConditionSpec(
         answer_model=cfg.get("live", {}).get("answer_model", "gpt-5.4-mini"),
         answer_prompt_version=prompts.fingerprint("answerer"),
@@ -143,7 +150,8 @@ def _spec(cfg, search_tools, budget, split, memory_access) -> ConditionSpec:
         grader="normalized_match",
         provider_config_id=_sha12(",".join(sorted(search_tools))),
         query_policy=cfg["policy"]["query_mode"], verify_policy="default",
-        stop_policy=cfg["policy"]["stop_mode"], memory_access=memory_access)
+        stop_policy=cfg["policy"]["stop_mode"], llm_frontier_settings=lf_settings,
+        memory_access=memory_access)
 
 
 @dataclass
@@ -251,6 +259,7 @@ def run_live_pipeline(cfg, items, *, providers, search_agent, cb_agent, cache,
                       live_settings: Optional[dict] = None,
                       parent_run_id: Optional[str] = None,
                       task_frame_parser=None,
+                      llm_frontier=None,
                       offline_fork: bool = False) -> dict[str, Any]:
     """Execute the requested conditions. Providers/agents are injected (mockable).
 
@@ -419,9 +428,14 @@ def run_live_pipeline(cfg, items, *, providers, search_agent, cb_agent, cache,
         "frontier_controller_enabled": ls.get(
             "frontier_controller_enabled",
             bool(cfg.get("policy", {}).get("enable_frontier_controller", False))),
+        "llm_frontier_enabled": ls.get(
+            "llm_frontier_enabled",
+            bool(cfg.get("policy", {}).get("enable_llm_frontier_repair", False)
+                 or cfg.get("policy", {}).get("enable_llm_frontier_planner", False))),
         # LLM task-frame parser accounting (answer-free): model calls + cache + fallbacks.
         "task_frame_parser": (task_frame_parser.stats() if task_frame_parser is not None
                               else {}),
+        "llm_frontier": (llm_frontier.stats() if llm_frontier is not None else {}),
         "tools_enabled": search_tools, "embedder": "hash_embedder",
         "dataset": dataset_label, "dataset_version": ver,
         "split": split.to_dict() | {"optimize_ids": "...", "confirm_ids": "..."},

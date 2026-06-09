@@ -15,6 +15,7 @@
     "task_frame_enabled": false,
     "llm_task_frame_parser_enabled": false,
     "frontier_controller_enabled": false,
+    "llm_frontier_enabled": false,
     "dataset": "synthetic_browse",
     "dataset_version": "synthetic_browse@44963c46dfcf",
     "split": {
@@ -149,6 +150,7 @@
   "task_frame_enabled": false,
   "llm_task_frame_parser_enabled": false,
   "frontier_controller_enabled": false,
+  "llm_frontier_enabled": false,
   "task_frame_parser": {},
   "leakage_check_details": {
     "memory_snapshot_leakage_pass": true,
@@ -193,6 +195,7 @@
       "query_policy": "learned",
       "verify_policy": "default",
       "stop_policy": "learned",
+      "llm_frontier_settings": "",
       "memory_access": "none"
     },
     "policy_memory": {
@@ -211,6 +214,7 @@
       "query_policy": "learned",
       "verify_policy": "default",
       "stop_policy": "learned",
+      "llm_frontier_settings": "",
       "memory_access": "frozen_snapshot"
     }
   },

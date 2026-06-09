@@ -28,13 +28,16 @@ class ConditionSpec:
     verify_policy: str
     stop_policy: str
     memory_access: str          # "none" | "frozen_snapshot" | "random" | "online"
+    #: LLM frontier proposer settings (mode + model + prompt) — must be IDENTICAL
+    #: across compared conditions (the only intended difference is memory access).
+    llm_frontier_settings: str = ""
 
     #: Fields compared by :func:`same_conditions`. ``memory_access`` is compared
     #: too, but it is the *intended* difference for the Level 1 headline.
     COMPARED = (
         "answer_model", "answer_prompt_version", "enabled_tools", "tool_budget",
         "split_id", "grader", "provider_config_id", "query_policy",
-        "verify_policy", "stop_policy", "memory_access",
+        "verify_policy", "stop_policy", "llm_frontier_settings", "memory_access",
     )
 
     def to_dict(self) -> dict[str, Any]:

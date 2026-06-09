@@ -63,6 +63,7 @@ class LiveSettings:
     task_frame_enabled: bool = False
     llm_task_frame_parser_enabled: bool = False
     frontier_controller_enabled: bool = False
+    llm_frontier_enabled: bool = False
     task_frame_parser_model: Optional[str] = None
     missing_search_keys: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
@@ -113,6 +114,7 @@ class LiveSettings:
             "task_frame_enabled": self.task_frame_enabled,
             "llm_task_frame_parser_enabled": self.llm_task_frame_parser_enabled,
             "frontier_controller_enabled": self.frontier_controller_enabled,
+            "llm_frontier_enabled": self.llm_frontier_enabled,
             "task_frame_parser_model": self.task_frame_parser_model,
             "provider_classes": self.provider_classes(),
             "tools_meta": self.tools_meta(),
@@ -160,6 +162,7 @@ def resolve_live_settings(
     enable_task_frame: bool = False,
     enable_llm_task_frame_parser: bool = False,
     enable_frontier_controller: bool = False,
+    enable_llm_frontier: bool = False,
     env: Optional[dict[str, str]] = None,
 ) -> LiveSettings:
     if mode not in MODES:
@@ -246,4 +249,5 @@ def resolve_live_settings(
         task_frame_enabled=enable_task_frame,
         llm_task_frame_parser_enabled=enable_llm_task_frame_parser,
         frontier_controller_enabled=enable_frontier_controller and enable_task_frame,
+        llm_frontier_enabled=enable_llm_frontier and enable_task_frame,
         missing_search_keys=sorted(set(missing)), notes=notes, warnings=warnings)

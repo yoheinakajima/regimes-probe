@@ -165,6 +165,60 @@ def _project_frontier(g: "_GraphBuilder", aid: str, tf_node: str, cf: dict[str, 
         g.rel(f"epistemic_action#{aid}#{i}", node, Relations.TOOL_CALL_FROM_FRONTIER_ACTION)
 
 
+def _project_llm_frontier(g: "_GraphBuilder", aid: str, tf_node: str, a_node: str,
+                          lf: dict[str, Any], calls: Optional[list] = None) -> None:
+    """Project the LLM frontier proposer subgraph (Level 5c): state cards, proposals,
+    validations, selections, and the tool-call link."""
+    sel_by_id: dict[str, str] = {}      # proposal_id -> proposal node
+    for si, st in enumerate(lf.get("steps", [])):
+        card_hash = st.get("card_hash", "")
+        sc = g.obj(f"research_state_card#{aid}#{si}", Objects.RESEARCH_STATE_CARD, {
+            "card_hash": card_hash, "mode": st.get("mode"),
+            "prompt_version": st.get("prompt_version"), "prompt_hash": st.get("prompt_hash"),
+            "model": st.get("model"), "cache_hit": st.get("cache_hit"),
+            "fallback_reason": st.get("fallback_reason", "")})
+        pr = g.obj(f"llm_frontier_prompt#{aid}#{si}", Objects.LLM_FRONTIER_PROMPT,
+                   {"prompt_version": st.get("prompt_version"), "prompt_hash": st.get("prompt_hash")})
+        g.rel(sc, pr, Relations.PROPOSAL_BASED_ON_STATE_CARD)
+        for p in st.get("proposals", []):
+            pid = p.get("proposal_id")
+            pn = g.obj(f"llm_frontier_proposal#{aid}#{si}#{pid}", Objects.LLM_FRONTIER_PROPOSAL, {
+                "action_type": p.get("action_type"), "target_slot_id": p.get("target_slot_id"),
+                "candidate_id": p.get("candidate_id"), "status": p.get("status"),
+                "score": p.get("score"), "proposed_query": p.get("proposed_query"),
+                "avoids_generic_query": p.get("avoids_generic_query")})
+            g.rel(pn, sc, Relations.PROPOSAL_BASED_ON_STATE_CARD)
+            if p.get("target_slot_id"):
+                g.rel(pn, f"latent_slot#{aid}#{p['target_slot_id']}", Relations.PROPOSAL_TARGETS_SLOT)
+            for cid in p.get("constraint_ids", []):
+                g.rel(pn, f"constraint#{aid}#{cid}", Relations.PROPOSAL_TESTS_CONSTRAINT)
+            if p.get("candidate_id"):
+                g.rel(pn, f"slot_candidate#{aid}#{p['candidate_id']}", Relations.PROPOSAL_USES_CANDIDATE)
+            if p.get("status") == "rejected":
+                v = g.obj(f"llm_frontier_validation#{aid}#{si}#{pid}", Objects.LLM_FRONTIER_VALIDATION,
+                          {"rejection_reason": p.get("rejection_reason")})
+                g.rel(pn, v, Relations.PROPOSAL_REJECTED_BECAUSE)
+            sel_by_id[str(pid)] = pn
+        selp = st.get("selected", {})
+        if selp.get("proposal_id"):
+            sn = g.obj(f"llm_frontier_selection#{aid}#{si}", Objects.LLM_FRONTIER_SELECTION,
+                       {"proposal_id": selp.get("proposal_id"), "score": selp.get("score")})
+            pn = sel_by_id.get(str(selp.get("proposal_id")))
+            if pn:
+                g.rel(pn, sn, Relations.PROPOSAL_SELECTED_FOR_ACTION)
+    # each tool call driven by an LLM proposal links to its proposal node.
+    for i, c in enumerate(calls or []):
+        fa = c.get("frontier_action_id") or ""
+        if fa.startswith("lfp_"):
+            pid = fa[len("lfp_"):]
+            for si in range(len(lf.get("steps", []))):
+                node = f"llm_frontier_proposal#{aid}#{si}#{pid}"
+                if g.has(node):
+                    g.rel(f"epistemic_action#{aid}#{i}", node,
+                          Relations.TOOL_CALL_FROM_LLM_FRONTIER_PROPOSAL)
+                    break
+
+
 def build_graph_projection(
     run_id: str,
     *,
@@ -438,6 +492,11 @@ def build_graph_projection(
                 cf = d.get("candidate_frontier") or {}
                 if cf and not cf.get("skipped"):
                     _project_frontier(g, aid, tf_node, cf, d.get("calls", []))
+
+                # --- Level 5c LLM frontier proposer subgraph ---
+                lf = d.get("llm_frontier") or {}
+                if lf.get("enabled"):
+                    _project_llm_frontier(g, aid, tf_node, a_node, lf, d.get("calls", []))
 
     # --- run-level objects: memory_snapshot + policy_fragment lineage ---
     fragments = snapshot.get("fragments", {}) if snapshot else {}

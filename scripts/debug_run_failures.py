@@ -153,6 +153,49 @@ def main() -> int:
                 print(f"      [{tag}] {a.get('action_type')} slot={a.get('target_slot_id')} "
                       f"eig={a.get('expected_information_gain')} "
                       + (f"rej={a.get('rejected_reason')}" if a.get('rejected_reason') else ""))
+        # Level 5c LLM frontier proposer: per-step proposals, validation, selection.
+        lf = r.get("llm_frontier") or {}
+        if lf.get("enabled"):
+            tot = lf.get("totals", {}) or {}
+            print(f"  LLM FRONTIER ({lf.get('mode')}/{lf.get('model')}): "
+                  f"model_calls={tot.get('llm_frontier_model_calls')} "
+                  f"cache_hits={tot.get('llm_frontier_cache_hits')} "
+                  f"proposals={tot.get('llm_frontier_proposals_count')} "
+                  f"accepted={tot.get('llm_frontier_accepted_count')} "
+                  f"selected={tot.get('llm_frontier_selected_count')} "
+                  f"repair_invoked={tot.get('llm_frontier_repair_invocation_count')} "
+                  f"fallback={tot.get('llm_frontier_fallback_count')}")
+            for st in lf.get("steps", []):
+                cs = st.get("card_summary", {}) or {}
+                print(f"    step {st.get('step')}: card={str(st.get('card_hash'))[:10]} "
+                      f"mode={cs.get('epistemic_mode')} "
+                      f"known_ctx={cs.get('known_context_terms')} "
+                      f"blocking={cs.get('unresolved_blocking_constraints')} "
+                      f"slates={cs.get('n_candidate_slates')} hyps={cs.get('n_hypotheses')} "
+                      f"budget={cs.get('remaining_budget')}")
+                dr = st.get("det_recommendation", {}) or {}
+                print(f"      det_rec: {dr.get('action_type')} q={dr.get('query')!r} "
+                      f"slot={dr.get('target_slot_id')} generic={dr.get('is_generic_query')}")
+                if st.get("skipped_reason"):
+                    print(f"      (skipped: {st.get('skipped_reason')})")
+                print(f"      cache_hit={st.get('cache_hit')} model_called={st.get('model_called')} "
+                      f"prompt={str(st.get('prompt_hash'))[:8]} proposal_hash={str(st.get('proposal_hash'))[:8]}"
+                      + (f" fallback={st.get('fallback_reason')}" if st.get('fallback_reason') else ""))
+                for p in st.get("proposals", []):
+                    mark = "✓" if p.get("status") == "accepted" else "✗"
+                    print(f"      {mark} {p.get('proposal_id')} [{p.get('action_type')}] "
+                          f"q={p.get('proposed_query')!r} slot={p.get('target_slot_id')} "
+                          f"constraints={p.get('constraint_ids')} anchors={p.get('anchors_used')} "
+                          f"score={p.get('score')}"
+                          + (f" REJECT={p.get('rejection_reason')}" if p.get('status') == "rejected" else ""))
+                sel = st.get("selected", {}) or {}
+                if sel:
+                    print(f"      → SELECTED {sel.get('proposal_id')}: q={sel.get('proposed_query')!r} "
+                          f"anchors={sel.get('anchors_used')} "
+                          f"repaired_generic={st.get('repaired_generic')} "
+                          f"expected_evidence={sel.get('expected_evidence')!r}")
+        elif lf.get("skipped_reason"):
+            print(f"  LLM FRONTIER: skipped ({lf.get('skipped_reason')})")
         # Stage chain (iterative clue resolution): query -> results -> typed candidates.
         for c in r.get("calls", []):
             cands = c.get("candidate_entities", [])
@@ -163,6 +206,9 @@ def main() -> int:
                   + (f", q={c.get('query_quality')}" if c.get('query_quality') else "")
                   + (f", no_progress" if c.get('no_progress') else "")
                   + (f", sticky={c.get('sticky_penalty')}" if c.get('sticky_penalty') else ""))
+            fa_id = c.get("frontier_action_id")
+            if fa_id and str(fa_id).startswith("lfp_"):
+                print(f"        ↳ from LLM frontier proposal {str(fa_id)[4:]}")
             ta = c.get("task_action") or {}
             if ta.get("kind"):
                 print(f"        action[{ta['kind']}] slot={ta.get('target_slot_id')} "

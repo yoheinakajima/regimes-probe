@@ -223,6 +223,7 @@ class AttemptTrace:
     task_frame_parse: dict[str, Any] = field(default_factory=dict)
     epistemic_mode: dict[str, Any] = field(default_factory=dict)
     candidate_frontier: dict[str, Any] = field(default_factory=dict)
+    llm_frontier: dict[str, Any] = field(default_factory=dict)
 
     @property
     def tool_calls(self) -> int:
@@ -261,6 +262,8 @@ class SearchLoopConfig:
     force_task_frame: bool = False
     disable_direct_answer: bool = False
     enable_frontier_controller: bool = False
+    enable_llm_frontier_repair: bool = False
+    enable_llm_frontier_planner: bool = False
     scrape_fallback_to_page_fetch: bool = True
     allow_social_scrape: bool = False
 
@@ -277,6 +280,7 @@ class SearchLoop:
         answerer: Optional[DeterministicAnswerer] = None,
         invoker_factory=None,
         task_frame_parser=None,
+        llm_frontier=None,
     ) -> None:
         self.router = router
         self.query_policy = query_policy
@@ -284,6 +288,7 @@ class SearchLoop:
         self.answerer = answerer or DeterministicAnswerer()
         self._invoker_factory = invoker_factory
         self.task_frame_parser = task_frame_parser
+        self.llm_frontier = llm_frontier
 
     def run(
         self,
@@ -413,6 +418,14 @@ class SearchLoop:
                 "tool_calls_from_frontier_actions": 0,
                 "shadow_agreements": 0, "shadow_total": 0, "shadow_disagree_reasons": [],
                 "first_action_discriminative": None, "first_query_generic": None}
+        # LLM frontier proposer (Level 5c): optional, repairs a generic deterministic
+        # query OR proposes the next action from a bounded ActiveGraph state card.
+        lf_mode = ("planner" if config.enable_llm_frontier_planner
+                   else ("repair" if config.enable_llm_frontier_repair else ""))
+        llm_frontier = (self.llm_frontier if (task_frame and frame is not None and lf_mode
+                                              and self.llm_frontier is not None) else None)
+        lf_steps: list[dict[str, Any]] = []
+        lf_no_progress_queries: list[str] = []
         if task_frame and frame is not None:
             _mode = epistemic_decision.selected_epistemic_mode
             if _mode in ("direct_answer_possible", "simple_lookup"):
@@ -479,6 +492,30 @@ class SearchLoop:
                     no_progress_domains=no_progress_domains,
                     page_fetch_available=page_fetch_available, scrape_available=scrape_available,
                     allow_social=config.allow_social_scrape, force_page_fetch=force_page_fetch)
+                # LLM frontier proposer: validate/score/select a constraint-grounded
+                # action that replaces (planner) or repairs (repair) the generic one.
+                if llm_frontier is not None:
+                    from regimes_probe.agent.llm_frontier import build_research_state_card
+                    card = build_research_state_card(
+                        frame, frontier, question=item.question,
+                        epistemic_mode=epistemic_decision.selected_epistemic_mode,
+                        available_tools=config.available_tools,
+                        remaining_budget=config.budget - len(calls),
+                        memory_access_mode=("policy_memory" if memory.has_priors() else "no_memory")
+                        if hasattr(memory, "has_priors") else "unknown",
+                        failed_queries=[c.query for c in calls if c.failed],
+                        no_progress_queries=lf_no_progress_queries, det_plan=step_plan)
+                    lf_plan, lf_meta = llm_frontier.plan_step(
+                        card, step_plan, frame=frame, frontier=frontier, mode=lf_mode,
+                        observations=observations, scraped_urls=scraped_urls,
+                        no_progress_domains=no_progress_domains,
+                        page_fetch_available=page_fetch_available, scrape_available=scrape_available,
+                        allow_social=config.allow_social_scrape, force_page_fetch=force_page_fetch,
+                        failed_queries=lf_no_progress_queries + [c.query for c in calls if c.failed])
+                    lf_meta["step"] = step
+                    lf_steps.append(lf_meta)
+                    if lf_plan is not None:
+                        step_plan = lf_plan
             if frontier_controller and step_plan is not None and step_plan.executable:
                 if ctrl["first_action_discriminative"] is None and step_plan.kind == "search":
                     ctrl["first_action_discriminative"] = step_plan.is_discriminative_constraint
@@ -767,6 +804,8 @@ class SearchLoop:
                 if not progressed:
                     if scrape_info and ev.domain:
                         no_progress_domains.add(ev.domain)
+                    if query and query not in lf_no_progress_queries and not scrape_info:
+                        lf_no_progress_queries.append(query)   # feeds the LLM state card
                     best = htable.best_hypothesis()
                     if best is not None:
                         htable.note_no_progress(best.hypothesis_id)
@@ -889,4 +928,14 @@ class SearchLoop:
                 uses_layer=(config.enable_task_frame or config.auto_epistemic_mode
                             or config.force_task_frame),
                 had_frame=(task_frame and frame is not None), controller=ctrl),
+            llm_frontier=({"enabled": True, "mode": lf_mode,
+                           "model": self.llm_frontier.model if self.llm_frontier else "",
+                           "steps": lf_steps,
+                           "totals": self.llm_frontier.stats() if self.llm_frontier else {}}
+                          if llm_frontier is not None else (
+                              {"enabled": False,
+                               "skipped_reason": (f"epistemic_mode={epistemic_decision.selected_epistemic_mode}"
+                                                  if (lf_mode and task_frame and frame is not None)
+                                                  else "")}
+                              if lf_mode else {})),
         )

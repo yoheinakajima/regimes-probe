@@ -109,6 +109,7 @@ class DebugRecord:
     task_frame_parse: dict[str, Any] = field(default_factory=dict)
     epistemic_mode: dict[str, Any] = field(default_factory=dict)
     candidate_frontier: dict[str, Any] = field(default_factory=dict)
+    llm_frontier: dict[str, Any] = field(default_factory=dict)
     evidence_titles: list[str] = field(default_factory=list)
     evidence_urls: list[str] = field(default_factory=list)
     evidence_snippet_previews: list[str] = field(default_factory=list)
@@ -253,6 +254,7 @@ def build_debug_record(*, item, trace, grade, reward, condition: str, budget: in
         task_frame_parse=dict(getattr(trace, "task_frame_parse", {}) or {}),
         epistemic_mode=dict(getattr(trace, "epistemic_mode", {}) or {}),
         candidate_frontier=_bounded_frontier(getattr(trace, "candidate_frontier", {}) or {}),
+        llm_frontier=dict(getattr(trace, "llm_frontier", {}) or {}),
         evidence_titles=[e["title_preview"] for e in evidence],
         evidence_urls=[e["url"] for e in evidence],
         evidence_snippet_previews=[e["snippet_preview"] for e in evidence])

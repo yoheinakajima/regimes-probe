@@ -41,6 +41,8 @@ class AgentConfig:
     force_task_frame: bool = False     # always escalate to task-frame mode
     disable_direct_answer: bool = False  # never use the direct-answer mode
     enable_frontier_controller: bool = False  # frontier scheduler DRIVES tool selection
+    enable_llm_frontier_repair: bool = False   # LLM repairs a generic deterministic query
+    enable_llm_frontier_planner: bool = False  # LLM proposes top-K frontier actions
     scrape_fallback_to_page_fetch: bool = True  # firecrawl_scrape fail -> page_fetch
     allow_social_scrape: bool = False
     as_of: str = "2026-06-01"
@@ -51,7 +53,7 @@ class AgentConfig:
 
 class EpistemicAgent:
     def __init__(self, config: AgentConfig, *, extractor: Optional[SignatureExtractor] = None,
-                 answerer=None, task_frame_parser=None) -> None:
+                 answerer=None, task_frame_parser=None, llm_frontier=None) -> None:
         self.config = config
         self.extractor = extractor or SignatureExtractor()
         self.router = Router(config.router)
@@ -59,8 +61,10 @@ class EpistemicAgent:
         self.stopping_policy = StoppingPolicy(config.stop_mode, config.stop)
         self.answerer = answerer
         self.task_frame_parser = task_frame_parser
+        self.llm_frontier = llm_frontier
         self.loop = SearchLoop(self.router, self.query_policy, self.stopping_policy,
-                               answerer=answerer, task_frame_parser=task_frame_parser)
+                               answerer=answerer, task_frame_parser=task_frame_parser,
+                               llm_frontier=llm_frontier)
 
     def signature(self, item: Item) -> QuerySignature:
         return self.extractor.compute(item.question)
@@ -94,6 +98,8 @@ class EpistemicAgent:
             force_task_frame=self.config.force_task_frame,
             disable_direct_answer=self.config.disable_direct_answer,
             enable_frontier_controller=self.config.enable_frontier_controller,
+            enable_llm_frontier_repair=self.config.enable_llm_frontier_repair,
+            enable_llm_frontier_planner=self.config.enable_llm_frontier_planner,
             scrape_fallback_to_page_fetch=self.config.scrape_fallback_to_page_fetch,
             allow_social_scrape=self.config.allow_social_scrape,
         )

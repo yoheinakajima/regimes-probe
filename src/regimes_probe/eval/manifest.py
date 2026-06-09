@@ -127,6 +127,10 @@ def build_manifest(
         "frontier_controller_enabled": ls.get(
             "frontier_controller_enabled",
             bool(cfg.get("policy", {}).get("enable_frontier_controller", False))),
+        "llm_frontier_enabled": ls.get(
+            "llm_frontier_enabled",
+            bool(cfg.get("policy", {}).get("enable_llm_frontier_repair", False)
+                 or cfg.get("policy", {}).get("enable_llm_frontier_planner", False))),
         "task_frame_parser_model": ls.get(
             "task_frame_parser_model",
             cfg.get("policy", {}).get("task_frame_parser_model")),

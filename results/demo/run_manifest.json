@@ -5,7 +5,7 @@
   "parent_run_id": null,
   "git": {
     "branch": "claude/regimes-probe-setup-ILfr0",
-    "commit": "2a3674ae60cd06243709b0e2deb0d9d7f2437302",
+    "commit": "82e27797c72af6792e7646036a2683db45d75a78",
     "dirty": true
   },
   "dataset": {
@@ -107,6 +107,7 @@
   "task_frame_enabled": false,
   "llm_task_frame_parser_enabled": false,
   "frontier_controller_enabled": false,
+  "llm_frontier_enabled": false,
   "task_frame_parser_model": null,
   "live_settings": {},
   "prompts": {
@@ -148,6 +149,14 @@
       "content_hash": "1be719e9a4e55bbc",
       "fingerprint": "task_frame_parser@v3#1be719e9",
       "intended_use": "open-world operational task-frame parsing (Level 4b/4e; never answers)",
+      "allowed_to_vary": true
+    },
+    "frontier_planner": {
+      "name": "frontier_planner",
+      "version": "v1",
+      "content_hash": "b9f8908713cf5547",
+      "fingerprint": "frontier_planner@v1#b9f89087",
+      "intended_use": "LLM frontier-action/query proposals from graph state (Level 5c; never answers)",
       "allowed_to_vary": true
     }
   },

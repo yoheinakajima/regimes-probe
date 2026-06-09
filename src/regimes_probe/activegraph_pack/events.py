@@ -60,6 +60,15 @@ class Events:
     EVIDENCE_LINKED_TO_CANDIDATE = "evidence.linked_to_candidate"
     EVIDENCE_LINKED_TO_SLOT = "evidence.linked_to_slot"
     EVIDENCE_LINKED_TO_CONSTRAINT = "evidence.linked_to_constraint"
+    # LLM frontier proposer (Level 5c)
+    LLM_FRONTIER_STATE_CARD_CREATED = "llm_frontier_state_card_created"
+    LLM_FRONTIER_PROPOSALS_GENERATED = "llm_frontier_proposals_generated"
+    LLM_FRONTIER_PROPOSAL_VALIDATED = "llm_frontier_proposal_validated"
+    LLM_FRONTIER_PROPOSAL_REJECTED = "llm_frontier_proposal_rejected"
+    LLM_FRONTIER_PROPOSAL_SELECTED = "llm_frontier_proposal_selected"
+    LLM_FRONTIER_PROPOSAL_EXECUTED = "llm_frontier_proposal_executed"
+    LLM_FRONTIER_REPAIR_INVOKED = "llm_frontier_repair_invoked"
+    LLM_FRONTIER_CACHE_HIT = "llm_frontier_cache_hit"
 
 
 #: Candidate-slate / frontier event-type strings (trace + projection only).
@@ -72,6 +81,14 @@ SLATE_EVENTS: tuple[str, ...] = (
     Events.FRONTIER_ACTION_EXECUTED, Events.FRONTIER_ACTION_SCORED,
     Events.EVIDENCE_LINKED_TO_CANDIDATE, Events.EVIDENCE_LINKED_TO_SLOT,
     Events.EVIDENCE_LINKED_TO_CONSTRAINT,
+)
+
+#: LLM frontier proposer event-type strings (trace + projection only).
+LLM_FRONTIER_EVENTS: tuple[str, ...] = (
+    Events.LLM_FRONTIER_STATE_CARD_CREATED, Events.LLM_FRONTIER_PROPOSALS_GENERATED,
+    Events.LLM_FRONTIER_PROPOSAL_VALIDATED, Events.LLM_FRONTIER_PROPOSAL_REJECTED,
+    Events.LLM_FRONTIER_PROPOSAL_SELECTED, Events.LLM_FRONTIER_PROPOSAL_EXECUTED,
+    Events.LLM_FRONTIER_REPAIR_INVOKED, Events.LLM_FRONTIER_CACHE_HIT,
 )
 
 

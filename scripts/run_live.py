@@ -135,6 +135,16 @@ def main() -> int:
                          "selection (each call links to a frontier_action id; falls back "
                          "to the old planner per step). Requires --enable-task-frame. "
                          "Off by default (shadow mode: recommendations recorded only).")
+    ap.add_argument("--enable-llm-frontier-repair", action="store_true",
+                    help="Level 5c: call the LLM to repair a GENERIC deterministic "
+                         "frontier query into a constraint-grounded one. Requires "
+                         "--enable-task-frame. Cached/replayable; off by default.")
+    ap.add_argument("--enable-llm-frontier-planner", action="store_true",
+                    help="Level 5c: ask the LLM for top-K frontier-action proposals from "
+                         "the ActiveGraph state card (deterministic code validates/scores/"
+                         "executes). Requires --enable-task-frame. Off by default.")
+    ap.add_argument("--llm-frontier-model", default=None,
+                    help="Model for the LLM frontier proposer (default: --answer-model).")
     ap.add_argument("--judge-model", default=None,
                     help="(reserved) LLM judge; grading currently uses exact/normalized match")
     ap.add_argument("--split-seed", default=None)
@@ -173,14 +183,22 @@ def main() -> int:
                             or bool(cfg.get("policy", {}).get("enable_llm_task_frame_parser", False)))
     frontier_controller_requested = (args.enable_frontier_controller
                                      or bool(cfg.get("policy", {}).get("enable_frontier_controller", False)))
+    llm_frontier_requested = (args.enable_llm_frontier_repair or args.enable_llm_frontier_planner
+                              or bool(cfg.get("policy", {}).get("enable_llm_frontier_repair", False))
+                              or bool(cfg.get("policy", {}).get("enable_llm_frontier_planner", False)))
     try:
         validate_task_frame_flags(task_frame=task_frame_enabled, llm_parser=llm_parser_requested,
-                                  frontier_controller=frontier_controller_requested)
+                                  frontier_controller=frontier_controller_requested,
+                                  llm_frontier=llm_frontier_requested)
     except ValueError as exc:
         print(f"=== run_live: REFUSING (configuration error) ===\n{exc}")
         return 2
     llm_parser_enabled = llm_parser_requested
     frontier_controller_enabled = frontier_controller_requested
+    llm_frontier_repair_enabled = bool(args.enable_llm_frontier_repair
+                                       or cfg.get("policy", {}).get("enable_llm_frontier_repair", False))
+    llm_frontier_planner_enabled = bool(args.enable_llm_frontier_planner
+                                        or cfg.get("policy", {}).get("enable_llm_frontier_planner", False))
 
     # Resolve models + tools from mode/CLI/config/env (cheap-first; OpenAI hosted
     # web_search is opt-in, never a silent default).
@@ -201,6 +219,7 @@ def main() -> int:
         enable_task_frame=task_frame_enabled,
         enable_llm_task_frame_parser=llm_parser_enabled,
         enable_frontier_controller=frontier_controller_enabled,
+        enable_llm_frontier=llm_frontier_repair_enabled or llm_frontier_planner_enabled,
     )
     # Stamp the effective flags into cfg.policy so the agent + manifest both see them.
     cfg.setdefault("policy", {})["enable_query_decomposition"] = decompose_enabled
@@ -214,6 +233,8 @@ def main() -> int:
     cfg["policy"]["disable_direct_answer"] = bool(
         args.disable_direct_answer or cfg.get("policy", {}).get("disable_direct_answer", False))
     cfg["policy"]["enable_frontier_controller"] = frontier_controller_enabled
+    cfg["policy"]["enable_llm_frontier_repair"] = llm_frontier_repair_enabled
+    cfg["policy"]["enable_llm_frontier_planner"] = llm_frontier_planner_enabled
     # Parser model defaults to the answer model unless explicitly overridden.
     task_frame_parser_model = (args.task_frame_parser_model
                                or cfg.get("policy", {}).get("task_frame_parser_model")
@@ -331,6 +352,8 @@ def main() -> int:
                             auto_epistemic_mode=cfg["policy"]["auto_epistemic_mode"],
                             force_task_frame=cfg["policy"]["force_task_frame"],
                             enable_frontier_controller=cfg["policy"]["enable_frontier_controller"],
+                            enable_llm_frontier_repair=llm_frontier_repair_enabled,
+                            enable_llm_frontier_planner=llm_frontier_planner_enabled,
                             disable_direct_answer=cfg["policy"]["disable_direct_answer"],
                             scrape_fallback_to_page_fetch=bool(
                                 cfg["policy"].get("scrape_fallback_to_page_fetch", True)),
@@ -349,14 +372,26 @@ def main() -> int:
         tf_parser = LLMTaskFrameParser(
             model_fn=tf_model_fn, cache=ParserCache(cache_path),
             model=task_frame_parser_model)
+    # Cached/replayable LLM frontier proposer (Level 5c): model_fn through the SAME
+    # RecordingCache; its own ParserCache file dedups proposals across conditions.
+    lf_proposer = None
+    if llm_frontier_repair_enabled or llm_frontier_planner_enabled:
+        from regimes_probe.agent.llm_frontier import LLMFrontierProposer
+        from regimes_probe.agent.llm_task_frame import ParserCache
+        from regimes_probe.live.providers import build_frontier_model_fn
+        lf_model = args.llm_frontier_model or answer_model
+        lf_cache_path = str(Path(plan.run_dir) / "llm_frontier_cache.json")
+        lf_proposer = LLMFrontierProposer(
+            model_fn=build_frontier_model_fn(lf_model, cache, armed=True),
+            cache=ParserCache(lf_cache_path), model=lf_model)
     search_agent = EpistemicAgent(agent_cfg,
                                   answerer=build_live_answerer("search", model=answer_model,
                                                                cache=cache, armed=True),
-                                  task_frame_parser=tf_parser)
+                                  task_frame_parser=tf_parser, llm_frontier=lf_proposer)
     cb_agent = EpistemicAgent(agent_cfg,
                               answerer=build_live_answerer("closed_book", model=answer_model,
                                                            cache=cache, armed=True),
-                              task_frame_parser=tf_parser)
+                              task_frame_parser=tf_parser, llm_frontier=lf_proposer)
     resume = (json.loads(Path(args.resume_from_snapshot).read_text())
               if args.resume_from_snapshot else None)
 
@@ -368,7 +403,8 @@ def main() -> int:
         results_root=args.results_root, dataset_label=label, dataset_version=version,
         dataset_path=ds_path, is_real=is_real, search_tools=search_tools,
         weights=reward_weights(cfg), params=bandit_params(cfg), resume_snapshot=resume,
-        live_settings=settings.to_dict(), task_frame_parser=tf_parser)
+        live_settings=settings.to_dict(), task_frame_parser=tf_parser,
+        llm_frontier=lf_proposer)
     el = result["eligibility"]
     print(f"run dir: {result['run_dir']}")
     print(f"cache: {result['cache']}")

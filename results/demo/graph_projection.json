@@ -48,7 +48,12 @@
     "frontier_decision",
     "frontier_score",
     "candidate_evidence_link",
-    "candidate_constraint_status"
+    "candidate_constraint_status",
+    "research_state_card",
+    "llm_frontier_proposal",
+    "llm_frontier_validation",
+    "llm_frontier_selection",
+    "llm_frontier_prompt"
   ],
   "relation_types": [
     "attempt_for_item",
@@ -105,7 +110,14 @@
     "evidence_updates_candidate_status",
     "candidate_unlocks_dependent_slot",
     "tool_call_from_frontier_action",
-    "hypothesis_updated_after_frontier_action"
+    "hypothesis_updated_after_frontier_action",
+    "proposal_targets_slot",
+    "proposal_tests_constraint",
+    "proposal_uses_candidate",
+    "proposal_based_on_state_card",
+    "proposal_selected_for_action",
+    "proposal_rejected_because",
+    "tool_call_from_llm_frontier_proposal"
   ],
   "detail_limit": 60,
   "event_log": {

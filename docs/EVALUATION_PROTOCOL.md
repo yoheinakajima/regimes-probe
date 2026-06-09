@@ -324,3 +324,27 @@ constraint, not the generic answer-type target constraint) and `generic_first_qu
 (should be near zero). A controller win is "same/better accuracy with fewer wasted
 tool calls and a higher discriminative-first rate," audited from the per-call
 `frontier_action_id` links — not a black-box accuracy delta.
+
+**LLM frontier proposer is another clean A/B (Level 5c).** With the controller fixed on,
+turn on `--enable-llm-frontier-repair` or `--enable-llm-frontier-planner` (both require
+`--enable-task-frame`) and hold everything else constant — including across the
+`no_memory` / `policy_memory` arms, which the same-conditions validator now enforces via
+`ConditionSpec.llm_frontier_settings` (`mode|model|prompt-fingerprint`). The question this
+A/B answers is narrow and mechanistic: *does letting an LLM compose the query (under
+deterministic validation) reduce generic junk-retrieving queries without changing anything
+else?* Read it from the projected metrics, not a black-box accuracy delta:
+`generic_query_repaired_count` and `generic_query_blocked_count` (the bottleneck the layer
+targets), `proposal_accept_rate` / `proposal_rejection_counts` (how disciplined the
+validator is — a healthy run rejects generic / duplicate / nonexistent-reference
+proposals), `selected_query_constraint_anchor_rate` and
+`selected_query_known_context_anchor_rate` (the executed query is grounded in a real
+constraint / known-context term, not a bare descriptor), `duplicate_query_blocked_count`,
+`evidence_progress_by_llm_frontier_action` and `llm_frontier_realized_eig` (the proposed
+action actually advanced evidence), and `llm_frontier_vs_deterministic_agreement_rate`
+(where the LLM diverged from the deterministic plan). Because every proposal, its
+validation verdict, and its driven tool call are projected and the model call is cached by
+`card_hash`, the whole comparison is **replayable with zero model calls** and an offline
+fork can re-score the cached proposals under a different policy. A win is "fewer generic
+queries and more anchored, evidence-advancing tool calls at equal/better accuracy,"
+auditable from the `tool_call_from_llm_frontier_proposal` edges — and the model never
+touches policy memory, so it cannot leak an answer into the learned signal.

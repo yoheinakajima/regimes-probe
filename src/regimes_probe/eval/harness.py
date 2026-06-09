@@ -82,6 +82,7 @@ def _outcome(trace, grade, reward, *, condition: str, budget: int) -> AttemptOut
         frame=_frame_stats(trace),
         frame_parse=_frame_parse_stats(trace),
         frontier=_frontier_stats(trace),
+        llm_frontier=dict(getattr(trace, "llm_frontier", {}) or {}),
     )
 
 

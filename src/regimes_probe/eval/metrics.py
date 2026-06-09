@@ -56,6 +56,8 @@ class AttemptOutcome:
     frame_parse: dict = field(default_factory=dict)
     # Level 5 candidate-slate / frontier stats
     frontier: dict = field(default_factory=dict)
+    # Level 5c LLM frontier proposer stats
+    llm_frontier: dict = field(default_factory=dict)
 
     def to_row(self) -> dict[str, Any]:
         return {
@@ -283,6 +285,77 @@ def _frontier_metrics(stats: list[dict]) -> dict[str, Any]:
     }
 
 
+def _llm_frontier_metrics(stats: list[dict]) -> dict[str, Any]:
+    """Aggregate Level-5c LLM frontier proposer stats across a cell (from per-attempt steps)."""
+    from collections import Counter
+    used = [s for s in stats if s and s.get("enabled")]
+    if not used:
+        return {}
+    model_calls = cache_hits = proposals = accepted = selected = repair_invoked = 0
+    generic_repaired = generic_blocked = dup_blocked = 0
+    constraint_anchor = known_anchor = sel_total = agree = agree_total = 0
+    realized = 0.0
+    answer_from = 0
+    rej: Counter = Counter()
+    for s in used:
+        for st in s.get("steps", []):
+            if st.get("model_called"):
+                model_calls += 1
+            if st.get("cache_hit"):
+                cache_hits += 1
+            if st.get("mode") == "repair" and any(
+                    e.get("event_type") == "llm_frontier_repair_invoked"
+                    for e in st.get("events", [])):
+                repair_invoked += 1
+            props = st.get("proposals", [])
+            proposals += len(props)
+            accepted += sum(1 for p in props if p.get("status") == "accepted")
+            for p in props:
+                if p.get("status") == "rejected":
+                    r = (p.get("rejection_reason") or "").split(":")[0]
+                    rej[r] += 1
+                    if r == "generic_query":
+                        generic_blocked += 1
+                    elif r == "duplicate_no_progress_query":
+                        dup_blocked += 1
+            sel = st.get("selected") or {}
+            if sel.get("proposal_id"):
+                selected += 1
+                sel_total += 1
+                comps = sel.get("score_components", {})
+                if comps.get("constraint_anchor_score", 0) > 0:
+                    constraint_anchor += 1
+                if comps.get("known_context_anchor_score", 0) > 0:
+                    known_anchor += 1
+                realized += float(sel.get("score", 0.0))
+                if sel.get("action_type") == "answer_from_confirmed_hypothesis":
+                    answer_from += 1
+                if st.get("repaired_generic"):
+                    generic_repaired += 1
+                if st.get("det_action_type") is not None:
+                    agree_total += 1
+                    if sel.get("action_type") == st.get("det_action_type"):
+                        agree += 1
+    return {
+        "llm_frontier_model_calls": model_calls,
+        "llm_frontier_cache_hits": cache_hits,
+        "llm_frontier_proposals_count": proposals,
+        "llm_frontier_proposal_accept_rate": _safe_div(accepted, proposals),
+        "llm_frontier_proposal_rejection_counts": dict(rej),
+        "llm_frontier_selected_rate": _safe_div(selected, len(used)),
+        "llm_frontier_repair_invocation_count": repair_invoked,
+        "generic_query_repaired_count": generic_repaired,
+        "generic_query_blocked_count": generic_blocked,
+        "selected_query_constraint_anchor_rate": _safe_div(constraint_anchor, sel_total),
+        "selected_query_known_context_anchor_rate": _safe_div(known_anchor, sel_total),
+        "duplicate_query_blocked_count": dup_blocked,
+        "evidence_progress_by_llm_frontier_action": _safe_div(realized, sel_total),
+        "llm_frontier_vs_deterministic_agreement_rate": _safe_div(agree, agree_total),
+        "llm_frontier_realized_eig": _safe_div(realized, sel_total),
+        "answer_from_llm_frontier_confirmed_hypothesis_count": answer_from,
+    }
+
+
 def compute_metrics(outcomes: list[AttemptOutcome]) -> dict[str, Any]:
     """Aggregate metrics for one condition+budget cell."""
     n = len(outcomes)
@@ -336,6 +409,8 @@ def compute_metrics(outcomes: list[AttemptOutcome]) -> dict[str, Any]:
         **_frame_parser_metrics([o.frame_parse for o in outcomes]),
         # Level 5 candidate-slate / frontier aggregates
         **_frontier_metrics([o.frontier for o in outcomes]),
+        # Level 5c LLM frontier proposer aggregates
+        **_llm_frontier_metrics([o.llm_frontier for o in outcomes]),
         "correct_per_tool_call": _safe_div(correct, calls),
         "correct_per_dollar": _safe_div(correct, cost) if cost else 0.0,
         "correct_per_second": _safe_div(correct, latency) if latency else 0.0,

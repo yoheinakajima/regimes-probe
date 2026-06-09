@@ -55,21 +55,32 @@ FRONTIER_CONTROLLER_REQUIRES_TASK_FRAME = (
     "--enable-frontier-controller requires --enable-task-frame")
 
 
+LLM_FRONTIER_REQUIRES_TASK_FRAME = (
+    "--enable-llm-frontier-repair/--enable-llm-frontier-planner requires --enable-task-frame")
+
+
 def validate_task_frame_flags(*, task_frame: bool, llm_parser: bool,
-                              frontier_controller: bool = False) -> None:
+                              frontier_controller: bool = False,
+                              llm_frontier: bool = False) -> None:
     """Fail fast on a task-frame-dependent flag requested without the task frame."""
     if llm_parser and not task_frame:
         raise ValueError(LLM_PARSER_REQUIRES_TASK_FRAME)
     if frontier_controller and not task_frame:
         raise ValueError(FRONTIER_CONTROLLER_REQUIRES_TASK_FRAME)
+    if llm_frontier and not task_frame:
+        raise ValueError(LLM_FRONTIER_REQUIRES_TASK_FRAME)
 
 
-def build_agent(cfg: dict[str, Any], tools: list[str], *, task_frame_parser=None) -> EpistemicAgent:
+def build_agent(cfg: dict[str, Any], tools: list[str], *, task_frame_parser=None,
+                llm_frontier=None) -> EpistemicAgent:
     pol = cfg.get("policy", {})
     enable_llm_parser = bool(pol.get("enable_llm_task_frame_parser", False))
+    enable_lf = bool(pol.get("enable_llm_frontier_repair", False)
+                     or pol.get("enable_llm_frontier_planner", False))
     validate_task_frame_flags(task_frame=bool(pol.get("enable_task_frame", False)),
                               llm_parser=enable_llm_parser,
-                              frontier_controller=bool(pol.get("enable_frontier_controller", False)))
+                              frontier_controller=bool(pol.get("enable_frontier_controller", False)),
+                              llm_frontier=enable_lf)
     agent_cfg = AgentConfig(
         available_tools=tools,
         query_mode=pol.get("query_mode", "learned"),
@@ -82,6 +93,8 @@ def build_agent(cfg: dict[str, Any], tools: list[str], *, task_frame_parser=None
         force_task_frame=bool(pol.get("force_task_frame", False)),
         disable_direct_answer=bool(pol.get("disable_direct_answer", False)),
         enable_frontier_controller=bool(pol.get("enable_frontier_controller", False)),
+        enable_llm_frontier_repair=bool(pol.get("enable_llm_frontier_repair", False)),
+        enable_llm_frontier_planner=bool(pol.get("enable_llm_frontier_planner", False)),
         scrape_fallback_to_page_fetch=bool(pol.get("scrape_fallback_to_page_fetch", True)),
         allow_social_scrape=bool(pol.get("allow_social_scrape", False)),
         as_of=cfg.get("run", {}).get("as_of", "2026-06-01"),
@@ -100,7 +113,17 @@ def build_agent(cfg: dict[str, Any], tools: list[str], *, task_frame_parser=None
             model_fn=None, cache=ParserCache(cache_path),
             model=str(pol.get("task_frame_parser_model", "stub")),
             replay_only=bool(pol.get("task_frame_parser_replay_only", False)))
-    return EpistemicAgent(agent_cfg, task_frame_parser=task_frame_parser)
+    # LLM frontier proposer (offline-safe: no model_fn -> replay/cache-only -> falls
+    # back to the deterministic frontier query).
+    if llm_frontier is None and enable_lf:
+        from regimes_probe.agent.llm_frontier import LLMFrontierProposer
+        from regimes_probe.agent.llm_task_frame import ParserCache
+        llm_frontier = LLMFrontierProposer(
+            model_fn=None, cache=ParserCache(pol.get("llm_frontier_cache_path")),
+            model=str(pol.get("llm_frontier_model", "stub")),
+            replay_only=bool(pol.get("llm_frontier_replay_only", False)))
+    return EpistemicAgent(agent_cfg, task_frame_parser=task_frame_parser,
+                          llm_frontier=llm_frontier)
 
 
 def base_argparser(description: str) -> argparse.ArgumentParser:
@@ -339,6 +362,9 @@ def full_pipeline(
             cfg.get("policy", {}).get("enable_llm_task_frame_parser", False)),
         "frontier_controller_enabled": bool(
             cfg.get("policy", {}).get("enable_frontier_controller", False)),
+        "llm_frontier_enabled": bool(
+            cfg.get("policy", {}).get("enable_llm_frontier_repair", False)
+            or cfg.get("policy", {}).get("enable_llm_frontier_planner", False)),
         "dataset": dataset_label,
         "dataset_version": dataset_version,
         "split": split.to_dict() | {"optimize_ids": "...", "confirm_ids": "..."},

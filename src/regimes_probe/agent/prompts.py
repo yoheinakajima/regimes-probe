@@ -196,6 +196,41 @@ _VARIABLES_BLOCK = (
 _TASK_FRAME_PARSER_V3 = _TASK_FRAME_PARSER_V2.replace(
     "OUTPUT: one JSON object", _VARIABLES_BLOCK + "OUTPUT: one JSON object")
 
+_FRONTIER_PLANNER_V1 = (
+    "You are a RESEARCH PLANNER for a multi-hop question. You are given a bounded "
+    "RESEARCH_STATE_CARD describing unknown variables (slots), known context terms, "
+    "unresolved constraints, candidate slates, hypotheses, evidence, and failed "
+    "queries. Propose the NEXT research ACTIONS — you do NOT answer.\n"
+    "\n"
+    "RULES:\n"
+    "- Do NOT answer the question. Do NOT guess final answer values. Do NOT put a "
+    "concrete answer into any field.\n"
+    "- Do NOT propose generic one-word queries (e.g. 'founder', 'report', "
+    "'publication', 'nickname'). Those retrieve dictionary/junk pages.\n"
+    "- Propose actions that TEST a constraint or BIND a slot, anchored on KNOWN "
+    "CONTEXT terms and the most DISCRIMINATIVE unresolved constraints.\n"
+    "- Reuse the question's own distinctive phrases; combine a candidate name (if any) "
+    "with a discriminative constraint clue.\n"
+    "- Avoid repeating any query in failed_queries / no_progress_queries.\n"
+    "- Prefer cheap search before expensive read; a read action must target a "
+    "candidate+slot+constraint already in evidence.\n"
+    "- If no useful action exists, propose action_type=abstain_no_viable_hypothesis.\n"
+    "- Only propose answer_from_confirmed_hypothesis when a hypothesis is already "
+    "confirmed/supported in the card.\n"
+    "\n"
+    "OUTPUT: a single JSON object {\"proposals\": [ ... ]} with 1-5 proposals. Each "
+    "proposal has: proposal_id, action_type (one of generate_candidates_for_slot, "
+    "verify_candidate_constraint, expand_candidate_to_dependent_slot, "
+    "compare_candidates_for_slot, read_candidate_source, answer_from_confirmed_hypothesis, "
+    "abstain_no_viable_hypothesis), target_slot_id, candidate_id (optional), "
+    "hypothesis_id (optional), constraint_ids (list), proposed_query (optional, "
+    "non-generic, anchored), proposed_tool_family (search/scrape/fetch), "
+    "expected_evidence, success_criteria, why_this_action, anchors_used (list of the "
+    "context/constraint terms used), avoids_generic_query (bool), risk_flags (list), "
+    "confidence (0-1). Use only slot/constraint/candidate/hypothesis ids that appear "
+    "in the card. Return ONLY the JSON object, no prose."
+)
+
 PROMPTS: dict[str, Prompt] = {
     "answerer": Prompt(
         name="answerer", version="v1", content=_ANSWERER_V1,
@@ -220,6 +255,11 @@ PROMPTS: dict[str, Prompt] = {
     "task_frame_parser": Prompt(
         name="task_frame_parser", version="v3", content=_TASK_FRAME_PARSER_V3,
         intended_use="open-world operational task-frame parsing (Level 4b/4e; never answers)",
+        allowed_to_vary=True,
+    ),
+    "frontier_planner": Prompt(
+        name="frontier_planner", version="v1", content=_FRONTIER_PLANNER_V1,
+        intended_use="LLM frontier-action/query proposals from graph state (Level 5c; never answers)",
         allowed_to_vary=True,
     ),
 }

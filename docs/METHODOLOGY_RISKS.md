@@ -363,3 +363,35 @@ set — and the risk surface. Keep the experiment honest:
   planner's. The answer-support gate is unchanged, so the controller cannot make an
   unsupported answer "supported"; and every controller decision is event/trace-backed,
   so none of this is taken on faith.
+
+- **Letting an LLM propose queries is the highest-leverage *and* highest-risk knob.** The
+  Level-5c proposer (`--enable-llm-frontier-repair` / `--enable-llm-frontier-planner`)
+  exists because deterministic query synthesis emits generic descriptors that retrieve
+  junk; an LLM composes constraint-grounded queries far better. But an LLM in the loop is
+  exactly where leakage, non-reproducibility, and silent condition drift creep in, so the
+  design is **LLM-proposes / code-disposes** and the risks are pinned down concretely:
+  (a) **answer leakage** — the model sees only a bounded `ResearchStateCard` (no gold, no
+  secrets) and emits *actions*, never answers; an `answer_from_confirmed_hypothesis`
+  proposal is rejected unless the deterministic answer-support gate already holds, and
+  nothing the proposer sees or emits reaches policy memory (the existing no-answer-leakage
+  test covers a run with the proposer on); (b) **the LLM smuggling in a generic or
+  off-frame query** — every proposal is deterministically validated (real
+  slot/constraint/candidate/hypothesis ids, non-generic, anchored to a constraint or
+  known-context term, non-duplicate, allowed/affordable tool, connected to an *unresolved*
+  slot/constraint) and rejected-with-reason otherwise, so the LLM cannot widen the action
+  space, only propose within it — watch `proposal_rejection_counts` and
+  `selected_query_constraint_anchor_rate`; (c) **non-reproducibility / hidden spend** — every
+  call is cached by `prompt_fingerprint | model | card_hash`, a dry-run/replay makes **zero**
+  model calls (a cache miss refuses rather than spends and falls back to the deterministic
+  query), and temperature is 0, so a run replays byte-identically and an offline fork
+  re-scores cached proposals for free; (d) **silently changing the comparison** — the
+  proposer's `mode|model|prompt-fingerprint` is stamped into
+  `ConditionSpec.llm_frontier_settings`, which the same-conditions validator requires to be
+  **identical** across the `no_memory` / `policy_memory` arms, so "the LLM composed the
+  queries differently between arms" is caught as an unexpected diff rather than mistaken for
+  a memory effect. The honest claim this supports is mechanistic — "fewer generic queries,
+  more anchored evidence-advancing calls" — not a headline accuracy delta; all of it is
+  reconstructable from `graph_projection.json` (`llm_frontier_proposal` /
+  `llm_frontier_validation` / `tool_call_from_llm_frontier_proposal`), so none of it is
+  taken on faith. The whole layer is OFF by default; the synthetic demo never constructs the
+  proposer, so the committed demo artifacts are unaffected.

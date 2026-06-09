@@ -667,3 +667,59 @@ the controller can never get stuck. Shadow mode (default) records, per step,
 mode records `frontier_controller_used`, `old_planner_fallback_count`,
 `frontier_action_execution_success/failure_count`, and `tool_calls_from_frontier_actions`.
 Easy questions bypass the whole layer via the escalation controller (Level 4d).
+
+### Level 5c: LLM frontier-action / query proposer (LLM proposes, code disposes)
+
+The Level-5b controller drives tool calls correctly, but its query **synthesis** is the
+bottleneck. The live run `browsecomp-frontier-active-001` showed `frontier_controller`
+active with `tool_calls_from_frontier=12, fallback=0`, yet the emitted queries were bare
+role descriptors — `founder`, `report`, `publication`, `nickname`, `potential antagonist`,
+`19th Century monument` — which retrieve junk (FOUNDER Definition, Merriam-Webster,
+Username Generator, …). The frontier architecture is right; deterministic query synthesis
+under-uses the rich `TaskFrame` / `CandidateSlate` state. LLMs compose constraint-grounded
+research actions far better. **So an LLM proposes; deterministic code validates, scores,
+selects, executes, and records. ActiveGraph stays the source of truth.** `agent/llm_frontier.py`.
+
+Two **opt-in** flags, both requiring `--enable-task-frame` (hard config error otherwise),
+both default off, both **skipped for easy/direct/simple** epistemic modes:
+
+- `--enable-llm-frontier-repair` — the LLM is consulted **only** when the deterministic
+  query is generic / blocked / empty (`_is_generic_query`); it returns a constraint-grounded
+  replacement that keeps the deterministic action and **swaps only the query**.
+- `--enable-llm-frontier-planner` — the LLM proposes the **top-K** (1–5) next frontier
+  actions from the state card; deterministic code picks the best validated one.
+
+**Bounded `ResearchStateCard`** (no gold, no secrets) is projected from the persisted
+`TaskFrame` + `CandidateFrontier`: question preview, epistemic mode, target/intermediate
+slots, known-context terms, unresolved **blocking** constraints (with discriminative
+scores), candidate slates (active/confirmed/rejected), hypotheses, recent evidence
+summaries, failed / no-progress queries, available tools, remaining budget, memory-access
+mode, and the **deterministic recommendation** the LLM is asked to improve on.
+
+**The LLM never executes.** Each proposal is a typed action
+(`generate_candidates_for_slot` / `verify_candidate_constraint` /
+`expand_candidate_to_dependent_slot` / `compare_candidates_for_slot` /
+`read_candidate_source` / `answer_from_confirmed_hypothesis` /
+`abstain_no_viable_hypothesis`) with `target_slot_id` / `candidate_id` / `hypothesis_id` /
+`constraint_ids` / `proposed_query` / `proposed_tool_family` / `anchors_used` / `confidence`.
+Deterministic `validate_proposal` **rejects** (with a recorded reason) any proposal that
+references a nonexistent slot/constraint/candidate/hypothesis, is **generic**, duplicates a
+failed / no-progress query, lacks a constraint-or-known-context **anchor**, answers without
+a supported hypothesis, names a disallowed/unavailable tool, exceeds budget, or is not
+connected to an unresolved slot/constraint. Survivors are **scored** (EIG +
+constraint-anchor / known-context-anchor / discriminative-constraint scores, candidate &
+hypothesis relevance, novelty, minus duplicate / cost / no-progress penalties); the top one
+is translated into a `StepPlan` and executed exactly like any other frontier action —
+**every resulting tool call links back to the proposal** (`frontier_action_id` prefixed
+`lfp_`, `tool_call_from_llm_frontier_proposal` edge).
+
+**Replayable + answer-free, mirroring the LLM task-frame parser.** Every call is keyed by
+`prompt_fingerprint | model | card_hash` and routed through the same file-backed
+`ParserCache`. A **dry-run** (`--dry-run`) or **replay** (no `model_fn`, or `replay_only`)
+makes **zero model calls**: a cache hit is reused, a miss **refuses rather than spends** and
+the planner falls back to the deterministic query. Temperature 0, structured JSON only;
+nothing the proposer sees or emits reaches policy memory. `--llm-frontier-model` selects the
+model (default `--answer-model`). The proposer's settings (`mode|model|prompt-fingerprint`)
+are stamped into `ConditionSpec.llm_frontier_settings` so the **same-conditions** check
+requires them to be **identical** across the compared `no_memory` / `policy_memory` arms —
+the only intended difference stays memory access.

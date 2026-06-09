@@ -38,6 +38,11 @@ HEAVY_MODES = ("decomposed_search", "iterative_research", "task_frame_required")
 _REJECT_NO_PROGRESS = 2
 _CONFIRM_SUPPORT = 1                       # supported required constraints to confirm
 _YEAR = re.compile(r"\b(1[5-9]\d{2}|20\d{2})\b")
+#: source roles whose PAGE BODY tends to carry high evidentiary value, so a read of them
+#: is worth more (generic role types, not specific domains).
+_HIGH_VALUE_READ_ROLES = frozenset({
+    "professional_profile", "official_page", "scholarly_paper", "database_record",
+    "primary_source", "article"})
 
 #: Candidate *texts* that are retrieval noise, not real entities (used to (a) not count
 #: them as progress and (b) trigger LLM repair when a deterministic query leans on them).
@@ -127,6 +132,8 @@ class SlotCandidate:
     no_progress_count: int = 0
     duplicate_of: Optional[str] = None
     next_test_action_ids: list[str] = field(default_factory=list)
+    source_role: str = "unknown"             # best source role observed (read-value signal)
+    read_done: bool = False                  # a page-body read has been interpreted for it
 
     def to_dict(self) -> dict[str, Any]:
         return {"candidate_id": self.candidate_id,
@@ -224,6 +231,9 @@ class StepPlan:
     anchors_used: list[str] = field(default_factory=list)
     expected_evidence: str = ""
     proposed_tool_family: str = ""
+    # discriminative-first planning debug (Level 5e / req 6).
+    discriminative_reason: str = ""
+    chosen_constraint_specificity: float = 0.0
 
     _PLANNER_KIND = {
         "answer_from_confirmed_hypothesis": "answer_if_supported",
@@ -251,7 +261,9 @@ class StepPlan:
                 "query_text_preview": self.query[:160], "query_arm": self.query_arm,
                 "selected_reason": self.reason, "driven_by": "frontier_controller",
                 "is_discriminative_constraint": self.is_discriminative_constraint,
-                "is_generic_query": self.is_generic_query}
+                "is_generic_query": self.is_generic_query,
+                "discriminative_reason": self.discriminative_reason,
+                "chosen_constraint_specificity": round(self.chosen_constraint_specificity, 3)}
         if self.llm_frontier_proposal_id:
             info.update({"llm_frontier_proposal_id": self.llm_frontier_proposal_id,
                          "anchors_used": list(self.anchors_used),
@@ -321,6 +333,18 @@ class CandidateFrontier:
         #: candidate TEXT -> canonical SlotCandidate id, and assertion_id -> candidate_id.
         self.candidate_text_index: dict[str, dict[str, str]] = {}   # slot_id -> {norm: cid}
         self.assertion_to_candidate: dict[str, str] = {}
+        #: weak observations (req 4): normalized text -> slot hints, for nonexistent-candidate
+        #: breakdown (an extracted-but-not-admitted mention is not "truly nonexistent").
+        self.weak_observation_index: dict[str, list[str]] = {}
+        #: Level 5e read scheduling (req 5): per-slot consecutive search/verify-with-no-support
+        #: streak; after ``force_read_after_n`` a read of the best candidate source is forced.
+        self.force_read_after_n = 2
+        self._slot_no_support_streak: dict[str, int] = {}
+        self.read_starvation_count = 0
+        self.forced_read_count = 0
+        self.read_executed_count = 0
+        self.support_from_read_count = 0
+        self.support_dropped_count = 0
         self._cc = self._ec = self._hc = self._ac = self._evc = 0
         self._known = {_norm(t) for t in frame.known_context_terms}
         # one slate per slot that NEEDS binding (every unbound variable).
@@ -441,6 +465,12 @@ class CandidateFrontier:
                            data={"text": _prev(a.candidate_text, 60),
                                  "reason": a.rejection_reason})
                 if a.rejection_reason == "weak_observation_not_candidate":
+                    self.weak_observation_index.setdefault(
+                        self._norm_key(a.candidate_text), [])
+                    if directed_slot_id and directed_slot_id not in \
+                            self.weak_observation_index[self._norm_key(a.candidate_text)]:
+                        self.weak_observation_index[self._norm_key(a.candidate_text)].append(
+                            directed_slot_id)
                     self._emit("weak_observation_recorded", evidence_id=ev.evidence_id,
                                data={"text": _prev(a.candidate_text, 60)})
             for ca in interp.constraint_assertions:
@@ -486,15 +516,42 @@ class CandidateFrontier:
         sel_slot_new = sum(1 for cid in ev.newly_introduced_candidates
                            if (c := self.candidates_by_id.get(cid)) is not None
                            and c.slot_id == directed_slot_id)
+        sel_support_gain = max(0, after_sel_support - before_sel_support)
         ev.progress_components = {
             "raw_candidate_count": len(ev.newly_introduced_candidates),
             "slot_compatible_candidate_count": slot_compat,
             "selected_slot_candidate_count": sel_slot_new,
-            "selected_constraint_support_count": max(0, after_sel_support - before_sel_support),
+            "selected_constraint_support_count": sel_support_gain,
             "hypothesis_score_delta": round(after_conf - before_conf, 3),
             "target_support_path_delta": round(after_conf - before_conf, 3),
             "noise_candidate_count": noise_count,
         }
+        # Read scheduling streak (req 5): a search/verify on the selected slot that yields no
+        # NEW constraint support increments the streak; a read or any support resets it.
+        if read_depth and read_depth >= 1:
+            self.read_executed_count += 1
+            self._emit("read_interpreted", evidence_id=ev.evidence_id,
+                       data={"slot_id": directed_slot_id, "read_depth": read_depth,
+                             "new_support": sel_support_gain})
+        if directed_slot_id:
+            if sel_support_gain > 0 or (read_depth and read_depth >= 1):
+                self._slot_no_support_streak[directed_slot_id] = 0
+            else:
+                self._slot_no_support_streak[directed_slot_id] = (
+                    self._slot_no_support_streak.get(directed_slot_id, 0) + 1)
+        # Hard support-consistency invariant (req 1): the per-candidate support just attached
+        # MUST appear on the evidence record's supports_constraint_ids. If a selected
+        # constraint gained candidate support but the record didn't record it, that is a
+        # dropped-support bug — make it explicit rather than silent.
+        sel_slate = self.slates.get(directed_slot_id) if directed_slot_id else None
+        for cid in (directed_constraint_ids or []):
+            cand_supports = bool(sel_slate) and any(
+                cid in c.constraints_supported for c in sel_slate.candidates.values())
+            if cand_supports and cid not in ev.supports_constraint_ids:
+                self.support_dropped_count += 1
+                self._emit("support_dropped", evidence_id=ev.evidence_id,
+                           data={"constraint_id": cid, "slot_id": directed_slot_id,
+                                 "reason": "candidate_support_not_on_evidence_record"})
         return ev
 
     def _slot_constraint_support(self, slot_id: Optional[str],
@@ -516,31 +573,56 @@ class CandidateFrontier:
         return " ".join(w.lower() for w in re.findall(r"[A-Za-z0-9]+", text or ""))
 
     def resolve_candidate(self, text_or_id: str, *, slot_id: Optional[str] = None) -> dict:
-        """Resolve a candidate TEXT or id to its canonical SlotCandidate id (req 1/6).
+        """Resolve a candidate TEXT or id to its canonical SlotCandidate id (req 1/4/6).
 
-        Returns ``{candidate_id, found, searched_slot_ids, close_matches, other_slot}`` so a
-        verifier can resolve a candidate the evidence interpreter created — or record a rich
-        ``nonexistent_candidate`` debug when it genuinely cannot."""
-        debug = {"candidate_id": None, "found": False, "normalized": self._norm_key(text_or_id),
-                 "searched_slot_ids": [], "close_matches": [], "other_slot": None}
+        Returns ``{candidate_id, found, breakdown, searched_slot_ids, close_matches, other_slot}``.
+        ``breakdown`` classifies a miss generically (``exists_in_other_slot`` /
+        ``exists_as_weak_observation`` / ``exists_but_rejected`` / ``exists_but_stale`` /
+        ``normalized_alias_found`` / ``truly_nonexistent``) so a verifier never calls an
+        extracted candidate "nonexistent" without saying why."""
+        debug = {"candidate_id": None, "found": False, "breakdown": None,
+                 "normalized": self._norm_key(text_or_id), "searched_slot_ids": [],
+                 "close_matches": [], "other_slot": None}
         if text_or_id in self.candidates_by_id:
-            debug.update(candidate_id=text_or_id, found=True)
+            debug.update(candidate_id=text_or_id, found=True, breakdown="exact_id")
             return debug
         key = self._norm_key(text_or_id)
         order = ([slot_id] if slot_id else []) + [s for s in self.slates if s != slot_id]
+        # an ACTIVE/confirmed candidate on the selected (then any) slot resolves cleanly.
         for sid in order:
             debug["searched_slot_ids"].append(sid)
             cid = self.candidate_text_index.get(sid, {}).get(key)
-            if cid:
-                debug.update(candidate_id=cid, found=True)
-                if slot_id and sid != slot_id:
-                    debug["other_slot"] = sid
-                return debug
+            if not cid:
+                continue
+            cand = self.candidates_by_id.get(cid)
+            status = getattr(cand, "status", "active")
+            if status in ("rejected", "stale", "merged"):
+                # remember the worst-case classification but keep looking for a live one.
+                debug["close_matches"].append({"slot_id": sid, "text": key, "candidate_id": cid,
+                                               "status": status})
+                if debug["breakdown"] is None:
+                    debug["breakdown"] = ("exists_but_rejected" if status != "stale"
+                                          else "exists_but_stale")
+                continue
+            debug.update(candidate_id=cid, found=True)
+            if slot_id and sid != slot_id:
+                debug.update(other_slot=sid, breakdown="exists_in_other_slot")
+            else:
+                debug["breakdown"] = ("normalized_alias_found" if key != self._norm_key(cand.candidate_text)
+                                      else "exact_normalized")
+            return debug
+        # weak observation? (extracted but not admitted as a candidate)
+        if key in self.weak_observation_index:
+            debug["breakdown"] = "exists_as_weak_observation"
+            debug["weak_observation_slots"] = list(self.weak_observation_index[key])
+            return debug
         # close matches (substring/variant) for debug only.
         for sid in order:
             for k, cid in self.candidate_text_index.get(sid, {}).items():
                 if key and (key in k or k in key):
                     debug["close_matches"].append({"slot_id": sid, "text": k, "candidate_id": cid})
+        if debug["breakdown"] is None:
+            debug["breakdown"] = "truly_nonexistent"
         return debug
 
     def attach_constraint_support_from_interpretation(
@@ -564,7 +646,8 @@ class CandidateFrontier:
                     slot, a.candidate_text, _norm(a.candidate_text), a.inferred_role, ev,
                     source_tool, action_id, stage, _host(url), authority, contaminated,
                     a.from_ctx, f"{title} {ev.snippet_preview}".lower(), cons,
-                    supported=list(sup), contradicted=list(con),
+                    supported=list(sup), contradicted=list(con), source_role=a.source_role,
+                    read_depth=getattr(ev, "read_depth", 0),
                     directed_slot_id=directed_slot_id,
                     directed_constraint_ids=directed_constraint_ids, proposal_id=proposal_id)
                 a.canonical_candidate_ids[sid] = cid
@@ -580,13 +663,14 @@ class CandidateFrontier:
 
     def _assign(self, slot, text, norm, role, ev, source_tool, action_id, stage,
                 domain, authority, contaminated, from_ctx, text_l, cons,
-                *, supported=None, contradicted=None,
+                *, supported=None, contradicted=None, source_role="unknown", read_depth=0,
                 directed_slot_id=None, directed_constraint_ids=None,
                 proposal_id=None) -> str:
         slate = self.slates[slot.slot_id]
         existing = next((c for c in slate.candidates.values()
                          if c.normalized_text_hash == _hash(norm)), None)
         cand_l = text.lower()
+        had_support = bool(existing and existing.constraints_supported)
         # Support is ATTACHED from the interpreter's recognizers (req 2); fall back to the
         # overlap rule only when a direct caller did not supply it.
         if supported is None:
@@ -627,9 +711,16 @@ class CandidateFrontier:
         if domain:
             _union(cand.source_domains, domain)
         cand.source_authority_score = max(cand.source_authority_score, authority)
+        if source_role and source_role != "unknown":
+            cand.source_role = source_role
+        if read_depth and read_depth >= 1:
+            cand.read_done = True
         for cid in supported:
+            newly = cid not in cand.constraints_supported
             _union(cand.constraints_supported, cid)
             _union(ev.supports_constraint_ids, cid)
+            if newly and read_depth and read_depth >= 1:
+                self.support_from_read_count += 1     # support_from_read_rate signal (req 13)
             self._emit("evidence.linked_to_constraint", candidate_id=cand.candidate_id,
                        evidence_id=ev.evidence_id, constraint_id=cid)
         for cid in contradicted:
@@ -803,6 +894,11 @@ class CandidateFrontier:
             blocking.sort(key=lambda c: -_disc(c))    # most discriminative first
             active = [c for c in slate.candidates.values() if c.status == "active"]
             confirmed = [c for c in slate.candidates.values() if c.status == "confirmed"]
+            streak = self._slot_no_support_streak.get(slate.slot_id, 0)
+            slate_has_support = any(c.constraints_supported for c in slate.candidates.values())
+            # After N consecutive search/verify with no support, search/verify is decayed so a
+            # read (or pivot) can take over — snippets aren't converting to support (req 5).
+            streak_penalty = 0.8 * min(streak, 3)
             if blocking:
                 top = blocking[0]
                 # Prefer DISCRIMINATIVE blocking constraints over generic answer-type
@@ -813,11 +909,11 @@ class CandidateFrontier:
                 if active:
                     _add("verify_candidate_constraint", slot=slate.slot_id,
                          cand=active[0].candidate_id, cons=cons_ids,
-                         eig=3.0 + 0.75 * _disc(top) + disc_bonus, cost=1.0,
+                         eig=3.0 + 0.75 * _disc(top) + disc_bonus - streak_penalty, cost=1.0,
                          reason="resolve_blocking_constraint")
                 else:
                     _add("generate_candidates_for_slot", slot=slate.slot_id, cons=cons_ids,
-                         eig=2.5 + 0.75 * _disc(top) + disc_bonus, cost=1.0,
+                         eig=2.5 + 0.75 * _disc(top) + disc_bonus - streak_penalty, cost=1.0,
                          reason="bind_slot_via_discriminative_constraint")
             elif not slate.candidates:
                 _add("generate_candidates_for_slot", slot=slate.slot_id, eig=2.0, cost=1.0,
@@ -825,12 +921,27 @@ class CandidateFrontier:
             if len(active) >= 2:
                 _add("compare_candidates_for_slot", slot=slate.slot_id, eig=1.5, cost=1.0,
                      reason="distinguish_competing_candidates")
-            # reads are expensive — cheap verification is preferred (lower net score).
+            # READS convert snippet candidates into page-body support (req 5). A read is
+            # boosted when the candidate has a source + unresolved constraints AND snippets
+            # produced no support, or a forced read is due after a no-support streak. One
+            # read can close several constraints (cons = all unresolved for the candidate).
+            forced = streak >= self.force_read_after_n
             for c in active:
-                if c.source_domains and c.constraints_unknown:
-                    _add("read_candidate_source", slot=slate.slot_id, cand=c.candidate_id,
-                         cons=list(c.constraints_unknown), eig=1.0, cost=2.0,
-                         reason="deepen_candidate_evidence")
+                if not (c.source_domains and c.constraints_unknown):
+                    continue
+                src_val = 0.5 if c.source_role in _HIGH_VALUE_READ_ROLES else 0.0
+                convert = (not c.constraints_supported)     # snippets gave a candidate, no support
+                read_eig = 1.0 + (2.5 if forced else 0.0) + (1.0 if convert else 0.0) + src_val
+                reason = ("forced_read_after_no_support" if forced
+                          else ("read_to_convert_candidate" if convert
+                                else "deepen_candidate_evidence"))
+                ra = _add("read_candidate_source", slot=slate.slot_id, cand=c.candidate_id,
+                          cons=list(c.constraints_unknown), eig=read_eig, cost=2.0, reason=reason)
+                ra.plan["read_value"] = {"forced": forced, "convert": convert,
+                                         "source_role": c.source_role, "streak": streak,
+                                         "n_unresolved": len(c.constraints_unknown)}
+                if forced:
+                    self.forced_read_count += 1
             for c in confirmed:
                 for dep in self._dependents(slate.slot_id):
                     if dep in self.slates and not self._best_candidate(dep):
@@ -865,6 +976,15 @@ class CandidateFrontier:
         def _score(a: FrontierAction) -> float:
             return a.expected_information_gain - 0.5 * a.estimated_cost
         best = max(cands, key=lambda a: (_score(a), -self.frontier_actions.index(a)))
+        # read-starvation signal (req 13): a readable candidate action existed but a
+        # search/verify outscored it -> the read was starved this step.
+        reads = [a for a in cands if a.action_type == "read_candidate_source"]
+        if reads and best.action_type != "read_candidate_source":
+            self.read_starvation_count += 1
+        if best.action_type == "read_candidate_source":
+            self._emit("read_scheduled", action_id=best.action_id,
+                       data={"slot_id": best.target_slot_id, "candidate_id": best.candidate_id,
+                             "reason": best.selected_reason})
         for a in cands:
             if a is best:
                 a.selected, a.selected_reason = True, a.selected_reason or "max_expected_information_gain"
@@ -944,10 +1064,36 @@ class CandidateFrontier:
         query, arm, disc, generic = self._build_query(sel)
         if not query:
             return StepPlan(sel.action_id, at, "unexecutable", reason="empty_query")
+        spec, disc_reason = self._discriminativeness(
+            self._con(sel.constraint_ids[0]) if sel.constraint_ids else None)
         return StepPlan(sel.action_id, at, "search", query=query, query_arm=arm,
                         target_slot_id=sel.target_slot_id, candidate_id=sel.candidate_id,
                         constraint_ids=list(sel.constraint_ids), reason=sel.selected_reason,
-                        is_discriminative_constraint=disc, is_generic_query=generic)
+                        is_discriminative_constraint=disc, is_generic_query=generic,
+                        discriminative_reason=disc_reason, chosen_constraint_specificity=spec)
+
+    def _discriminativeness(self, con) -> tuple[float, str]:
+        """Generic discriminativeness: specificity + numeric/date + named-entity anchors +
+        how many slots it constrains (req 6). No hard-coded clue templates."""
+        if con is None:
+            return 0.0, "no_constraint"
+        disc = _disc(con)
+        terms = list(getattr(con, "normalized_terms", []))
+        has_year = bool(_YEAR.findall(getattr(con, "text_span", "") or ""))
+        has_proper = any(str(t)[:1].isupper() for t in terms if len(str(t)) >= 4)
+        n_slots = len(getattr(con, "applies_to", []) or [])
+        score = disc + (0.5 if has_year else 0.0) + (0.5 if has_proper else 0.0) \
+            + (0.25 * max(0, n_slots - 1))
+        reasons = []
+        if disc >= 1.0:
+            reasons.append("high_specificity")
+        if has_year:
+            reasons.append("numeric_or_date_anchor")
+        if has_proper:
+            reasons.append("named_entity_anchor")
+        if n_slots >= 2:
+            reasons.append("constrains_multiple_slots")
+        return round(score, 3), (",".join(reasons) or "low_discriminative")
 
     def _resolve_read(self, observations, scraped_urls, no_progress_domains,
                       page_fetch_available, scrape_available, allow_social, force_page_fetch):
@@ -1117,6 +1263,12 @@ class CandidateFrontier:
                 sum(a.expected_information_gain for a in self.frontier_actions)
                 / len(self.frontier_actions)) if self.frontier_actions else 0.0,
             "n_candidate_events": len(self.events),
+            # Level 5e read scheduling + support-consistency (req 13).
+            "read_starvation_count": self.read_starvation_count,
+            "forced_read_after_no_support_count": self.forced_read_count,
+            "read_executed_count": self.read_executed_count,
+            "support_from_read_count": self.support_from_read_count,
+            "support_dropped_count": self.support_dropped_count,
         }
 
 

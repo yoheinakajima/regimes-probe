@@ -854,3 +854,40 @@ benchmark-specific rules):
   year). `deterministic_query_marked_ok_but_repaired_count` /
   `deterministic_query_bad_but_not_repaired_count` track the gap between the cheap
   generic-string check and the evidence-quality check.
+
+### Level 5e: reads close evidence + a discriminative, support-consistent loop
+
+The interpreter made support inspectable but the live traces showed candidates binding to
+slots while constraints rarely closed: `ev→slot` true, `ev→cons` false, reads starved by
+EIG even when only a page body can support a constraint, and the agent stuck at
+stage_depth=1. This layer makes the research loop *close* evidence, generically:
+
+- **Reads are scheduled, not starved.** `read_candidate_source` is boosted when a candidate
+  has a source + unresolved constraints but snippets produced no support
+  (`read_to_convert_candidate`), and after **N** (default 2, configurable) consecutive
+  search/verify actions on a slot yield no full/partial support, a read of the best
+  candidate source is **forced** (`forced_read_after_no_support`) — search/verify EIG decays
+  with the no-support streak so a read (or a pivot) takes over instead of another
+  near-duplicate search. One read can close several constraints at once: the interpreter
+  emits multiple candidate-constraint assertions from one page body. Read value is higher
+  for high-evidentiary source *roles* (profile/official/scholarly/database/article) —
+  generic role types, never specific domains.
+- **Discriminative-first, with recorded reasons.** Each search step records
+  `chosen_constraint_specificity` and a `discriminative_reason` computed generically from
+  term rarity, numeric/date and named-entity anchors, and how many slots the constraint
+  binds — no hard-coded clue templates.
+- **Candidate registry alias resolution + breakdown.** The verifier resolves a proposal's
+  candidate against the canonical registry by id / normalized text / cross-slot, and a miss
+  is classified (`exists_in_other_slot` / `exists_as_weak_observation` / `exists_but_rejected`
+  / `exists_but_stale` / `normalized_alias_found` / `truly_nonexistent`) so an extracted
+  candidate is never called "nonexistent" without saying why.
+- **Support-consistency invariant.** If a selected constraint gained per-candidate support
+  but that support did not land on the evidence record, a `support_dropped` event is emitted
+  with a reason (`support_asserted_not_consumed_count`) — support disappearing is made
+  explicit, never silent. The answer-support gate is unchanged and still strict.
+
+Still deferred (documented as the next step, not silently weakened): a full LLM **evidence
+judge** returning graded support assertions (the deterministic recognizers + the optional
+source-role hook are the current canonical path), learned **provider routing**, and an
+explicit **Answer Support Contract** for a relaxed mode — default remains strict
+all-required support.

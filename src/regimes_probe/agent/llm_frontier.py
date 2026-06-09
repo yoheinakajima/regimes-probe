@@ -591,11 +591,13 @@ class LLMFrontierProposer:
             if p.candidate_lookup_debug:
                 if p.candidate_lookup_debug.get("found"):
                     _ev("candidate_lookup_resolved", proposal_id=p.proposal_id,
-                        candidate_id=p.candidate_lookup_debug.get("candidate_id"))
+                        candidate_id=p.candidate_lookup_debug.get("candidate_id"),
+                        breakdown=p.candidate_lookup_debug.get("breakdown"))
                 else:
                     _ev("candidate_lookup_failed", proposal_id=p.proposal_id,
+                        breakdown=p.candidate_lookup_debug.get("breakdown"),
                         data={k: p.candidate_lookup_debug.get(k) for k in
-                              ("normalized", "searched_slot_ids", "close_matches")})
+                              ("normalized", "searched_slot_ids", "close_matches", "breakdown")})
             if ok:
                 p.status = "accepted"
                 score_proposal(p, frame, frontier, failed_norms=failed_norms)

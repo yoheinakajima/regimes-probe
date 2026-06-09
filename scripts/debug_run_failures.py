@@ -134,6 +134,16 @@ def main() -> int:
             elif ctrl.get("shadow_total"):
                 print(f"  FRONTIER CONTROLLER: shadow  agreement="
                       f"{ctrl.get('shadow_agreements')}/{ctrl.get('shadow_total')}")
+            # Level 5e read scheduling + support-consistency (req 12).
+            fm = cf.get("metrics", {}) or {}
+            print(f"  READ SCHEDULING: reads_executed={fm.get('read_executed_count')} "
+                  f"forced_read={fm.get('forced_read_after_no_support_count')} "
+                  f"starved={fm.get('read_starvation_count')} "
+                  f"support_from_read={fm.get('support_from_read_count')} "
+                  f"support_dropped={fm.get('support_dropped_count')}")
+            sfa = cf.get("selected_frontier_action", {}) or {}
+            if sfa.get("plan", {}).get("read_value"):
+                print(f"    read_value: {sfa['plan']['read_value']}")
             print(f"  CANDIDATE SLATES ({cf.get('n_slates')} slots):")
             for sl in cf.get("slates", []):
                 tops = ", ".join(f"{c['candidate_text_preview']}[{c['status']}"

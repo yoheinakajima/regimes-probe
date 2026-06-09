@@ -399,3 +399,17 @@ the proposal and registry namespaces diverged. `deterministic_query_marked_ok_bu
 and `deterministic_query_bad_but_not_repaired_count` measure whether repair fires on
 evidence-quality failures (noise/no-progress/prompt-language queries), not just one-word
 generics.
+
+**Judge the research *loop* by reads and support yield, not accuracy alone (Level 5e).**
+The success target for the next trace is consistency, not score: `support_dropped_count`
+(should be 0 — support never disappears silently), `support_from_read_count` /
+`support_from_read_rate` (reads should convert snippet candidates into body-evidence
+support on at least some cases), `forced_read_after_no_support_count` and
+`read_starvation_count` (reads scheduled when snippets can't close body-only constraints,
+not starved), `first_action_discriminative_constraint_rate` with the recorded
+`discriminative_reason`, and the `nonexistent_candidate_breakdown` /
+`canonical_candidate_alias_resolution_rate` (an extracted candidate resolves canonically
+instead of failing). `read_after_search_rate` and the per-attempt `stage_depth`/`followup`
+counts should rise for `task_frame_required` cases as reads add depth. Because read-heavy
+policies cost more, weigh support yield **per read and per dollar**, and treat learned
+provider metrics as observations, not fixed truths.

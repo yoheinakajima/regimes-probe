@@ -284,6 +284,20 @@ def _frontier_metrics(stats: list[dict]) -> dict[str, Any]:
         "generic_first_query_rate": _safe_div(
             sum(1 for s in active if s.get("first_query_generic") is True),
             sum(1 for s in active if s.get("first_query_generic") is not None)),
+        # --- Level 5e read scheduling + support consistency (req 13) ---
+        "read_starvation_count": sum(int(s.get("read_starvation_count", 0)) for s in active),
+        "forced_read_after_no_support_count": sum(
+            int(s.get("forced_read_after_no_support_count", 0)) for s in active),
+        "read_executed_count": sum(int(s.get("read_executed_count", 0)) for s in active),
+        "support_from_read_count": sum(int(s.get("support_from_read_count", 0)) for s in active),
+        "support_from_read_rate": _safe_div(
+            sum(int(s.get("support_from_read_count", 0)) for s in active),
+            sum(int(s.get("read_executed_count", 0)) for s in active)),
+        "read_after_search_rate": _safe_div(
+            sum(int(s.get("read_executed_count", 0)) for s in active),
+            sum(int(s.get("tool_calls_from_frontier", 0)) for s in active)),
+        "support_asserted_not_consumed_count": sum(
+            int(s.get("support_dropped_count", 0)) for s in active),
     }
 
 
@@ -305,6 +319,7 @@ def _llm_frontier_metrics(stats: list[dict]) -> dict[str, Any]:
     marked_ok_repaired = bad_not_repaired = 0
     rej: Counter = Counter()
     trig: Counter = Counter()
+    nonexistent_breakdown: Counter = Counter()
     for s in used:
         for st in s.get("steps", []):
             if st.get("model_called"):
@@ -321,6 +336,8 @@ def _llm_frontier_metrics(stats: list[dict]) -> dict[str, Any]:
                     lookup_resolved += 1
                 elif et == "candidate_lookup_failed":
                     lookup_failed += 1
+                    nonexistent_breakdown[
+                        e.get("breakdown") or e.get("data", {}).get("breakdown") or "unknown"] += 1
                     if (e.get("close_matches") or e.get("data", {}).get("close_matches")):
                         lookup_failed_but_extracted += 1
             if st.get("mode") == "repair" and any(
@@ -412,6 +429,9 @@ def _llm_frontier_metrics(stats: list[dict]) -> dict[str, Any]:
             lookup_resolved, lookup_resolved + lookup_failed),
         "verifier_nonexistent_but_extracted_candidate_count": lookup_failed_but_extracted,
         "extracted_candidate_not_in_registry_count": lookup_failed,
+        "nonexistent_candidate_breakdown": dict(nonexistent_breakdown),
+        "canonical_candidate_alias_resolution_rate": _safe_div(
+            lookup_resolved, lookup_resolved + lookup_failed),
         "deterministic_query_marked_ok_but_repaired_count": marked_ok_repaired,
         "deterministic_query_bad_but_not_repaired_count": bad_not_repaired,
     }

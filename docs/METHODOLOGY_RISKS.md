@@ -454,3 +454,21 @@ set — and the risk surface. Keep the experiment honest:
   apart again. And because permissive role typing (`unknown` → every slot) quietly poisons
   every slate, an unknown-role observation is now a recorded `weak_observation`, not a
   candidate — fan-out into all slates is itself treated as a bug.
+
+- **Reads and a future LLM evidence judge can both inflate things — guard each.** Scheduling
+  reads aggressively (forced after a no-support streak) closes body-only constraints but
+  **inflates tool cost**, so read value must be judged by support yield *per read and per
+  dollar*, not by read count; `read_starvation_count` / `support_from_read_rate` are
+  diagnostics, not goals. The next layer — a full LLM **evidence judge** — is exactly where
+  over-crediting creeps in: an LLM will happily call a directory heading "support". The
+  defenses are non-negotiable and already enforced for the deterministic recognizers, and
+  must hold for any judge: support stays **quote-backed, source-clean
+  (non-contaminated/non-noise), candidate-specific and predicate-specific, replayable
+  (cached, zero model calls on replay), and answer-free** — partial support never resolves a
+  blocking constraint, it only moves EIG/scheduling. A **relaxed Answer Support Contract**,
+  if ever enabled, is **not** equivalent to strict all-constraint support: it must be behind
+  an explicit flag, record every downgraded constraint with a reason, report unsupported
+  constraints on the answer, and be distinguished from strict in any headline claim. Default
+  stays strict. Finally, **provider routing** learned from one run may not generalize —
+  empty/contamination/support-yield rates are observations to score over many traces, never
+  a hard-coded "provider X is best" rule.

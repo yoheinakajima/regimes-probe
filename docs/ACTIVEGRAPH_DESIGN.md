@@ -356,3 +356,15 @@ quote), which proposal a verifier resolved to that same candidate, and why an
 `ev→slot-true / ev→cons-false` interpretation produced no constraint support. The
 resolution (`resolve_candidate`) and recognizer support are pure deterministic functions of
 the recorded text + frame, so the whole registry re-projects identically on replay.
+
+**Read scheduling + support-consistency are event-sourced (Level 5e).** New **events**:
+`read_scheduled` (a `read_candidate_source` was selected — often `forced_read_after_no_support`),
+`read_interpreted` (a page-body read was folded in, with its new-support delta), and
+`support_dropped` (a per-candidate support that failed to land on the evidence record, with a
+reason). The frontier's `metrics()` now projects `read_executed_count`,
+`forced_read_after_no_support_count`, `read_starvation_count`, `support_from_read_count`, and
+`support_dropped_count`; the verifier's `candidate_lookup_failed` carries the
+`nonexistent_candidate` breakdown. A reviewer can replay, from `graph_projection.json`,
+which step forced a read, whether that read produced support, and exactly where (if
+anywhere) support was dropped — the support path is auditable end to end, and the read/streak
+logic is a pure function of the recorded support deltas so it re-projects identically.

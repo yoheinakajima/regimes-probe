@@ -43,6 +43,7 @@ class AgentConfig:
     enable_frontier_controller: bool = False  # frontier scheduler DRIVES tool selection
     enable_llm_frontier_repair: bool = False   # LLM repairs a generic deterministic query
     enable_llm_frontier_planner: bool = False  # LLM proposes top-K frontier actions
+    enable_llm_evidence_interpreter: bool = False  # LLM re-classifies a result's source role
     scrape_fallback_to_page_fetch: bool = True  # firecrawl_scrape fail -> page_fetch
     allow_social_scrape: bool = False
     as_of: str = "2026-06-01"
@@ -53,7 +54,8 @@ class AgentConfig:
 
 class EpistemicAgent:
     def __init__(self, config: AgentConfig, *, extractor: Optional[SignatureExtractor] = None,
-                 answerer=None, task_frame_parser=None, llm_frontier=None) -> None:
+                 answerer=None, task_frame_parser=None, llm_frontier=None,
+                 evidence_interpreter=None) -> None:
         self.config = config
         self.extractor = extractor or SignatureExtractor()
         self.router = Router(config.router)
@@ -62,9 +64,11 @@ class EpistemicAgent:
         self.answerer = answerer
         self.task_frame_parser = task_frame_parser
         self.llm_frontier = llm_frontier
+        self.evidence_interpreter = evidence_interpreter
         self.loop = SearchLoop(self.router, self.query_policy, self.stopping_policy,
                                answerer=answerer, task_frame_parser=task_frame_parser,
-                               llm_frontier=llm_frontier)
+                               llm_frontier=llm_frontier,
+                               evidence_interpreter=evidence_interpreter)
 
     def signature(self, item: Item) -> QuerySignature:
         return self.extractor.compute(item.question)
@@ -100,6 +104,7 @@ class EpistemicAgent:
             enable_frontier_controller=self.config.enable_frontier_controller,
             enable_llm_frontier_repair=self.config.enable_llm_frontier_repair,
             enable_llm_frontier_planner=self.config.enable_llm_frontier_planner,
+            enable_llm_evidence_interpreter=self.config.enable_llm_evidence_interpreter,
             scrape_fallback_to_page_fetch=self.config.scrape_fallback_to_page_fetch,
             allow_social_scrape=self.config.allow_social_scrape,
         )

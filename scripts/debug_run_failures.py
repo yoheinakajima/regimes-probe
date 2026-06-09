@@ -153,6 +153,34 @@ def main() -> int:
                 print(f"      [{tag}] {a.get('action_type')} slot={a.get('target_slot_id')} "
                       f"eig={a.get('expected_information_gain')} "
                       + (f"rej={a.get('rejected_reason')}" if a.get('rejected_reason') else ""))
+            # Level 5d evidence interpretation: source role + candidate/constraint assertions.
+            interps = cf.get("interpretations", [])
+            if interps:
+                ist = cf.get("interpreter_stats", {}) or {}
+                print(f"  EVIDENCE INTERPRETATION ({ist.get('evidence_interpreter_model','deterministic')}): "
+                      f"results={ist.get('evidence_interpretation_count')} "
+                      f"accepted={ist.get('accepted_candidate_assertion_count')} "
+                      f"rejected={ist.get('rejected_candidate_assertion_count')} "
+                      f"roles={ist.get('source_role_counts')} "
+                      f"rejections={ist.get('candidate_assertion_rejection_counts')}")
+                for it in interps[:8]:
+                    print(f"    [{it.get('source_role')}] {it.get('source_domain')} "
+                          f"{it.get('source_title_preview')!r}"
+                          + (f" noise={it.get('noise_reasons')}" if it.get('noise_reasons') else ""))
+                    for a in it.get("candidate_assertions", []):
+                        mark = "✓" if not a.get("rejection_reason") else "✗"
+                        line = (f"        {mark} {a.get('candidate_text')!r} "
+                                f"role={a.get('inferred_role')} → slots {a.get('proposed_slot_ids')}")
+                        if a.get("rejection_reason"):
+                            line += f"  REJECT={a.get('rejection_reason')}"
+                        else:
+                            line += (f" supports={a.get('supports_constraint_ids')} "
+                                     f"quote={a.get('evidence_quote_or_span')!r}")
+                        print(line)
+                    for c in it.get("constraint_assertions", []):
+                        if c.get("status") in ("supports", "contradicts"):
+                            print(f"        constraint {c.get('constraint_id')} [{c.get('status')}] "
+                                  f"quote={c.get('evidence_quote_or_span')!r} ({c.get('reason')})")
         # Level 5c LLM frontier proposer: per-step proposals, validation, selection.
         lf = r.get("llm_frontier") or {}
         if lf.get("enabled"):

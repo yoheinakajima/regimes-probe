@@ -92,6 +92,10 @@ policy:
   # Off by default; cache/replay-safe. --enable-llm-frontier-repair / -planner.
   enable_llm_frontier_repair: false
   enable_llm_frontier_planner: false
+  # Level 5d: the deterministic evidence interpreter is ALWAYS on (slates are populated
+  # from structured assertions, not raw n-grams). This flag only adds an optional
+  # cached/replayable LLM source-role re-classification. --enable-llm-evidence-interpreter.
+  enable_llm_evidence_interpreter: false
   # Level 3 evidence reading: if firecrawl_scrape fails (e.g. 402/quota), fall
   # back to the basic page_fetch on the same URL. Social pages are not scraped
   # unless allow_social_scrape is set.

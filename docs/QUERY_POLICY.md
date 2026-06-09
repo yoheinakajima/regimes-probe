@@ -771,3 +771,49 @@ fix makes the proposal → action → evidence chain **faithful and auditable**:
   `exa_search`, `firecrawl_search`, …) is accepted as-is; a family (`search`/`scrape`/
   `fetch`) resolves to an enabled tool in that family; only a non-enabled or unknown tool is
   rejected — fixing spurious `disallowed_tool:serper_search` rejections.
+
+### Level 5d: evidence interpretation (retrieval is not understanding)
+
+Even with good frames and good queries, raw results still filled candidate slates with page
+chrome and generic terms — "Datasets", "Hugging Face", "Translate", "Login", "Merriam",
+"Username Generator", "FOUNDER Definition" — and `constraint_sup` stayed near zero even when
+the right entity (e.g. `Cristina Ortiz`) appeared. The cause: slates were populated from raw
+n-grams and constraint support came from arbitrary term overlap. **The fix is to interpret
+each result into structured assertions before it can touch a slate.** `agent/evidence_interpreter.py`.
+
+For every search result / fetched page, `EvidenceInterpreter.interpret` emits an
+`EvidenceInterpretation`:
+
+- a **source role** — `primary_source` / `professional_profile` / `official_page` /
+  `article` / `scholarly_paper` / `database_record` / `directory_listing` / `social_page` /
+  `forum_page` / `generic_definition_page` / `benchmark_contaminated` /
+  `ui_or_navigation_noise` / `unknown` — classified **generically** by source *type* + page
+  *intent*, not a BrowseComp domain stoplist (dictionary pages define terms; UI/nav text is
+  not evidence; contaminated pages cannot support answers; social/forum pages are weak). A
+  small set of well-known platform *hosts* is used only to TYPE a role
+  (`linkedin.com/in` → professional_profile), never as the rejection mechanism;
+- **candidate assertions** — each extracted entity, accepted or **rejected with a reason**
+  (`generic_definition_noise` / `ui_navigation_noise` / `benchmark_contaminated_source` /
+  `source_platform_noise` / `role_incompatible` / `no_slot_compatible_evidence` /
+  `insufficient_context` / `unsupported_by_selected_constraint`), with its inferred role,
+  the slot(s) it may bind (role-compatible target/selected slot), the constraints it
+  supports/contradicts, an evidence **quote/span**, and a confidence;
+- **constraint assertions** — for the tested constraints, `supports` / `contradicts` /
+  `irrelevant` / `insufficient`, each with a quote.
+
+**Slates are populated only from accepted candidate assertions**, and **constraint support
+changes only via a constraint assertion from a non-noise, role-compatible source** — never
+from term overlap on a definition/UI/contaminated page. A candidate may enter a slate only
+if the evidence presents it as a plausible entity of the slot's role, it is tied to the
+selected slot/constraint, it is not chrome/generic, and the source role is acceptable for
+candidate generation. So the WHO `Cristina Ortiz` LinkedIn result (professional_profile)
+yields a person candidate on the cover-designer slot with its education/employment
+constraints supported, while the "FOUNDER Definition" dictionary result yields **no**
+founder candidate.
+
+The interpreter is **deterministic by default** (always on; this is the new slate-population
+mechanism). An optional `--enable-llm-evidence-interpreter` (requires `--enable-task-frame`)
+adds a **cached/replayable** LLM hook that may only re-classify a result's source role from
+bounded snippets — it never answers, is keyed by `prompt_hash | evidence_hash | frame_hash |
+model`, and replay/dry-run make **zero** model calls. Nothing the interpreter sees or emits
+reaches policy memory.

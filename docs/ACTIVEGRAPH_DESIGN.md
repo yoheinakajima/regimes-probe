@@ -310,3 +310,32 @@ tool call links to its proposal via the `lfp_`-prefixed `frontier_action_id`
 reach the evidence layer; and because every field is persisted on the step trace, the whole
 chain **re-projects identically on replay** and an offline fork can re-audit it with zero
 model calls.
+
+### Evidence interpretation as native graph state (Level 5d)
+
+The evidence interpreter (`QUERY_POLICY.md` Level 5d, `agent/evidence_interpreter.py`) makes
+the step from *retrieval* to *understanding* a first-class, replayable part of the graph:
+candidate slates and constraint support are now derived from recorded **assertions**, not
+from transient n-gram extraction. Each ingested result emits an `EvidenceInterpretation`
+recorded on the frontier and projected. New **projection objects**
+(`activegraph_pack/objects.py:PROJECTION_OBJECTS`): `evidence_interpretation`,
+`candidate_assertion`, `constraint_assertion`, `source_role_classification`,
+`evidence_noise_classification`. New **events** (`EVIDENCE_INTERPRETATION_EVENTS`, outside
+the frozen `ALL_EVENTS`): `evidence_interpreted`, `source_classified`,
+`candidate_assertion_made`, `candidate_assertion_rejected`, `constraint_assertion_made`. New
+**relations** (`PROJECTION_RELATIONS`): `evidence_interpreted_as`,
+`interpretation_asserts_candidate`, `interpretation_supports_constraint`,
+`interpretation_contradicts_constraint`, `candidate_assertion_assigned_to_slot`,
+`candidate_assertion_rejected_because`, `source_classified_as`,
+`evidence_updates_candidate_slate`, `evidence_updates_constraint_status`.
+
+So a reviewer can reconstruct, purely from `graph_projection.json`: how each result was
+typed (source role), which extracted entities became candidates vs were rejected and **why**
+(the `candidate_assertion_rejected_because` edge), which constraints each result supported
+(with a quote), and exactly which slate/constraint updates each interpretation caused. The
+classification is a pure, deterministic function of the recorded result text + frame, so the
+slates/assertions **re-project identically** on replay; the optional LLM source-role hook is
+cached by `prompt_hash | evidence_hash | frame_hash | model`, so even with it enabled a
+replay makes no model call and an offline fork can re-interpret cached results for free.
+Because slates are populated from assertions on non-noise sources only, no answer text from
+a definition/UI/contaminated page can leak into policy memory.

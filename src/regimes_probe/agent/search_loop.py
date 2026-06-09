@@ -266,6 +266,7 @@ class SearchLoopConfig:
     enable_frontier_controller: bool = False
     enable_llm_frontier_repair: bool = False
     enable_llm_frontier_planner: bool = False
+    enable_llm_evidence_interpreter: bool = False
     scrape_fallback_to_page_fetch: bool = True
     allow_social_scrape: bool = False
 
@@ -283,6 +284,7 @@ class SearchLoop:
         invoker_factory=None,
         task_frame_parser=None,
         llm_frontier=None,
+        evidence_interpreter=None,
     ) -> None:
         self.router = router
         self.query_policy = query_policy
@@ -291,6 +293,9 @@ class SearchLoop:
         self._invoker_factory = invoker_factory
         self.task_frame_parser = task_frame_parser
         self.llm_frontier = llm_frontier
+        #: optional shared (cache, model_fn) for the LLM evidence-interpreter hook; a fresh
+        #: per-attempt EvidenceInterpreter is built from it so stats stay per-attempt.
+        self.evidence_interpreter = evidence_interpreter
 
     def run(
         self,
@@ -434,7 +439,19 @@ class SearchLoop:
                 slate_skipped_reason = f"epistemic_mode={_mode}"
             else:
                 from regimes_probe.agent.candidate_frontier import CandidateFrontier
-                frontier = CandidateFrontier(frame, attempt_id=attempt_id, item_id=item.id)
+                # Level 5d: a per-attempt evidence interpreter (deterministic by default;
+                # LLM source-role re-classification only when enabled + a shared cache/model
+                # is injected, so replay/dry-run make no model call).
+                interp = None
+                if config.enable_llm_evidence_interpreter and self.evidence_interpreter is not None:
+                    from regimes_probe.agent.evidence_interpreter import EvidenceInterpreter
+                    ei = self.evidence_interpreter
+                    interp = EvidenceInterpreter(
+                        model_fn=getattr(ei, "model_fn", None), cache=getattr(ei, "cache", None),
+                        model=getattr(ei, "model", "deterministic"),
+                        replay_only=getattr(ei, "replay_only", False), enabled_llm=True)
+                frontier = CandidateFrontier(frame, attempt_id=attempt_id, item_id=item.id,
+                                             interpreter=interp)
                 ctrl["frontier_controller_used"] = bool(config.enable_frontier_controller)
 
         calls: list[CallRecord] = []

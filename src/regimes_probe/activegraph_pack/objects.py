@@ -74,6 +74,12 @@ class Objects:
     LLM_FRONTIER_VALIDATION = "llm_frontier_validation"
     LLM_FRONTIER_SELECTION = "llm_frontier_selection"
     LLM_FRONTIER_PROMPT = "llm_frontier_prompt"
+    # Level 5d evidence interpretation
+    EVIDENCE_INTERPRETATION = "evidence_interpretation"
+    CANDIDATE_ASSERTION = "candidate_assertion"
+    CONSTRAINT_ASSERTION = "constraint_assertion"
+    SOURCE_ROLE_CLASSIFICATION = "source_role_classification"
+    EVIDENCE_NOISE_CLASSIFICATION = "evidence_noise_classification"
     POLICY_UPDATE = "policy_update"
     PROMOTION_DECISION = "promotion_decision"
     REPORT = "report"
@@ -161,6 +167,11 @@ PROJECTION_OBJECTS: tuple[str, ...] = (
     Objects.LLM_FRONTIER_VALIDATION,
     Objects.LLM_FRONTIER_SELECTION,
     Objects.LLM_FRONTIER_PROMPT,
+    Objects.EVIDENCE_INTERPRETATION,
+    Objects.CANDIDATE_ASSERTION,
+    Objects.CONSTRAINT_ASSERTION,
+    Objects.SOURCE_ROLE_CLASSIFICATION,
+    Objects.EVIDENCE_NOISE_CLASSIFICATION,
 )
 
 #: Map an event-log object type onto its standardized projection type.

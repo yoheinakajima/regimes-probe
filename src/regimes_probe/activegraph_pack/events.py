@@ -77,6 +77,12 @@ class Events:
     CANDIDATE_PROMOTED_FROM_LLM_FRONTIER_EVIDENCE = "candidate_promoted_from_llm_frontier_evidence"
     LLM_FRONTIER_REPAIR_TRIGGERED_REASON = "llm_frontier_repair_triggered_reason"
     TOOL_FAMILY_NORMALIZED = "tool_family_normalized"
+    # Level 5d evidence interpretation (retrieval -> structured assertions)
+    EVIDENCE_INTERPRETED = "evidence_interpreted"
+    SOURCE_CLASSIFIED = "source_classified"
+    CANDIDATE_ASSERTION_MADE = "candidate_assertion_made"
+    CANDIDATE_ASSERTION_REJECTED = "candidate_assertion_rejected"
+    CONSTRAINT_ASSERTION_MADE = "constraint_assertion_made"
 
 
 #: Candidate-slate / frontier event-type strings (trace + projection only).
@@ -101,6 +107,13 @@ LLM_FRONTIER_EVENTS: tuple[str, ...] = (
     Events.SELECTED_PROPOSAL_TRANSLATED_TO_ACTION, Events.EVIDENCE_LINKED_TO_LLM_PROPOSAL,
     Events.CANDIDATE_PROMOTED_FROM_LLM_FRONTIER_EVIDENCE,
     Events.LLM_FRONTIER_REPAIR_TRIGGERED_REASON, Events.TOOL_FAMILY_NORMALIZED,
+)
+
+#: Evidence-interpretation event-type strings (trace + projection only).
+EVIDENCE_INTERPRETATION_EVENTS: tuple[str, ...] = (
+    Events.EVIDENCE_INTERPRETED, Events.SOURCE_CLASSIFIED,
+    Events.CANDIDATE_ASSERTION_MADE, Events.CANDIDATE_ASSERTION_REJECTED,
+    Events.CONSTRAINT_ASSERTION_MADE,
 )
 
 

@@ -414,3 +414,25 @@ set — and the risk surface. Keep the experiment honest:
   narrow (only one-word generics) — it now fires on repeated zero-progress, stale/noise
   candidates, and missing high-priority anchors, with the reason recorded, so "the
   deterministic query was bad but not *generic*" no longer slips through unrepaired.
+
+- **Retrieval is not understanding — and raw n-grams quietly corrupt the state.** Before the
+  interpreter, slates filled with page chrome ("Datasets", "Hugging Face", "Translate",
+  "Login", "Merriam", "FOUNDER Definition") and constraint support rose from arbitrary term
+  overlap, so a slate could *look* busy while containing nothing real — and a correct entity
+  (`Cristina Ortiz`) could be present in results yet never promoted. The risk is twofold: (a)
+  **false progress** — junk candidates and overlap-based support inflate evidence/hypothesis
+  scores without any real finding; (b) **a BrowseComp-specific stoplist would be cheating** —
+  hardcoding "reject huggingface.co" overfits the benchmark and hides the general problem.
+  The defense is the generic interpreter (`agent/evidence_interpreter.py`): slates are
+  populated **only** from accepted candidate assertions, constraint support changes **only**
+  via a constraint assertion from a non-noise, role-compatible source, and rejection is by
+  generic **source role + page intent** (a definition page defines terms; UI/nav text is not
+  evidence; a contaminated page cannot support an answer) — not a domain list. Every
+  acceptance/rejection is recorded with a reason and a quote and projected, so a reviewer can
+  see *why* each slate entry exists. Watch `source_role_noise_rate`,
+  `noise_candidate_rejection_rate`, `constraint_support_from_interpretation_rate`, and the
+  debug-only `has_gold_but_not_promoted_count`; if support is rising without accepted
+  assertions, or chrome is entering slates, the interpretation layer is the thing to fix, not
+  the score. The interpreter is deterministic by default (no model dependence); the optional
+  LLM source-role hook is cached/replayable and answer-free, so it cannot leak or
+  de-reproduce a run.

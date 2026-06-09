@@ -368,3 +368,20 @@ count` shows enabled concrete tools (`serper_search`/`exa_search`) being accepte
 than spuriously rejected. Read these together with `has_gold_but_not_promoted` in the
 analysis artifacts (gold lives only there, never in the card) to catch the
 "right answer present but never scored" failure the bug produced.
+
+**Evidence interpretation turns "did retrieval work?" into "was the result understood?"
+(Level 5d).** The deterministic interpreter is always on, so judge a run by whether results
+were interpreted into the *right* assertions, not by how many were retrieved:
+`source_role_counts` / `source_role_noise_rate` show how much of the result stream is
+definition/UI/contaminated chrome; `noise_candidate_rejection_rate` and
+`candidate_assertion_rejection_counts` show the slate being protected from n-gram junk
+("Datasets", "Login", "Merriam", …); `accepted_candidate_assertion_count` vs
+`candidate_assertion_count` shows the accept/reject discipline;
+`constraint_assertion_support_count` and `constraint_support_from_interpretation_rate` show
+constraint support flowing **only** from explicit assertions on non-noise sources (never
+arbitrary overlap); and `candidate_promotion_from_evidence_count` shows real entities making
+it onto slates. The debug-only `has_gold_but_not_promoted_count` (computed in
+`debug_run_failures.py` where gold is available — never in policy memory) is the direct
+check for the WHO `Cristina Ortiz` failure: a correct candidate present in results but not
+promoted. A healthy interpreter run rejects most chrome, accepts role-compatible entities on
+the selected slot, and raises constraint support via quoted assertions.

@@ -145,6 +145,13 @@ def main() -> int:
                          "executes). Requires --enable-task-frame. Off by default.")
     ap.add_argument("--llm-frontier-model", default=None,
                     help="Model for the LLM frontier proposer (default: --answer-model).")
+    ap.add_argument("--enable-llm-evidence-interpreter", action="store_true",
+                    help="Level 5d: let an LLM re-classify a result's SOURCE ROLE from "
+                         "bounded snippets (the deterministic interpreter always runs; this "
+                         "only refines source-role typing). Requires --enable-task-frame. "
+                         "Cached/replayable; off by default.")
+    ap.add_argument("--llm-evidence-interpreter-model", default=None,
+                    help="Model for the LLM evidence interpreter (default: --answer-model).")
     ap.add_argument("--judge-model", default=None,
                     help="(reserved) LLM judge; grading currently uses exact/normalized match")
     ap.add_argument("--split-seed", default=None)
@@ -186,10 +193,14 @@ def main() -> int:
     llm_frontier_requested = (args.enable_llm_frontier_repair or args.enable_llm_frontier_planner
                               or bool(cfg.get("policy", {}).get("enable_llm_frontier_repair", False))
                               or bool(cfg.get("policy", {}).get("enable_llm_frontier_planner", False)))
+    llm_evidence_interpreter_requested = (
+        args.enable_llm_evidence_interpreter
+        or bool(cfg.get("policy", {}).get("enable_llm_evidence_interpreter", False)))
     try:
         validate_task_frame_flags(task_frame=task_frame_enabled, llm_parser=llm_parser_requested,
                                   frontier_controller=frontier_controller_requested,
-                                  llm_frontier=llm_frontier_requested)
+                                  llm_frontier=llm_frontier_requested,
+                                  llm_evidence_interpreter=llm_evidence_interpreter_requested)
     except ValueError as exc:
         print(f"=== run_live: REFUSING (configuration error) ===\n{exc}")
         return 2
@@ -199,6 +210,7 @@ def main() -> int:
                                        or cfg.get("policy", {}).get("enable_llm_frontier_repair", False))
     llm_frontier_planner_enabled = bool(args.enable_llm_frontier_planner
                                         or cfg.get("policy", {}).get("enable_llm_frontier_planner", False))
+    llm_evidence_interpreter_enabled = llm_evidence_interpreter_requested
 
     # Resolve models + tools from mode/CLI/config/env (cheap-first; OpenAI hosted
     # web_search is opt-in, never a silent default).
@@ -235,6 +247,7 @@ def main() -> int:
     cfg["policy"]["enable_frontier_controller"] = frontier_controller_enabled
     cfg["policy"]["enable_llm_frontier_repair"] = llm_frontier_repair_enabled
     cfg["policy"]["enable_llm_frontier_planner"] = llm_frontier_planner_enabled
+    cfg["policy"]["enable_llm_evidence_interpreter"] = llm_evidence_interpreter_enabled
     # Parser model defaults to the answer model unless explicitly overridden.
     task_frame_parser_model = (args.task_frame_parser_model
                                or cfg.get("policy", {}).get("task_frame_parser_model")
@@ -384,14 +397,28 @@ def main() -> int:
         lf_proposer = LLMFrontierProposer(
             model_fn=build_frontier_model_fn(lf_model, cache, armed=True),
             cache=ParserCache(lf_cache_path), model=lf_model)
+    # Cached/replayable LLM evidence interpreter (Level 5d): a SHARED (model_fn, cache)
+    # the per-attempt interpreter is built from; the deterministic interpreter always runs.
+    ev_interpreter = None
+    if llm_evidence_interpreter_enabled:
+        from regimes_probe.agent.evidence_interpreter import EvidenceInterpreter
+        from regimes_probe.agent.llm_task_frame import ParserCache
+        from regimes_probe.live.providers import build_evidence_model_fn
+        ev_model = args.llm_evidence_interpreter_model or answer_model
+        ev_cache_path = str(Path(plan.run_dir) / "llm_evidence_interpreter_cache.json")
+        ev_interpreter = EvidenceInterpreter(
+            model_fn=build_evidence_model_fn(ev_model, cache, armed=True),
+            cache=ParserCache(ev_cache_path), model=ev_model, enabled_llm=True)
     search_agent = EpistemicAgent(agent_cfg,
                                   answerer=build_live_answerer("search", model=answer_model,
                                                                cache=cache, armed=True),
-                                  task_frame_parser=tf_parser, llm_frontier=lf_proposer)
+                                  task_frame_parser=tf_parser, llm_frontier=lf_proposer,
+                                  evidence_interpreter=ev_interpreter)
     cb_agent = EpistemicAgent(agent_cfg,
                               answerer=build_live_answerer("closed_book", model=answer_model,
                                                            cache=cache, armed=True),
-                              task_frame_parser=tf_parser, llm_frontier=lf_proposer)
+                              task_frame_parser=tf_parser, llm_frontier=lf_proposer,
+                              evidence_interpreter=ev_interpreter)
     resume = (json.loads(Path(args.resume_from_snapshot).read_text())
               if args.resume_from_snapshot else None)
 

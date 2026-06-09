@@ -59,9 +59,14 @@ LLM_FRONTIER_REQUIRES_TASK_FRAME = (
     "--enable-llm-frontier-repair/--enable-llm-frontier-planner requires --enable-task-frame")
 
 
+LLM_EVIDENCE_INTERPRETER_REQUIRES_TASK_FRAME = (
+    "--enable-llm-evidence-interpreter requires --enable-task-frame")
+
+
 def validate_task_frame_flags(*, task_frame: bool, llm_parser: bool,
                               frontier_controller: bool = False,
-                              llm_frontier: bool = False) -> None:
+                              llm_frontier: bool = False,
+                              llm_evidence_interpreter: bool = False) -> None:
     """Fail fast on a task-frame-dependent flag requested without the task frame."""
     if llm_parser and not task_frame:
         raise ValueError(LLM_PARSER_REQUIRES_TASK_FRAME)
@@ -69,18 +74,22 @@ def validate_task_frame_flags(*, task_frame: bool, llm_parser: bool,
         raise ValueError(FRONTIER_CONTROLLER_REQUIRES_TASK_FRAME)
     if llm_frontier and not task_frame:
         raise ValueError(LLM_FRONTIER_REQUIRES_TASK_FRAME)
+    if llm_evidence_interpreter and not task_frame:
+        raise ValueError(LLM_EVIDENCE_INTERPRETER_REQUIRES_TASK_FRAME)
 
 
 def build_agent(cfg: dict[str, Any], tools: list[str], *, task_frame_parser=None,
-                llm_frontier=None) -> EpistemicAgent:
+                llm_frontier=None, evidence_interpreter=None) -> EpistemicAgent:
     pol = cfg.get("policy", {})
     enable_llm_parser = bool(pol.get("enable_llm_task_frame_parser", False))
     enable_lf = bool(pol.get("enable_llm_frontier_repair", False)
                      or pol.get("enable_llm_frontier_planner", False))
+    enable_ei = bool(pol.get("enable_llm_evidence_interpreter", False))
     validate_task_frame_flags(task_frame=bool(pol.get("enable_task_frame", False)),
                               llm_parser=enable_llm_parser,
                               frontier_controller=bool(pol.get("enable_frontier_controller", False)),
-                              llm_frontier=enable_lf)
+                              llm_frontier=enable_lf,
+                              llm_evidence_interpreter=enable_ei)
     agent_cfg = AgentConfig(
         available_tools=tools,
         query_mode=pol.get("query_mode", "learned"),
@@ -95,6 +104,7 @@ def build_agent(cfg: dict[str, Any], tools: list[str], *, task_frame_parser=None
         enable_frontier_controller=bool(pol.get("enable_frontier_controller", False)),
         enable_llm_frontier_repair=bool(pol.get("enable_llm_frontier_repair", False)),
         enable_llm_frontier_planner=bool(pol.get("enable_llm_frontier_planner", False)),
+        enable_llm_evidence_interpreter=enable_ei,
         scrape_fallback_to_page_fetch=bool(pol.get("scrape_fallback_to_page_fetch", True)),
         allow_social_scrape=bool(pol.get("allow_social_scrape", False)),
         as_of=cfg.get("run", {}).get("as_of", "2026-06-01"),
@@ -122,8 +132,18 @@ def build_agent(cfg: dict[str, Any], tools: list[str], *, task_frame_parser=None
             model_fn=None, cache=ParserCache(pol.get("llm_frontier_cache_path")),
             model=str(pol.get("llm_frontier_model", "stub")),
             replay_only=bool(pol.get("llm_frontier_replay_only", False)))
+    # LLM evidence interpreter (offline-safe: no model_fn -> cache/replay-only source-role
+    # re-classification -> falls back to the deterministic interpreter on a cache miss).
+    if evidence_interpreter is None and enable_ei:
+        from regimes_probe.agent.evidence_interpreter import EvidenceInterpreter
+        from regimes_probe.agent.llm_task_frame import ParserCache
+        evidence_interpreter = EvidenceInterpreter(
+            model_fn=None, cache=ParserCache(pol.get("llm_evidence_interpreter_cache_path")),
+            model=str(pol.get("llm_evidence_interpreter_model", "stub")),
+            replay_only=bool(pol.get("llm_evidence_interpreter_replay_only", False)),
+            enabled_llm=True)
     return EpistemicAgent(agent_cfg, task_frame_parser=task_frame_parser,
-                          llm_frontier=llm_frontier)
+                          llm_frontier=llm_frontier, evidence_interpreter=evidence_interpreter)
 
 
 def base_argparser(description: str) -> argparse.ArgumentParser:
@@ -365,6 +385,8 @@ def full_pipeline(
         "llm_frontier_enabled": bool(
             cfg.get("policy", {}).get("enable_llm_frontier_repair", False)
             or cfg.get("policy", {}).get("enable_llm_frontier_planner", False)),
+        "llm_evidence_interpreter_enabled": bool(
+            cfg.get("policy", {}).get("enable_llm_evidence_interpreter", False)),
         "dataset": dataset_label,
         "dataset_version": dataset_version,
         "split": split.to_dict() | {"optimize_ids": "...", "confirm_ids": "..."},

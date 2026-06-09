@@ -83,7 +83,20 @@ def _outcome(trace, grade, reward, *, condition: str, budget: int) -> AttemptOut
         frame_parse=_frame_parse_stats(trace),
         frontier=_frontier_stats(trace),
         llm_frontier=dict(getattr(trace, "llm_frontier", {}) or {}),
+        interpretation=_interpretation_stats(trace),
     )
+
+
+def _interpretation_stats(trace) -> dict:
+    """Per-attempt evidence-interpretation stats (Level 5d), aggregated by compute_metrics."""
+    cf = getattr(trace, "candidate_frontier", {}) or {}
+    if not cf or cf.get("skipped"):
+        return {}
+    st = dict(cf.get("interpreter_stats", {}) or {})
+    # how many confirmed candidates trace back to an interpreted (non-noise) source.
+    confirmed = sum(len(s.get("confirmed_candidate_ids", [])) for s in cf.get("slates", []))
+    st["candidate_promotion_from_evidence_count"] = confirmed
+    return st
 
 
 def _frontier_stats(trace) -> dict:

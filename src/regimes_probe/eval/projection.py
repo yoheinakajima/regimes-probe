@@ -245,6 +245,62 @@ def _project_llm_frontier(g: "_GraphBuilder", aid: str, tf_node: str, a_node: st
                     break
 
 
+def _project_evidence_interpretation(g: "_GraphBuilder", aid: str, cf: dict[str, Any]) -> None:
+    """Project the Level-5d evidence-interpretation subgraph: each result's source-role
+    classification, candidate assertions (assigned or rejected), and constraint assertions
+    — so the slate/constraint state is reconstructable from interpretations, not n-grams."""
+    for ii, interp in enumerate(cf.get("interpretations", [])):
+        inode = g.obj(f"evidence_interpretation#{aid}#{ii}", Objects.EVIDENCE_INTERPRETATION, {
+            "interpretation_id": interp.get("interpretation_id"),
+            "source_tool": interp.get("source_tool"), "source_domain": interp.get("source_domain"),
+            "source_role": interp.get("source_role"),
+            "title_preview": interp.get("source_title_preview"),
+            "target_slot_ids": interp.get("target_slot_ids", []),
+            "tested_constraint_ids": interp.get("tested_constraint_ids", []),
+            "noise_reasons": interp.get("noise_reasons", []),
+            "interpreter_version": interp.get("interpreter_version"),
+            "interpreter_mode": interp.get("interpreter_mode")})
+        sr = g.obj(f"source_role_classification#{aid}#{ii}", Objects.SOURCE_ROLE_CLASSIFICATION,
+                   {"source_role": interp.get("source_role"),
+                    "noise_reasons": interp.get("noise_reasons", [])})
+        g.rel(inode, sr, Relations.SOURCE_CLASSIFIED_AS)
+        g.rel(inode, sr, Relations.EVIDENCE_INTERPRETED_AS)
+        if interp.get("noise_reasons"):
+            nz = g.obj(f"evidence_noise_classification#{aid}#{ii}",
+                       Objects.EVIDENCE_NOISE_CLASSIFICATION,
+                       {"noise_reasons": interp.get("noise_reasons", [])})
+            g.rel(inode, nz, Relations.EVIDENCE_INTERPRETED_AS)
+        for ai, a in enumerate(interp.get("candidate_assertions", [])):
+            an = g.obj(f"candidate_assertion#{aid}#{ii}#{ai}", Objects.CANDIDATE_ASSERTION, {
+                "candidate_text": a.get("candidate_text"), "inferred_role": a.get("inferred_role"),
+                "proposed_slot_ids": a.get("proposed_slot_ids", []),
+                "supports_constraint_ids": a.get("supports_constraint_ids", []),
+                "source_role": a.get("source_role"), "confidence": a.get("confidence"),
+                "rejection_reason": a.get("rejection_reason"),
+                "evidence_quote_or_span": a.get("evidence_quote_or_span")})
+            g.rel(inode, an, Relations.INTERPRETATION_ASSERTS_CANDIDATE)
+            if a.get("rejection_reason"):
+                g.rel(an, sr, Relations.CANDIDATE_ASSERTION_REJECTED_BECAUSE)
+            else:
+                for sid in a.get("proposed_slot_ids", []):
+                    g.rel(an, f"latent_slot#{aid}#{sid}",
+                          Relations.CANDIDATE_ASSERTION_ASSIGNED_TO_SLOT)
+                    g.rel(inode, f"latent_slot#{aid}#{sid}",
+                          Relations.EVIDENCE_UPDATES_CANDIDATE_SLATE)
+        for ci, c in enumerate(interp.get("constraint_assertions", [])):
+            cn = g.obj(f"constraint_assertion#{aid}#{ii}#{ci}", Objects.CONSTRAINT_ASSERTION, {
+                "constraint_id": c.get("constraint_id"), "status": c.get("status"),
+                "confidence": c.get("confidence"), "reason": c.get("reason"),
+                "evidence_quote_or_span": c.get("evidence_quote_or_span")})
+            cid = c.get("constraint_id")
+            if c.get("status") == "supports":
+                g.rel(inode, cn, Relations.INTERPRETATION_SUPPORTS_CONSTRAINT)
+                g.rel(inode, f"constraint#{aid}#{cid}", Relations.EVIDENCE_UPDATES_CONSTRAINT_STATUS)
+            elif c.get("status") == "contradicts":
+                g.rel(inode, cn, Relations.INTERPRETATION_CONTRADICTS_CONSTRAINT)
+                g.rel(inode, f"constraint#{aid}#{cid}", Relations.EVIDENCE_UPDATES_CONSTRAINT_STATUS)
+
+
 def build_graph_projection(
     run_id: str,
     *,
@@ -518,6 +574,9 @@ def build_graph_projection(
                 cf = d.get("candidate_frontier") or {}
                 if cf and not cf.get("skipped"):
                     _project_frontier(g, aid, tf_node, cf, d.get("calls", []))
+                    # --- Level 5d evidence interpretation subgraph ---
+                    if cf.get("interpretations"):
+                        _project_evidence_interpretation(g, aid, cf)
 
                 # --- Level 5c LLM frontier proposer subgraph ---
                 lf = d.get("llm_frontier") or {}

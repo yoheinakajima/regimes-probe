@@ -46,11 +46,20 @@ _NOISE_DEFINITION = frozenset({
     "wiktionary", "synonym", "synonyms", "antonym", "encyclopedia", "encyclopaedia"})
 _NOISE_PLATFORM = frozenset({
     "linkedin", "facebook", "twitter", "instagram", "youtube", "tiktok", "pinterest",
-    "reddit", "quora", "tumblr", "medium", "substack", "github", "tripadvisor", "yelp"})
+    "reddit", "quora", "tumblr", "medium", "substack", "github", "tripadvisor", "yelp",
+    "huggingface", "wikipedia", "wikimedia", "stackoverflow", "stackexchange"})
+#: multiword platform / source names that are site chrome, not task entities.
+_NOISE_PLATFORM_PHRASES = frozenset({
+    "hugging face", "stack overflow", "stack exchange", "google scholar",
+    "internet archive", "wayback machine", "google translate"})
 _NOISE_UI = frozenset({
     "login", "log", "signin", "sign", "signup", "register", "menu", "home", "search",
     "username", "generator", "table", "tables", "page", "click", "next", "previous",
-    "settings", "profile", "account", "navigation", "cookie", "cookies", "subscribe"})
+    "settings", "profile", "account", "navigation", "cookie", "cookies", "subscribe",
+    "translate", "datasets", "dataset", "models", "spaces", "docs", "documentation",
+    "pricing", "download", "downloads", "newsletter", "cart", "checkout", "explore",
+    "trending", "categories", "topics", "tags", "sitemap", "preferences", "language",
+    "results", "browse", "directory", "crossword", "clue", "clues"})
 
 
 def _noise_kind(text: str) -> str:
@@ -58,9 +67,10 @@ def _noise_kind(text: str) -> str:
     words = {w.lower() for w in re.findall(r"[A-Za-z]+", text or "")}
     if not words:
         return ""
+    norm = " ".join(w.lower() for w in re.findall(r"[A-Za-z]+", text or ""))
     if words & _NOISE_DEFINITION:
         return "generic_definition_noise"
-    if words & _NOISE_PLATFORM and len(words) <= 2:
+    if norm in _NOISE_PLATFORM_PHRASES or (words & _NOISE_PLATFORM and len(words) <= 2):
         return "source_platform_noise"
     if words & _NOISE_UI and len(words) <= 2:
         return "ui_navigation_noise"
@@ -286,7 +296,8 @@ class CandidateFrontier:
     """Per-slot candidate slates + frontier scheduler, event-sourced and projectable."""
 
     def __init__(self, frame, *, attempt_id: str = "", item_id: str = "",
-                 run_id: str = "", clock: Optional[Callable[[], int]] = None) -> None:
+                 run_id: str = "", clock: Optional[Callable[[], int]] = None,
+                 interpreter=None) -> None:
         self.frame = frame
         self.attempt_id, self.item_id, self.run_id = attempt_id, item_id, run_id
         self._seq = 0
@@ -297,6 +308,11 @@ class CandidateFrontier:
         self.evidence: list[EvidenceRecord] = []
         self.frontier_actions: list[FrontierAction] = []
         self.events: list[dict[str, Any]] = []
+        #: Level 5d: structured EvidenceInterpretation per ingested observation. Slates are
+        #: populated from these assertions, not raw n-grams. A default deterministic
+        #: interpreter is created lazily to avoid an import cycle.
+        self.interpreter = interpreter
+        self.interpretations: list[Any] = []
         self._cc = self._ec = self._hc = self._ac = self._evc = 0
         self._known = {_norm(t) for t in frame.known_context_terms}
         # one slate per slot that NEEDS binding (every unbound variable).
@@ -340,6 +356,20 @@ class CandidateFrontier:
     def _dependents(self, slot_id: str) -> list[str]:
         return [s.slot_id for s in self.frame.all_slots if slot_id in getattr(s, "depends_on", [])]
 
+    def _interpreter(self):
+        """The evidence interpreter (lazy default deterministic; avoids an import cycle)."""
+        if self.interpreter is None:
+            from regimes_probe.agent.evidence_interpreter import EvidenceInterpreter
+            self.interpreter = EvidenceInterpreter()
+        return self.interpreter
+
+    def _cons_for(self, slot_id: str, directed_slot_id, directed_constraint_ids):
+        cons = list(self._constraints_for_slot(slot_id))
+        if slot_id == directed_slot_id:
+            cons += [c for c in (self._con(cid) for cid in (directed_constraint_ids or []))
+                     if c is not None and c not in cons]
+        return cons
+
     # ---------- ingest ----------
     def ingest_evidence(self, observations, *, source_tool: str, stage: int = 1,
                         read_depth: int = 0, action_id: Optional[str] = None,
@@ -363,6 +393,7 @@ class CandidateFrontier:
         before_conf = before_best.confidence_score if before_best else 0.0
         before_sel_support = self._slot_constraint_support(directed_slot_id, directed_constraint_ids)
         noise_count = 0
+        interp_engine = self._interpreter()
         for o in observations:
             if getattr(o, "failed", False):
                 continue
@@ -379,38 +410,45 @@ class CandidateFrontier:
             if contaminated:
                 ev.contamination_score = 1.0
             text_l = f"{title} {snippet}".lower()
-            for e in _entities_in_field(title) + _entities_in_field(snippet):
-                if _is_generic_entity(e) or len(e) < 3:
+            # INTERPRET the result into structured assertions (source role + candidate +
+            # constraint assertions). Slates are populated ONLY from accepted assertions.
+            interp = interp_engine.interpret(
+                o, frame=self.frame, frontier=self, source_evidence_id=ev.evidence_id,
+                source_tool=source_tool, selected_slot_id=directed_slot_id,
+                selected_constraint_ids=directed_constraint_ids, known_norms=self._known)
+            self.interpretations.append(interp)
+            self._emit("evidence_interpreted", evidence_id=ev.evidence_id,
+                       data={"interpretation_id": interp.interpretation_id,
+                             "source_role": interp.source_role,
+                             "noise_reasons": list(interp.noise_reasons)})
+            self._emit("source_classified", evidence_id=ev.evidence_id,
+                       data={"source_role": interp.source_role})
+            for a in interp.candidate_assertions:
+                if a.accepted:
                     continue
-                if _noise_kind(e):
-                    noise_count += 1
-                    continue                # retrieval noise is never a candidate
-                norm = _norm(e)
-                is_known = norm in self._known
-                role, from_ctx = _context_role(e, title, snippet)
-                # A KNOWN CONSTANT keeps its ISOLATED role (context must not flip a
-                # given location into an organization candidate) and is only admitted
-                # to a role-compatible slot whose constraint the evidence supports.
-                if is_known:
-                    role, from_ctx = classify_entity_role(e), False
-                target_slots = list(self._slots_for_role(role))
-                # DIRECTED: also admit the candidate to the proposal's slot when role
-                # compatible, so the slot the LLM searched for actually gets the binding.
-                if (dslot is not None and dslot.slot_id in self.slates
-                        and dslot not in target_slots
-                        and _role_compatible(role, dslot.slot_role)):
-                    target_slots.append(dslot)
-                for slot in target_slots:
-                    cons = self._constraints_for_slot(slot.slot_id)
-                    if slot.slot_id == directed_slot_id:
-                        cons = cons + [c for c in (self._con(cid) for cid in directed_constraint_ids)
-                                       if c is not None and c not in cons]
-                    supported = [c for c in cons if _supports(c, text_l)
-                                 and any(t in norm for t in c.normalized_terms if len(t) >= 4)]
-                    if is_known and not supported:
-                        continue            # not bound to this slot -> not a candidate
-                    self._assign(slot, e, norm, role, ev, source_tool, action_id,
-                                 stage, _host(url), authority, contaminated, from_ctx,
+                noise_count += a.rejection_reason in (
+                    "generic_definition_noise", "ui_navigation_noise",
+                    "source_platform_noise", "benchmark_contaminated_source")
+                self._emit("candidate_assertion_rejected", evidence_id=ev.evidence_id,
+                           data={"text": _prev(a.candidate_text, 60),
+                                 "reason": a.rejection_reason})
+            for ca in interp.constraint_assertions:
+                self._emit("constraint_assertion_made", evidence_id=ev.evidence_id,
+                           data={"constraint_id": ca.constraint_id, "status": ca.status})
+            # apply accepted candidate assertions -> slates (deterministic _assign).
+            for a in interp.accepted_candidates():
+                self._emit("candidate_assertion_made", evidence_id=ev.evidence_id,
+                           data={"text": _prev(a.candidate_text, 60),
+                                 "role": a.inferred_role,
+                                 "proposed_slot_ids": list(a.proposed_slot_ids)})
+                for sid in a.proposed_slot_ids:
+                    slot = self.frame.slot(sid)
+                    if slot is None or sid not in self.slates:
+                        continue
+                    cons = self._cons_for(sid, directed_slot_id, directed_constraint_ids)
+                    self._assign(slot, a.candidate_text, _norm(a.candidate_text),
+                                 a.inferred_role, ev, source_tool, action_id, stage,
+                                 _host(url), authority, contaminated, a.from_ctx,
                                  text_l, cons, directed_slot_id=directed_slot_id,
                                  directed_constraint_ids=directed_constraint_ids,
                                  proposal_id=proposal_id)
@@ -957,6 +995,8 @@ class CandidateFrontier:
             "selected_frontier_action": next(
                 (a.to_dict() for a in self.frontier_actions if a.selected), {}),
             "events": list(self.events),
+            "interpretations": [i.to_dict() for i in self.interpretations][:20],
+            "interpreter_stats": (self.interpreter.stats() if self.interpreter is not None else {}),
             "metrics": self.metrics(),
         }
 

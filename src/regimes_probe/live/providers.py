@@ -325,6 +325,36 @@ def build_frontier_model_fn(model: str, cache: RecordingCache, *, armed: bool):
     return _model_fn
 
 
+def build_evidence_model_fn(model: str, cache: RecordingCache, *, armed: bool):
+    """A cached/replayable ``model_fn(prompt)->str`` for the LLM evidence interpreter.
+
+    Same discipline as the frontier proposer: dry-run raises :class:`NotArmed`, replay
+    miss raises :class:`ReplayMiss`, success is recorded. The model only RE-CLASSIFIES a
+    single result's source role from bounded snippets — it never answers."""
+    def _model_fn(prompt_text: str) -> str:
+        meta = {"model": model, "task": "evidence_source_role", "input": prompt_text}
+        h = cache.request_hash("openai_responses_evidence", model, meta)
+        entry = cache.get(h)
+        if entry and cache.mode in ("auto", "replay"):
+            cache.hits += 1
+            return entry["response"].get("text", "")
+        if cache.mode == "replay":
+            raise ReplayMiss("evidence_interpreter: no cached response (replay mode)")
+        if not armed:
+            raise NotArmed("evidence_interpreter: refusing to call model in dry-run "
+                           "(pass --execute to arm live calls)")
+        from openai import OpenAI  # local import: never at module load
+        client = OpenAI()
+        resp = client.responses.create(model=model, input=prompt_text, temperature=0)
+        text = (getattr(resp, "output_text", "") or "").strip()
+        cache.calls += 1
+        if cache.mode != "off":
+            cache.store(h, provider="openai_responses_evidence", name=model,
+                        request_meta=meta, response_payload={"text": text})
+        return text
+    return _model_fn
+
+
 def missing_keys(tool_names: list[str], *, answer_model_needs_openai: bool = True) -> list[str]:
     """Env-var NAMES that are required but absent (for execute/strict errors)."""
     needed: set[str] = set()

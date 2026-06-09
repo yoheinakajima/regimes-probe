@@ -53,7 +53,12 @@
     "llm_frontier_proposal",
     "llm_frontier_validation",
     "llm_frontier_selection",
-    "llm_frontier_prompt"
+    "llm_frontier_prompt",
+    "evidence_interpretation",
+    "candidate_assertion",
+    "constraint_assertion",
+    "source_role_classification",
+    "evidence_noise_classification"
   ],
   "relation_types": [
     "attempt_for_item",
@@ -119,7 +124,16 @@
     "proposal_rejected_because",
     "tool_call_from_llm_frontier_proposal",
     "evidence_linked_to_llm_proposal",
-    "candidate_promoted_from_llm_frontier"
+    "candidate_promoted_from_llm_frontier",
+    "evidence_interpreted_as",
+    "interpretation_asserts_candidate",
+    "interpretation_supports_constraint",
+    "interpretation_contradicts_constraint",
+    "candidate_assertion_assigned_to_slot",
+    "candidate_assertion_rejected_because",
+    "source_classified_as",
+    "evidence_updates_candidate_slate",
+    "evidence_updates_constraint_status"
   ],
   "detail_limit": 60,
   "event_log": {

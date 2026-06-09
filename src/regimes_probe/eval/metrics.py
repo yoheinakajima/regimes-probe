@@ -58,6 +58,8 @@ class AttemptOutcome:
     frontier: dict = field(default_factory=dict)
     # Level 5c LLM frontier proposer stats
     llm_frontier: dict = field(default_factory=dict)
+    # Level 5d evidence interpretation stats
+    interpretation: dict = field(default_factory=dict)
 
     def to_row(self) -> dict[str, Any]:
         return {
@@ -394,6 +396,51 @@ def _llm_frontier_metrics(stats: list[dict]) -> dict[str, Any]:
     }
 
 
+_NOISE_REJECTIONS = ("generic_definition_noise", "ui_navigation_noise",
+                     "source_platform_noise", "benchmark_contaminated_source")
+_NOISE_SOURCE_ROLES = ("generic_definition_page", "ui_or_navigation_noise",
+                       "benchmark_contaminated")
+
+
+def _evidence_interpretation_metrics(stats: list[dict]) -> dict[str, Any]:
+    """Aggregate Level-5d evidence-interpretation stats across a cell."""
+    from collections import Counter
+    used = [s for s in stats if s]
+    if not used:
+        return {}
+    interp = candidate = accepted = rejected = supp = contra = promoted = 0
+    roles: Counter = Counter()
+    rej: Counter = Counter()
+    for s in used:
+        interp += int(s.get("evidence_interpretation_count", 0))
+        candidate += int(s.get("candidate_assertion_count", 0))
+        accepted += int(s.get("accepted_candidate_assertion_count", 0))
+        rejected += int(s.get("rejected_candidate_assertion_count", 0))
+        supp += int(s.get("constraint_assertion_support_count", 0))
+        contra += int(s.get("constraint_assertion_contradiction_count", 0))
+        promoted += int(s.get("candidate_promotion_from_evidence_count", 0))
+        for k, v in (s.get("source_role_counts") or {}).items():
+            roles[k] += int(v)
+        for k, v in (s.get("candidate_assertion_rejection_counts") or {}).items():
+            rej[k] += int(v)
+    noise_rej = sum(rej.get(r, 0) for r in _NOISE_REJECTIONS)
+    noise_roles = sum(roles.get(r, 0) for r in _NOISE_SOURCE_ROLES)
+    return {
+        "evidence_interpretation_count": interp,
+        "source_role_counts": dict(roles),
+        "candidate_assertion_count": candidate,
+        "accepted_candidate_assertion_count": accepted,
+        "rejected_candidate_assertion_count": rejected,
+        "candidate_assertion_rejection_counts": dict(rej),
+        "constraint_assertion_support_count": supp,
+        "constraint_assertion_contradiction_count": contra,
+        "constraint_support_from_interpretation_rate": _safe_div(supp, interp),
+        "noise_candidate_rejection_rate": _safe_div(noise_rej, candidate),
+        "source_role_noise_rate": _safe_div(noise_roles, interp),
+        "candidate_promotion_from_evidence_count": promoted,
+    }
+
+
 def compute_metrics(outcomes: list[AttemptOutcome]) -> dict[str, Any]:
     """Aggregate metrics for one condition+budget cell."""
     n = len(outcomes)
@@ -449,6 +496,8 @@ def compute_metrics(outcomes: list[AttemptOutcome]) -> dict[str, Any]:
         **_frontier_metrics([o.frontier for o in outcomes]),
         # Level 5c LLM frontier proposer aggregates
         **_llm_frontier_metrics([o.llm_frontier for o in outcomes]),
+        # Level 5d evidence interpretation aggregates
+        **_evidence_interpretation_metrics([o.interpretation for o in outcomes]),
         "correct_per_tool_call": _safe_div(correct, calls),
         "correct_per_dollar": _safe_div(correct, cost) if cost else 0.0,
         "correct_per_second": _safe_div(correct, latency) if latency else 0.0,

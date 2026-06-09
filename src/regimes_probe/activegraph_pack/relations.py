@@ -85,6 +85,16 @@ class Relations:
     TOOL_CALL_FROM_LLM_FRONTIER_PROPOSAL = "tool_call_from_llm_frontier_proposal"
     EVIDENCE_LINKED_TO_LLM_PROPOSAL = "evidence_linked_to_llm_proposal"
     CANDIDATE_PROMOTED_FROM_LLM_FRONTIER = "candidate_promoted_from_llm_frontier"
+    # Level 5d evidence interpretation
+    EVIDENCE_INTERPRETED_AS = "evidence_interpreted_as"
+    INTERPRETATION_ASSERTS_CANDIDATE = "interpretation_asserts_candidate"
+    INTERPRETATION_SUPPORTS_CONSTRAINT = "interpretation_supports_constraint"
+    INTERPRETATION_CONTRADICTS_CONSTRAINT = "interpretation_contradicts_constraint"
+    CANDIDATE_ASSERTION_ASSIGNED_TO_SLOT = "candidate_assertion_assigned_to_slot"
+    CANDIDATE_ASSERTION_REJECTED_BECAUSE = "candidate_assertion_rejected_because"
+    SOURCE_CLASSIFIED_AS = "source_classified_as"
+    EVIDENCE_UPDATES_CANDIDATE_SLATE = "evidence_updates_candidate_slate"
+    EVIDENCE_UPDATES_CONSTRAINT_STATUS = "evidence_updates_constraint_status"
     UPDATE_FROM_REWARD = "update_from_reward"
     REGIME_FOR_FAILURE = "regime_for_failure"
     PROMOTION_FOR_UPDATE = "promotion_for_update"
@@ -175,4 +185,13 @@ PROJECTION_RELATIONS: tuple[str, ...] = (
     Relations.TOOL_CALL_FROM_LLM_FRONTIER_PROPOSAL,
     Relations.EVIDENCE_LINKED_TO_LLM_PROPOSAL,
     Relations.CANDIDATE_PROMOTED_FROM_LLM_FRONTIER,
+    Relations.EVIDENCE_INTERPRETED_AS,
+    Relations.INTERPRETATION_ASSERTS_CANDIDATE,
+    Relations.INTERPRETATION_SUPPORTS_CONSTRAINT,
+    Relations.INTERPRETATION_CONTRADICTS_CONSTRAINT,
+    Relations.CANDIDATE_ASSERTION_ASSIGNED_TO_SLOT,
+    Relations.CANDIDATE_ASSERTION_REJECTED_BECAUSE,
+    Relations.SOURCE_CLASSIFIED_AS,
+    Relations.EVIDENCE_UPDATES_CANDIDATE_SLATE,
+    Relations.EVIDENCE_UPDATES_CONSTRAINT_STATUS,
 )

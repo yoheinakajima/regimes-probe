@@ -177,6 +177,25 @@ _TASK_FRAME_PARSER_V2 = (
     "Return ONLY the JSON object, no prose."
 )
 
+_VARIABLES_BLOCK = (
+    "\nVARIABLES vs CONSTANTS (critical — avoids both leakage and over-rejection):\n"
+    "- Target and intermediate slots are UNKNOWN VARIABLES to be found. Their "
+    "slot_name is a DESCRIPTOR of the unknown (e.g. '90s TV series', 'founder full "
+    "name', 'person who wrote the introduction', 'hotel originally opened in 1955'). "
+    "Reuse the question's wording freely — a descriptor is NOT an answer and is NOT "
+    "leakage.\n"
+    "- Do NOT put a concrete value in a target slot. Leave bound_value empty for "
+    "targets; candidate values are produced LATER from evidence, never during "
+    "parsing.\n"
+    "- Constants GIVEN in the question (a specific named org/place/source/date such "
+    "as 'WHO', 'Tennessee', 'New Mexico', 'Gracie Award') go in known_context_terms "
+    "or as constraints — NEVER as a target answer slot, unless the question asks for "
+    "that exact constant type.\n"
+    "- Optionally set per slot: slot_status (unbound_variable | known_constant), "
+    "descriptor_text, bound_value (leave empty), evidence_required_to_bind.\n")
+_TASK_FRAME_PARSER_V3 = _TASK_FRAME_PARSER_V2.replace(
+    "OUTPUT: one JSON object", _VARIABLES_BLOCK + "OUTPUT: one JSON object")
+
 PROMPTS: dict[str, Prompt] = {
     "answerer": Prompt(
         name="answerer", version="v1", content=_ANSWERER_V1,
@@ -199,8 +218,8 @@ PROMPTS: dict[str, Prompt] = {
         allowed_to_vary=True,
     ),
     "task_frame_parser": Prompt(
-        name="task_frame_parser", version="v2", content=_TASK_FRAME_PARSER_V2,
-        intended_use="open-world operational task-frame parsing (Level 4b; never answers)",
+        name="task_frame_parser", version="v3", content=_TASK_FRAME_PARSER_V3,
+        intended_use="open-world operational task-frame parsing (Level 4b/4e; never answers)",
         allowed_to_vary=True,
     ),
 }

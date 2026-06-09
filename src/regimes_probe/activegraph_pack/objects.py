@@ -49,6 +49,12 @@ class Objects:
     CONSTRAINT_FACET = "constraint_facet"
     OPERATIONAL_AFFORDANCE = "operational_affordance"
     ANSWER_SUPPORT_PATH = "answer_support_path"
+    # Variable / constant / binding distinction (Level 4e)
+    KNOWN_CONTEXT_TERM = "known_context_term"
+    SLOT_VARIABLE = "slot_variable"
+    CANDIDATE_BINDING = "candidate_binding"
+    SLOT_DESCRIPTOR = "slot_descriptor"
+    BINDING_STATUS = "binding_status"
     POLICY_UPDATE = "policy_update"
     PROMOTION_DECISION = "promotion_decision"
     REPORT = "report"
@@ -114,6 +120,11 @@ PROJECTION_OBJECTS: tuple[str, ...] = (
     Objects.CONSTRAINT_FACET,
     Objects.OPERATIONAL_AFFORDANCE,
     Objects.ANSWER_SUPPORT_PATH,
+    Objects.KNOWN_CONTEXT_TERM,
+    Objects.SLOT_VARIABLE,
+    Objects.CANDIDATE_BINDING,
+    Objects.SLOT_DESCRIPTOR,
+    Objects.BINDING_STATUS,
 )
 
 #: Map an event-log object type onto its standardized projection type.

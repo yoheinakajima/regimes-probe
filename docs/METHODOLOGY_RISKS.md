@@ -307,3 +307,22 @@ set — and the risk surface. Keep the experiment honest:
   Guard: `id_mapping` is recorded and `raw_slot_id` is kept on every slot so a
   reviewer can re-derive the mapping from the trace; references that do not survive
   remap (genuinely unknown ids) still fall back rather than being quietly dropped.
+- **A validator can be wrong in BOTH directions; don't only guard leakage.** The
+  known-context-as-target check originally rejected any target slot whose name
+  overlapped the question — which *looks* like a prudent anti-leakage guard but
+  silently discarded good frames (a target named "90s TV series" is a descriptor of
+  the unknown, not a leaked answer). Over-rejection is as harmful as under-rejection:
+  it hides real parser quality behind deterministic fallbacks and makes the LLM
+  parser look useless. The fix is a **variable/constant/binding** distinction
+  (`classify_target_slot`): reject only a *premature binding* (`bound_value` set, or a
+  Title-Case constant whose role mismatches the question and that has no binding
+  constraints), accept *descriptor variables* (type/relational language, or role
+  matches the interrogative head, or it has constraints), and *warn* (never fall back)
+  on the ambiguous middle. Two failure modes to keep watching: (a) the parser
+  smuggling an answer into a target slot as a `bound_value` or a specific named
+  entity — that must still fail (it is real leakage); (b) the validator drifting back
+  toward string matching — track the `known_context_promoted_to_target` reason
+  distribution and the `ambiguous_target_descriptor` warning rate, and confirm the
+  reasons are `premature_bound_value`/`concrete_known_constant`, not descriptor
+  overlap. The answer-support gate is unchanged and still evidence-based, so a
+  descriptor that passes validation cannot by itself produce a supported answer.

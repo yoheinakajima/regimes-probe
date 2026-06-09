@@ -274,3 +274,20 @@ accuracy with the controller on vs. off; the win is "same accuracy, less wasted
 work" on the easy tail, not a headline accuracy change. The default benchmark run
 keeps explicit flags so conditions stay comparable; the controller is for the
 generic-agent setting and is recorded per attempt (`selected_epistemic_mode`).
+
+### Level 4e: descriptor variables are not leakage
+
+The known-context-as-target validator now tests **variable vs. constant**, not string
+overlap (`QUERY_POLICY.md` Level 4e). When auditing parser quality, do NOT treat a
+target slot name that reuses question wording ("90s TV series", "founder full name")
+as leakage — that is a *descriptor* of the unknown and is expected. The real failures
+to watch are the opposite two: a parser that **prematurely binds** a target
+(`bound_value` populated, or a Title-Case constant like "World Health Organisation"
+promoted to the answer) — caught by validation and recorded as
+`known_context_promoted_to_target:<reason>` — and a validator that **over-rejects**
+useful descriptors (now surfaced as `validation_warnings`, not fallbacks). Read the
+per-slot `slot_status` and the preview's `known_context_target_check` to tell these
+apart. Because raw descriptors, inferred `slot_status`, and the validation decision
+are all recorded in the trace/graph, "does the parser create good variable
+descriptors vs. prematurely bind answers?" becomes a measurable, learnable signal —
+not a hand judgment.

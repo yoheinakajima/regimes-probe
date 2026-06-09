@@ -552,3 +552,43 @@ default off so the benchmark uses explicit flags), `--force-task-frame`,
 `--disable-direct-answer`. The decision (`selected_epistemic_mode`,
 `escalation_reason`, `skipped_heavy_parser_reason`, `estimated_effort`, `signals`) is
 recorded on every attempt for audit.
+
+### Level 4e: variables vs. constants vs. bindings (don't reject descriptors)
+
+**Why.** Once the open-world parser worked, a *good* frame still fell back: the
+TV-series question parsed to a target slot named "90s TV series"
+(role `title_or_work`, with the actor clues as constraints) — and the validator
+rejected it with `known_context_promoted_to_target` because the slot name overlapped
+the question text. That is the wrong test. "90s TV series" is not a leaked answer; it
+is a **descriptor of the unknown target variable**. Target slot names *normally* come
+from the question. Rejecting overlap conflates a **variable descriptor** with a
+**bound value**.
+
+**The distinction (generic, no phrase allowlist).** Slots carry an explicit binding
+lifecycle (`agent/task_frame.py::SLOT_STATUSES`): `unbound_variable` →
+`candidate_binding` → `derived_value`, plus `known_constant` for values *given* in
+the question. A slot also carries `descriptor_text`, `bound_value`,
+`known_context_refs`, `evidence_required_to_bind`, and `parser_confidence`. At parse
+time every target/intermediate slot is an `unbound_variable` (candidates only appear
+later, from evidence). `infer_slot_status` fills the status when the parser omits it.
+
+**The rewritten check** (`classify_target_slot`) replaces string-overlap with a
+variable/constant test. A target slot **fails** only when it is a *premature binding*
+(`bound_value` populated, or `slot_status` already `known_constant`/`candidate_binding`)
+or a *concrete known constant*: a Title-Case proper-noun entity (`_is_named_entity`:
+"World Health Organisation", "Tennessee", "Gracie Award", "New Mexico") whose role
+does **not** match the interrogative head **and** that has **no binding constraints**
+(nothing to find — it is already given). A slot **passes** (`unbound_variable_descriptor`)
+when its role matches the question's head, OR it has binding constraints, OR it reads
+as a descriptor (a generic type/role head or relational language — `_is_descriptor`,
+which is False for a bare proper-noun entity). Genuinely ambiguous cases produce a
+`validation_warning`, never a fallback. Outcomes: "90s TV series"/"founder full name"/
+"person who wrote the introduction"/"global report released by WHO" → **pass**;
+"World Health Organisation" (asked for a person) / "Tennessee" (asked for a series)
+→ **fail**. Reusing question wording in a target slot name is **not leakage and not
+overfitting** — it is how you describe an unknown.
+
+**Answer support is unchanged** (Level 4b): a descriptor alone never implies support.
+`answer_supported` still requires an evidence-backed candidate binding for the target
+slot, non-contaminated evidence, required blocking constraints satisfied, and the full
+answer → hypothesis → slot → evidence → constraint path.

@@ -34,7 +34,8 @@ from regimes_probe.agent.affordances import (
     AFFORDANCES, COMMON_FACETS, derive_affordances, normalize_facets, novel_facets)
 from regimes_probe.agent.clue_resolution import ROLES, _norm
 from regimes_probe.agent.task_frame import (
-    Constraint, Slot, TaskFrame, _interrogative_target_role, parse_task_frame)
+    SLOT_STATUSES, Constraint, Slot, TaskFrame, _ROLE_TRIGGERS,
+    _interrogative_target_role, parse_task_frame)
 
 #: Slot roles map to evidence types — a small standardized set. Unknown roles are
 #: coerced to "unknown" with a WARNING (never a hard rejection).
@@ -188,6 +189,117 @@ class ParseMeta:
         }
 
 
+# ------------------------------------------------- variable / constant / binding
+# A target slot is an UNBOUND VARIABLE described by question language — not a leaked
+# answer. The validator must reject only a *concrete known constant* or a *premature
+# binding*, never a descriptor that happens to reuse question text (e.g. "90s TV
+# series", "founder full name", "person who wrote the introduction").
+
+#: words that signal a relational / answer-type DESCRIPTOR (vs. a concrete entity).
+_RELATIONAL_WORDS = frozenset({
+    "who", "whom", "whose", "which", "that", "where", "when", "matching", "with",
+    "from", "by", "near", "born", "founded", "released", "wrote", "authored",
+    "starred", "featuring", "featured", "published", "located", "containing",
+    "about", "involving", "described"})
+_ANSWER_TYPE_WORDS = frozenset({
+    "name", "surname", "full", "title", "year", "date", "number", "value",
+    "identity", "profile", "amount", "count", "winner", "author"})
+#: small words that don't break a Title-Case proper-noun phrase.
+_CAP_STOPWORDS = frozenset({"of", "the", "and", "for", "in", "on", "at", "to", "a",
+                            "an", "de", "la", "el", "du", "von", "van", "by"})
+_NAME_TOK = re.compile(r"[A-Za-z0-9&'.]+")
+
+
+def _is_named_entity(name: str) -> bool:
+    """The slot name is a CONCRETE proper-noun entity (Title-Case phrase or acronym),
+    NOT a type descriptor. A single lowercase generic word makes it a descriptor:
+    'World Health Organisation' / 'Tennessee' / 'Gracie Award' -> True;
+    '90s TV series' / 'Mexican restaurant in NM' / 'founder full name' -> False."""
+    toks = [t for t in _NAME_TOK.findall(name or "") if any(c.isalpha() for c in t)]
+    significant = [t for t in toks if t.lower() not in _CAP_STOPWORDS]
+    if not significant:
+        return False
+    if len(significant) == 1 and significant[0].isupper() and len(significant[0]) <= 6:
+        return True                                  # acronym (WHO, NASA, FBI)
+    return all(t[0].isupper() for t in significant)
+
+
+def _has_type_or_relational(name: str, role: str) -> bool:
+    toks = _WORD.findall((name or "").lower())
+    if any(t in _ROLE_TRIGGERS for t in toks):       # a generic type head (series, report…)
+        return True
+    return any((t in _RELATIONAL_WORDS or t in _ANSWER_TYPE_WORDS) for t in toks)
+
+
+def _is_descriptor(name: str, role: str) -> bool:
+    """A variable DESCRIPTOR: type/relational language, and NOT a concrete entity."""
+    return (not _is_named_entity(name)) and _has_type_or_relational(name, role)
+
+
+def _role_matches_head(slot_role: str, question: str) -> bool:
+    head = _interrogative_target_role(question)
+    return head is None or slot_role == head
+
+
+def _slot_has_binding_constraints(slot_id: Any, payload: dict) -> bool:
+    sid = str(slot_id)
+    for c in payload.get("constraints") or []:
+        if isinstance(c, dict) and sid in [str(x) for x in _as_list(c.get("applies_to"))]:
+            return True
+    return False
+
+
+def _equals_known_context(name: str, kct_norms: set[str]) -> bool:
+    n = _norm(name or "")
+    return bool(n) and n in kct_norms
+
+
+def infer_slot_status(slot: dict, payload: dict, kct_norms: set[str]) -> str:
+    """Infer the binding lifecycle of a slot when the parser did not state it.
+
+    A target/intermediate slot is an ``unbound_variable`` unless it is clearly a
+    constant given in the question (a concrete entity equal to a known-context term
+    with no binding constraints) or already carries a concrete ``bound_value``."""
+    raw = str(slot.get("slot_status", "") or "").lower()
+    if raw in SLOT_STATUSES:
+        return raw
+    if str(slot.get("bound_value", "") or "").strip():
+        return "candidate_binding"
+    name = str(slot.get("slot_name", ""))
+    if (_equals_known_context(name, kct_norms) and _is_named_entity(name)
+            and not _slot_has_binding_constraints(slot.get("slot_id"), payload)):
+        return "known_constant"
+    return "unbound_variable"
+
+
+def classify_target_slot(slot: dict, payload: dict, question: str,
+                         kct_norms: set[str]) -> tuple[str, str]:
+    """Classify a TARGET slot as (decision, reason).
+
+    decision ∈ {"pass","warn","fail"}. A descriptor variable passes even if it reuses
+    question text; only a premature binding or a concrete known constant fails; a
+    genuinely ambiguous case warns (never a fallback)."""
+    name = str(slot.get("slot_name", ""))
+    role = str(slot.get("slot_role", "unknown"))
+    if str(slot.get("bound_value", "") or "").strip():
+        return "fail", "premature_bound_value"
+    status = infer_slot_status(slot, payload, kct_norms)
+    if status == "known_constant":
+        return "fail", "concrete_known_constant"
+    if status == "candidate_binding":
+        return "fail", "premature_candidate_binding"
+    # --- unbound variable: prefer to ACCEPT descriptors ---
+    if (_role_matches_head(role, question)
+            or _slot_has_binding_constraints(slot.get("slot_id"), payload)
+            or _is_descriptor(name, role)):
+        return "pass", "unbound_variable_descriptor"
+    if _equals_known_context(name, kct_norms):
+        return "fail", "exact_context_promoted_to_target"
+    if _is_named_entity(name):
+        return "fail", "concrete_known_constant"
+    return "warn", "ambiguous_descriptor"
+
+
 # --------------------------------------------------------------------------- json
 def _extract_json(raw: str) -> Optional[dict]:
     """Tolerantly pull the first top-level JSON object out of a model response."""
@@ -327,12 +439,17 @@ def validate_payload(payload: Any, question: str) -> list[str]:
         if a not in slot_ids or b not in slot_ids:
             errors.append(f"dependency_edge_refs_unknown_slot:{a}->{b}")
 
-    kct = payload.get("known_context_terms", []) or []        # known ctx not a target
-    target_names = {_norm(str(s.get("slot_name", ""))) for s in targets if isinstance(s, dict)}
-    for term in kct:
-        tnorm = _norm(str(term))
-        if tnorm and tnorm in target_names:
-            errors.append(f"known_context_promoted_to_target:{term}")
+    # Variable/constant validation (replaces string-overlap): a target slot fails
+    # only if it is a PREMATURE BINDING or a CONCRETE KNOWN CONSTANT, never because a
+    # descriptor reuses question text. Ambiguous cases warn (see parser_warnings).
+    kct_norms = {_norm(str(t)) for t in (payload.get("known_context_terms") or [])
+                 if _norm(str(t))}
+    for s in targets:
+        if not isinstance(s, dict):
+            continue
+        decision, reason = classify_target_slot(s, payload, question, kct_norms)
+        if decision == "fail":
+            errors.append(f"known_context_promoted_to_target:{reason}:{s.get('slot_id')}")
 
     return errors
 
@@ -352,6 +469,14 @@ def parser_warnings(payload: Any, question: str) -> list[str]:
     if head_role is not None and targets and not any(
             isinstance(s, dict) and s.get("slot_role") == head_role for s in targets):
         warns.append(f"target_role_mismatch:expected_{head_role}")
+    # ambiguous (neither clearly a descriptor nor clearly a constant) -> warn, not fail.
+    kct_norms = {_norm(str(t)) for t in (payload.get("known_context_terms") or [])
+                 if _norm(str(t))}
+    for s in targets:
+        if isinstance(s, dict):
+            decision, reason = classify_target_slot(s, payload, question, kct_norms)
+            if decision == "warn":
+                warns.append(f"ambiguous_target_descriptor:{reason}:{s.get('slot_id')}")
     for c in (payload.get("constraints") or []):
         if not isinstance(c, dict):
             continue
@@ -402,6 +527,8 @@ def _frame_from_payload(item_id: str, payload: dict, warnings: Optional[list[str
     warnings = warnings or []
     ordered_raw, raw_ids = _raw_slot_ids(payload)
     id_map: dict[str, str] = {rid: f"s{i}" for i, rid in enumerate(ordered_raw)}
+    kct_terms = [str(t) for t in _as_list(payload.get("known_context_terms"))]
+    kct_norms = {_norm(t) for t in kct_terms if _norm(t)}
 
     def _m(rid: Any) -> Optional[str]:           # raw id -> internal id (None if unknown)
         return id_map.get(str(rid))
@@ -414,15 +541,28 @@ def _frame_from_payload(item_id: str, payload: dict, warnings: Optional[list[str
         if role not in VALID_ROLES:
             role = "unknown"
         raw_id = str(d["slot_id"])
+        name = str(d.get("slot_name", "")).strip()
+        # which constants does this descriptor reference? (e.g. "report by WHO" -> WHO)
+        nl = name.lower()
+        refs = [t for t in kct_terms if t and _norm(t) and _norm(t) in _norm(name)
+                and _norm(t) != _norm(name)] or [t for t in kct_terms if t.lower() in nl]
+        ev = str(d.get("evidence_required_to_bind", "")
+                 or d.get("expected_evidence_type", role) or "")
         return Slot(
             slot_id=id_map.get(raw_id, raw_id),
-            slot_name=str(d.get("slot_name", "")).strip(),
+            slot_name=name,
             slot_role=role,
             is_target_answer_slot=bool(d.get("is_target_answer_slot", target)),
             is_intermediate_slot=bool(d.get("is_intermediate_slot", not target)),
             depends_on=_mlist(d.get("depends_on")),
             expected_evidence_type=str(d.get("expected_evidence_type", role) or role),
-            raw_slot_id=raw_id)
+            raw_slot_id=raw_id,
+            slot_status=infer_slot_status(d, payload, kct_norms),
+            descriptor_text=str(d.get("descriptor_text", "") or name),
+            bound_value=str(d.get("bound_value", "") or "").strip(),
+            known_context_refs=list(dict.fromkeys(refs))[:6],
+            evidence_required_to_bind=ev,
+            parser_confidence=float(d.get("parser_confidence", 0.0) or 0.0))
 
     frame = TaskFrame(item_id=item_id)
     frame.id_mapping = dict(id_map)

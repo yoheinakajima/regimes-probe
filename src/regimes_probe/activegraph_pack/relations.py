@@ -48,6 +48,14 @@ class Relations:
     ANSWER_SUPPORTED_BY_PATH = "answer_supported_by_path"
     UNRESOLVED_CONSTRAINT_BLOCKS_ANSWER = "unresolved_constraint_blocks_answer"
     EPISTEMIC_MODE_FOR_ATTEMPT = "epistemic_mode_for_attempt"
+    # Variable / constant / binding distinction (Level 4e)
+    SLOT_HAS_DESCRIPTOR = "slot_has_descriptor"
+    SLOT_BOUND_BY_CANDIDATE = "slot_bound_by_candidate"
+    SLOT_DEPENDS_ON_CONTEXT = "slot_depends_on_context"
+    CONTEXT_CONSTRAINS_SLOT = "context_constrains_slot"
+    CANDIDATE_SUPPORTED_BY_EVIDENCE = "candidate_supported_by_evidence"
+    TARGET_SLOT_UNBOUND_UNTIL_EVIDENCE = "target_slot_unbound_until_evidence"
+    KNOWN_CONTEXT_NOT_ANSWER = "known_context_not_answer"
     UPDATE_FROM_REWARD = "update_from_reward"
     REGIME_FOR_FAILURE = "regime_for_failure"
     PROMOTION_FOR_UPDATE = "promotion_for_update"
@@ -105,4 +113,11 @@ PROJECTION_RELATIONS: tuple[str, ...] = (
     Relations.ANSWER_SUPPORTED_BY_PATH,
     Relations.UNRESOLVED_CONSTRAINT_BLOCKS_ANSWER,
     Relations.EPISTEMIC_MODE_FOR_ATTEMPT,
+    Relations.SLOT_HAS_DESCRIPTOR,
+    Relations.SLOT_BOUND_BY_CANDIDATE,
+    Relations.SLOT_DEPENDS_ON_CONTEXT,
+    Relations.CONTEXT_CONSTRAINS_SLOT,
+    Relations.CANDIDATE_SUPPORTED_BY_EVIDENCE,
+    Relations.TARGET_SLOT_UNBOUND_UNTIL_EVIDENCE,
+    Relations.KNOWN_CONTEXT_NOT_ANSWER,
 )

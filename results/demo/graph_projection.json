@@ -31,7 +31,12 @@
     "semantic_constraint",
     "constraint_facet",
     "operational_affordance",
-    "answer_support_path"
+    "answer_support_path",
+    "known_context_term",
+    "slot_variable",
+    "candidate_binding",
+    "slot_descriptor",
+    "binding_status"
   ],
   "relation_types": [
     "attempt_for_item",
@@ -64,7 +69,14 @@
     "hypothesis_assigns_slot",
     "answer_supported_by_path",
     "unresolved_constraint_blocks_answer",
-    "epistemic_mode_for_attempt"
+    "epistemic_mode_for_attempt",
+    "slot_has_descriptor",
+    "slot_bound_by_candidate",
+    "slot_depends_on_context",
+    "context_constrains_slot",
+    "candidate_supported_by_evidence",
+    "target_slot_unbound_until_evidence",
+    "known_context_not_answer"
   ],
   "detail_limit": 60,
   "event_log": {

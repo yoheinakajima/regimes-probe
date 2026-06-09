@@ -201,13 +201,39 @@ def build_graph_projection(
                         "skipped_heavy_parser_reason": em.get("skipped_heavy_parser_reason"),
                         "auto": em.get("auto"), "applied": em.get("applied")})
                     g.rel(em_node, a_node, Relations.EPISTEMIC_MODE_FOR_ATTEMPT)
+                # known_context_term constants (NOT answers) — projected once per frame.
+                kct_nodes: dict[str, str] = {}
+                for term in tf.get("known_context_terms", [])[:12]:
+                    kt = g.obj(f"known_context_term#{aid}#{term}", Objects.KNOWN_CONTEXT_TERM,
+                               {"term": str(term)[:80]})
+                    g.rel(kt, tf_node, Relations.KNOWN_CONTEXT_NOT_ANSWER)
+                    kct_nodes[str(term)] = kt
                 for s in (tf.get("target_answer_slots", []) + tf.get("latent_slots", [])):
-                    s_node = g.obj(f"latent_slot#{aid}#{s['slot_id']}", Objects.LATENT_SLOT, {
+                    status = s.get("slot_status", "unbound_variable")
+                    # a slot is a VARIABLE until evidence binds it; record its status.
+                    s_node = g.obj(f"latent_slot#{aid}#{s['slot_id']}", Objects.SLOT_VARIABLE, {
                         "slot_name": s.get("slot_name"), "slot_role": s.get("slot_role"),
                         "raw_slot_id": s.get("raw_slot_id", ""),
+                        "slot_status": status, "bound_value": s.get("bound_value", ""),
                         "is_target_answer_slot": s.get("is_target_answer_slot"),
                         "is_intermediate_slot": s.get("is_intermediate_slot")})
                     g.rel(s_node, tf_node, Relations.SLOT_IN_FRAME)
+                    # descriptor object: the raw text describing the unknown.
+                    desc = s.get("descriptor_text") or s.get("slot_name")
+                    if desc:
+                        d_node = g.obj(f"slot_descriptor#{aid}#{s['slot_id']}",
+                                       Objects.SLOT_DESCRIPTOR, {"descriptor_text": str(desc)[:120]})
+                        g.rel(s_node, d_node, Relations.SLOT_HAS_DESCRIPTOR)
+                    # binding status object (unbound until evidence proposes a candidate).
+                    bs_node = g.obj(f"binding_status#{aid}#{s['slot_id']}", Objects.BINDING_STATUS,
+                                    {"slot_status": status})
+                    if status == "unbound_variable" and s.get("is_target_answer_slot"):
+                        g.rel(s_node, bs_node, Relations.TARGET_SLOT_UNBOUND_UNTIL_EVIDENCE)
+                    # context terms this descriptor references.
+                    for ref in s.get("known_context_refs", [])[:6]:
+                        kt = kct_nodes.get(str(ref))
+                        if kt:
+                            g.rel(s_node, kt, Relations.SLOT_DEPENDS_ON_CONTEXT)
                 for con in tf.get("constraints", []):
                     # Open-world SEMANTIC constraint: keep the raw label/facets AND the
                     # derived affordances (the planner branches on the latter).
@@ -278,6 +304,13 @@ def build_graph_projection(
                                         {"slot_id": sid, "candidate_text": str(ctext)[:80]})
                         g.rel(h_node, sa_node, Relations.HYPOTHESIS_ASSIGNS_CANDIDATE)
                         g.rel(h_node, f"latent_slot#{aid}#{sid}", Relations.HYPOTHESIS_ASSIGNS_SLOT)
+                        # a candidate_binding is the evidence-proposed value for a slot
+                        # VARIABLE (this is when a slot stops being unbound).
+                        cb_node = g.obj(f"candidate_binding#{aid}#{h['hypothesis_id']}#{sid}",
+                                        Objects.CANDIDATE_BINDING,
+                                        {"slot_id": sid, "candidate_text": str(ctext)[:80],
+                                         "from_evidence": True})
+                        g.rel(f"latent_slot#{aid}#{sid}", cb_node, Relations.SLOT_BOUND_BY_CANDIDATE)
                     if h.get("support_score", 0) > 0:
                         g.rel(h_node, tf_node, Relations.HYPOTHESIS_SUPPORTED_BY_EVIDENCE)
                     cov = d.get("frame_coverage", {})

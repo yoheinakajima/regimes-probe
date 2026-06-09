@@ -101,16 +101,29 @@ def _interrogative_target_role(question: str) -> Optional[str]:
     return None
 
 
+#: Slot binding lifecycle. A target slot is an *unbound variable* at parse time; it
+#: only becomes a candidate_binding once evidence proposes a concrete value. A
+#: known_constant is a value GIVEN in the question (never a target answer).
+SLOT_STATUSES = ("unbound_variable", "known_constant", "candidate_binding", "derived_value")
+
+
 @dataclass
 class Slot:
     slot_id: str                         # internal id (after remap)
-    slot_name: str
+    slot_name: str                       # raw descriptor the parser emitted
     slot_role: str                       # one of ROLES + "number"
     is_target_answer_slot: bool = False
     is_intermediate_slot: bool = False
     depends_on: list[str] = field(default_factory=list)   # internal ids
     expected_evidence_type: str = ""
     raw_slot_id: str = ""                 # the id the parser emitted (pre-remap)
+    # --- variable / constant / binding semantics ---
+    slot_status: str = "unbound_variable"   # one of SLOT_STATUSES
+    descriptor_text: str = ""            # how the slot describes the unknown (default: slot_name)
+    bound_value: str = ""               # a CONCRETE value (only after evidence binds it)
+    known_context_refs: list[str] = field(default_factory=list)  # constants it references
+    evidence_required_to_bind: str = ""  # what evidence would bind this variable
+    parser_confidence: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
         return {"slot_id": self.slot_id, "slot_name": self.slot_name,
@@ -119,7 +132,13 @@ class Slot:
                 "is_intermediate_slot": self.is_intermediate_slot,
                 "depends_on": list(self.depends_on),
                 "expected_evidence_type": self.expected_evidence_type,
-                "raw_slot_id": self.raw_slot_id}
+                "raw_slot_id": self.raw_slot_id,
+                "slot_status": self.slot_status,
+                "descriptor_text": self.descriptor_text or self.slot_name,
+                "bound_value": self.bound_value,
+                "known_context_refs": list(self.known_context_refs),
+                "evidence_required_to_bind": self.evidence_required_to_bind,
+                "parser_confidence": round(self.parser_confidence, 3)}
 
 
 @dataclass

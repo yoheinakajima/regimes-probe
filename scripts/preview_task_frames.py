@@ -30,7 +30,8 @@ from regimes_probe.agent.action_planner import ActionPlanner  # noqa: E402
 from regimes_probe.agent.epistemic_mode import decide_epistemic_mode  # noqa: E402
 from regimes_probe.agent.hypothesis_table import HypothesisTable  # noqa: E402
 from regimes_probe.agent.llm_task_frame import (  # noqa: E402
-    _parse_edge, _raw_slot_ids, _derive_raw_edges)
+    _parse_edge, _raw_slot_ids, _derive_raw_edges, classify_target_slot)
+from regimes_probe.agent.clue_resolution import _norm  # noqa: E402
 from regimes_probe.agent.llm_task_frame import (  # noqa: E402
     LLMTaskFrameParser, ParserCache, build_task_frame)
 
@@ -219,16 +220,34 @@ def _preview(question: str, *, use_llm: bool, parser, budget: int, show_raw: boo
             else:
                 stage = f"{meta.fallback_reason} (not an id-validation fallback)"
             print(f"    fallback_stage: {stage}")
+            # ---- VARIABLE / CONSTANT / BINDING DIAGNOSTICS ----
+            kct_norms = {_norm(str(t)) for t in (raw.get("known_context_terms") or [])
+                         if _norm(str(t))}
+            print(f"    known_context_terms: {(raw.get('known_context_terms') or [])[:8]}")
+            worst = "passed"
+            for s in (raw.get("target_answer_slots") or []):
+                decision, reason = classify_target_slot(s, raw, question, kct_norms)
+                allowed = decision != "fail"
+                if decision == "fail":
+                    worst = "failed"
+                elif decision == "warn" and worst != "failed":
+                    worst = "warning"
+                print(f"      target slot {s.get('slot_id')}: name={s.get('slot_name')!r} "
+                      f"role={s.get('slot_role')} status={s.get('slot_status', 'inferred')} "
+                      f"bound_value={s.get('bound_value') or '(none)'}")
+                print(f"        target_overlap_allowed: {str(allowed).lower()}  reason: {reason}")
+            print(f"    known_context_target_check: {worst}")
     if show_raw:
         print("  RAW PARSER OUTPUT (bounded):")
         for line in _bounded_raw(parser, meta).splitlines():
             print("    " + line)
 
     # ---- RESULTING FRAME (deterministic or accepted-LLM) ----
-    print("  target slots:      " + ", ".join(f"{s.slot_name}({s.slot_role})"
-                                               for s in frame.target_answer_slots))
-    print("  intermediate slots:" + ", ".join(f"{s.slot_name}({s.slot_role})"
-                                               for s in frame.latent_slots))
+    def _slot_str(s):
+        refs = f" refs={s.known_context_refs}" if s.known_context_refs else ""
+        return f"{s.slot_name}({s.slot_role}/{s.slot_status}){refs}"
+    print("  target slots:      " + ", ".join(_slot_str(s) for s in frame.target_answer_slots))
+    print("  intermediate slots:" + ", ".join(_slot_str(s) for s in frame.latent_slots))
     blocking = []
     for c in frame.constraints:
         blk = c.blocks_answer_if_unresolved or "can_block_answer" in c.affordances

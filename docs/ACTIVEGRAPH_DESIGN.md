@@ -167,6 +167,22 @@ derived affordances, the actions taken, and the outcome** together, the ontology
 which facets needed which tools, and which epistemic modes avoided wasted work,
 without freezing a constraint enum up front.
 
+**Variables vs. constants vs. bindings in the graph (Level 4e).** Slots project as
+`slot_variable` nodes carrying `slot_status` (unbound_variable/known_constant/
+candidate_binding/derived_value), `raw_slot_id`, and `bound_value`; each gets a
+`slot_has_descriptor` edge to a `slot_descriptor` node (the raw text describing the
+unknown) and a `binding_status` node — a target variable is linked
+`target_slot_unbound_until_evidence` until a candidate binds it. Constants GIVEN in
+the question are `known_context_term` nodes tied `known_context_not_answer` to the
+frame, and a descriptor that references one gets `slot_depends_on_context`. When a
+hypothesis proposes a value, it projects a `candidate_binding` node
+(`slot_bound_by_candidate`) — the moment a slot stops being unbound. This records, in
+one auditable place, the **raw descriptor, the inferred slot status, the validation
+decision, and the later evidence binding**, so future learning can distinguish
+parsers that write good variable descriptors from parsers that prematurely bind
+answers, and planners that bind slots correctly from evidence from validators that
+over-reject useful frames.
+
 **Bounding / safety.** Every attempt gets compact `question_attempt`/
 `answer_attempt`/`grade_result`/`reward_assignment` (+ `failure_regime` when it
 failed) nodes; heavy sub-nodes (`query_plan`/`tool_call`/`tool_response`/

@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Optional
 
 from regimes_probe.agent.clue_resolution import (
-    _entities_in_field, _is_generic_entity, _norm, classify_entity_role)
+    ROLES, _entities_in_field, _is_generic_entity, _norm, classify_entity_role)
 from regimes_probe.agent.hypothesis_table import EvidenceRecord, _context_role, _host
 
 CANDIDATE_STATUSES = ("active", "rejected", "confirmed", "merged", "stale")
@@ -38,6 +38,47 @@ HEAVY_MODES = ("decomposed_search", "iterative_research", "task_frame_required")
 _REJECT_NO_PROGRESS = 2
 _CONFIRM_SUPPORT = 1                       # supported required constraints to confirm
 _YEAR = re.compile(r"\b(1[5-9]\d{2}|20\d{2})\b")
+
+#: Candidate *texts* that are retrieval noise, not real entities (used to (a) not count
+#: them as progress and (b) trigger LLM repair when a deterministic query leans on them).
+_NOISE_DEFINITION = frozenset({
+    "definition", "meaning", "dictionary", "thesaurus", "merriam", "webster", "wikipedia",
+    "wiktionary", "synonym", "synonyms", "antonym", "encyclopedia", "encyclopaedia"})
+_NOISE_PLATFORM = frozenset({
+    "linkedin", "facebook", "twitter", "instagram", "youtube", "tiktok", "pinterest",
+    "reddit", "quora", "tumblr", "medium", "substack", "github", "tripadvisor", "yelp"})
+_NOISE_UI = frozenset({
+    "login", "log", "signin", "sign", "signup", "register", "menu", "home", "search",
+    "username", "generator", "table", "tables", "page", "click", "next", "previous",
+    "settings", "profile", "account", "navigation", "cookie", "cookies", "subscribe"})
+
+
+def _noise_kind(text: str) -> str:
+    """Classify a candidate's *text* as a retrieval-noise kind, or '' if it looks real."""
+    words = {w.lower() for w in re.findall(r"[A-Za-z]+", text or "")}
+    if not words:
+        return ""
+    if words & _NOISE_DEFINITION:
+        return "generic_definition_noise"
+    if words & _NOISE_PLATFORM and len(words) <= 2:
+        return "source_platform_noise"
+    if words & _NOISE_UI and len(words) <= 2:
+        return "ui_navigation_noise"
+    return ""
+
+
+def _role_compatible(entity_role: str, slot_role: str) -> bool:
+    """Whether an extracted-entity role may bind a slot. Permissive for free-form slot
+    roles (a person entity binds a `graphic_designer`/`author`/`founder` slot), but never
+    forces an incompatible type (a date never binds a person slot)."""
+    if entity_role == slot_role:
+        return True
+    if entity_role == "unknown" or slot_role == "unknown":
+        return True
+    # free-form / custom slot roles (not in the closed ROLES vocabulary) are person-like.
+    if slot_role not in ROLES and entity_role == "person":
+        return True
+    return False
 
 
 def _prev(s: str, n: int = 120) -> str:
@@ -164,6 +205,11 @@ class StepPlan:
     reason: str = ""
     is_discriminative_constraint: bool = False
     is_generic_query: bool = False
+    # LLM-frontier-proposal provenance (Level 5c) — set when the plan came from a proposal.
+    llm_frontier_proposal_id: Optional[str] = None
+    anchors_used: list[str] = field(default_factory=list)
+    expected_evidence: str = ""
+    proposed_tool_family: str = ""
 
     _PLANNER_KIND = {
         "answer_from_confirmed_hypothesis": "answer_if_supported",
@@ -183,7 +229,7 @@ class StepPlan:
         return self._PLANNER_KIND.get(self.action_type, "search_to_bind_slot")
 
     def action_info(self) -> dict[str, Any]:
-        return {"action_id": self.frontier_action_id,
+        info = {"action_id": self.frontier_action_id,
                 "frontier_action_id": self.frontier_action_id,
                 "kind": self.planner_kind, "frontier_action_type": self.action_type,
                 "target_slot_id": self.target_slot_id, "candidate_id": self.candidate_id,
@@ -192,6 +238,13 @@ class StepPlan:
                 "selected_reason": self.reason, "driven_by": "frontier_controller",
                 "is_discriminative_constraint": self.is_discriminative_constraint,
                 "is_generic_query": self.is_generic_query}
+        if self.llm_frontier_proposal_id:
+            info.update({"llm_frontier_proposal_id": self.llm_frontier_proposal_id,
+                         "anchors_used": list(self.anchors_used),
+                         "expected_evidence": self.expected_evidence[:160],
+                         "proposed_tool_family": self.proposed_tool_family,
+                         "driven_by": "llm_frontier_proposal"})
+        return info
 
 
 @dataclass
@@ -289,10 +342,27 @@ class CandidateFrontier:
 
     # ---------- ingest ----------
     def ingest_evidence(self, observations, *, source_tool: str, stage: int = 1,
-                        read_depth: int = 0, action_id: Optional[str] = None) -> EvidenceRecord:
+                        read_depth: int = 0, action_id: Optional[str] = None,
+                        directed_slot_id: Optional[str] = None,
+                        directed_constraint_ids: Optional[list[str]] = None,
+                        proposal_id: Optional[str] = None) -> EvidenceRecord:
+        """Fold a tool call's observations into the slates.
+
+        When the call was driven by an LLM frontier proposal, ``directed_slot_id`` /
+        ``directed_constraint_ids`` / ``proposal_id`` *direct* the linkage: a
+        role-compatible candidate is bound to the SELECTED slot (even when its role label
+        differs from the strict role index) and the SELECTED constraints are evaluated +
+        linked, so evidence ties to the slot/constraint the proposal actually searched
+        for — not a stale/default one. Returns the record with ``progress_components``."""
         self._ec += 1
         ev = EvidenceRecord(evidence_id=f"e{self._ec}", source_tool=source_tool,
                             read_depth=read_depth)
+        directed_constraint_ids = list(directed_constraint_ids or [])
+        dslot = self.frame.slot(directed_slot_id) if directed_slot_id else None
+        before_best = self.best_hypothesis()
+        before_conf = before_best.confidence_score if before_best else 0.0
+        before_sel_support = self._slot_constraint_support(directed_slot_id, directed_constraint_ids)
+        noise_count = 0
         for o in observations:
             if getattr(o, "failed", False):
                 continue
@@ -312,6 +382,9 @@ class CandidateFrontier:
             for e in _entities_in_field(title) + _entities_in_field(snippet):
                 if _is_generic_entity(e) or len(e) < 3:
                     continue
+                if _noise_kind(e):
+                    noise_count += 1
+                    continue                # retrieval noise is never a candidate
                 norm = _norm(e)
                 is_known = norm in self._known
                 role, from_ctx = _context_role(e, title, snippet)
@@ -320,15 +393,27 @@ class CandidateFrontier:
                 # to a role-compatible slot whose constraint the evidence supports.
                 if is_known:
                     role, from_ctx = classify_entity_role(e), False
-                for slot in self._slots_for_role(role):
+                target_slots = list(self._slots_for_role(role))
+                # DIRECTED: also admit the candidate to the proposal's slot when role
+                # compatible, so the slot the LLM searched for actually gets the binding.
+                if (dslot is not None and dslot.slot_id in self.slates
+                        and dslot not in target_slots
+                        and _role_compatible(role, dslot.slot_role)):
+                    target_slots.append(dslot)
+                for slot in target_slots:
                     cons = self._constraints_for_slot(slot.slot_id)
+                    if slot.slot_id == directed_slot_id:
+                        cons = cons + [c for c in (self._con(cid) for cid in directed_constraint_ids)
+                                       if c is not None and c not in cons]
                     supported = [c for c in cons if _supports(c, text_l)
                                  and any(t in norm for t in c.normalized_terms if len(t) >= 4)]
                     if is_known and not supported:
                         continue            # not bound to this slot -> not a candidate
                     self._assign(slot, e, norm, role, ev, source_tool, action_id,
                                  stage, _host(url), authority, contaminated, from_ctx,
-                                 text_l, cons)
+                                 text_l, cons, directed_slot_id=directed_slot_id,
+                                 directed_constraint_ids=directed_constraint_ids,
+                                 proposal_id=proposal_id)
             for hint in self.frame.answer_shape_hints:
                 if hint.lower() in text_l and hint not in ev.answer_shape_hints_found:
                     ev.answer_shape_hints_found.append(hint)
@@ -337,10 +422,47 @@ class CandidateFrontier:
         self.evidence.append(ev)
         self._advance_hypotheses(ev, action_id)
         self.generate_frontier_actions()
+        # progress components (honest, slot/constraint-aware — req: don't count noise).
+        after_best = self.best_hypothesis()
+        after_conf = after_best.confidence_score if after_best else 0.0
+        after_sel_support = self._slot_constraint_support(directed_slot_id, directed_constraint_ids)
+        slot_compat = sum(
+            1 for cid in ev.newly_introduced_candidates
+            if (c := self.candidates_by_id.get(cid)) is not None
+            and _role_compatible(c.inferred_role,
+                                 self.slates[c.slot_id].slot_role if c.slot_id in self.slates else "unknown"))
+        sel_slot_new = sum(1 for cid in ev.newly_introduced_candidates
+                           if (c := self.candidates_by_id.get(cid)) is not None
+                           and c.slot_id == directed_slot_id)
+        ev.progress_components = {
+            "raw_candidate_count": len(ev.newly_introduced_candidates),
+            "slot_compatible_candidate_count": slot_compat,
+            "selected_slot_candidate_count": sel_slot_new,
+            "selected_constraint_support_count": max(0, after_sel_support - before_sel_support),
+            "hypothesis_score_delta": round(after_conf - before_conf, 3),
+            "target_support_path_delta": round(after_conf - before_conf, 3),
+            "noise_candidate_count": noise_count,
+        }
         return ev
 
+    def _slot_constraint_support(self, slot_id: Optional[str],
+                                 constraint_ids: list[str]) -> int:
+        """Count how many of ``constraint_ids`` are currently supported by some active/
+        confirmed candidate on ``slot_id`` (for selected-constraint progress deltas)."""
+        if not slot_id or slot_id not in self.slates:
+            return 0
+        cset = set(constraint_ids)
+        supported: set[str] = set()
+        for c in self.slates[slot_id].candidates.values():
+            if c.status in ("rejected", "merged"):
+                continue
+            supported.update(set(c.constraints_supported) & cset)
+        return len(supported)
+
     def _assign(self, slot, text, norm, role, ev, source_tool, action_id, stage,
-                domain, authority, contaminated, from_ctx, text_l, cons) -> None:
+                domain, authority, contaminated, from_ctx, text_l, cons,
+                directed_slot_id=None, directed_constraint_ids=None,
+                proposal_id=None) -> None:
         slate = self.slates[slot.slot_id]
         existing = next((c for c in slate.candidates.values()
                          if c.normalized_text_hash == _hash(norm)), None)
@@ -392,7 +514,22 @@ class CandidateFrontier:
         _union(ev.supports_slot_ids, slot.slot_id)
         self._emit("evidence.linked_to_candidate", candidate_id=cand.candidate_id,
                    evidence_id=ev.evidence_id, slot_id=slot.slot_id)
+        # DIRECTED: record that this evidence/candidate ties back to the LLM proposal's
+        # selected slot + constraints (auditable proposal -> evidence link).
+        if proposal_id and slot.slot_id == directed_slot_id:
+            self._emit("evidence_linked_to_llm_proposal", candidate_id=cand.candidate_id,
+                       evidence_id=ev.evidence_id, slot_id=slot.slot_id,
+                       action_id=action_id,
+                       data={"proposal_id": proposal_id,
+                             "constraint_ids": list(directed_constraint_ids or []),
+                             "supported_constraint_ids": list(supported)})
+        was_confirmed = cand.status == "confirmed"
         self._update_status(cand, contaminated)
+        if (proposal_id and slot.slot_id == directed_slot_id
+                and cand.status == "confirmed" and not was_confirmed):
+            self._emit("candidate_promoted_from_llm_frontier_evidence",
+                       candidate_id=cand.candidate_id, slot_id=slot.slot_id,
+                       data={"proposal_id": proposal_id})
 
     def _update_status(self, cand: SlotCandidate, contaminated: bool) -> None:
         old = cand.status
@@ -753,6 +890,32 @@ class CandidateFrontier:
 
     def _con(self, cid: str):
         return next((c for c in self.frame.constraints if c.constraint_id == cid), None)
+
+    def register_proposal_action(self, *, proposal_id: str, action_type: str,
+                                 target_slot_id: Optional[str], candidate_id: Optional[str],
+                                 hypothesis_id: Optional[str], constraint_ids: list[str],
+                                 query: str = "", tool: str = "", tool_family: str = "",
+                                 anchors_used: Optional[list[str]] = None) -> FrontierAction:
+        """Materialize a selected LLM proposal as a first-class FrontierAction so the
+        executed tool call carries the PROPOSAL's slot/constraints (not a stale default).
+        Action id is ``lfp_<proposal_id>`` so the tool call links straight to its proposal.
+        """
+        self._ac += 1
+        a = FrontierAction(
+            action_id=f"lfp_{proposal_id}", action_type=action_type,
+            target_slot_id=target_slot_id, candidate_id=candidate_id,
+            hypothesis_id=hypothesis_id, constraint_ids=list(constraint_ids),
+            selected=True, selected_reason="llm_frontier_proposal",
+            plan={"proposal_id": proposal_id, "query_preview": _prev(query, 120),
+                  "proposed_tool": tool, "proposed_tool_family": tool_family,
+                  "anchors_used": list(anchors_used or [])})
+        self.frontier_actions = [fa for fa in self.frontier_actions
+                                 if fa.action_id != a.action_id] + [a]
+        self._emit("selected_proposal_translated_to_action", action_id=a.action_id,
+                   data={"proposal_id": proposal_id, "action_type": action_type,
+                         "target_slot_id": target_slot_id,
+                         "constraint_ids": list(constraint_ids)})
+        return a
 
     def record_execution(self, action_id: str, *, success: bool, kind: str = "",
                          evidence_progress: float = 0.0) -> None:

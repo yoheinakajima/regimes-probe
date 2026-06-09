@@ -290,3 +290,23 @@ identically** on replay and an offline fork can re-validate/re-score the cached 
 under a different policy **without any model call** — refusing to spend if the proposal
 cache is absent. The proposer's own settings are pinned into `ConditionSpec` so a
 comparison cannot silently differ in how queries were composed.
+
+**Proposal → action → evidence integrity is itself event-sourced.** The first repair run
+revealed the selected proposal's slot/constraints were not being carried into the executed
+action; the fix keeps the whole chain in the graph so a reviewer can prove faithfulness
+from `graph_projection.json` alone. New **events** (added to `LLM_FRONTIER_EVENTS`, still
+outside the frozen `ALL_EVENTS`): `selected_proposal_translated_to_action`,
+`frontier_action_integrity_checked`, `frontier_action_integrity_error`,
+`evidence_linked_to_llm_proposal`, `candidate_promoted_from_llm_frontier_evidence`,
+`llm_frontier_repair_triggered_reason`, `tool_family_normalized`. New **relations**
+(`PROJECTION_RELATIONS`): `evidence_linked_to_llm_proposal`,
+`candidate_promoted_from_llm_frontier`. The `llm_frontier_selection` node now exposes the
+audit fields directly — `proposal_slot_id` vs `executed_slot_id`, `proposal_constraint_ids`
+vs `executed_constraint_ids`, `integrity_passed`, `repair_trigger_reason`,
+`normalized_tool`/`normalized_tool_family`, and `progress_components` — and the executed
+tool call links to its proposal via the `lfp_`-prefixed `frontier_action_id`
+(`tool_call_from_llm_frontier_proposal`). When integrity fails, the proposal is **refused**
+(the deterministic planner drives that step instead), so a faithless translation can never
+reach the evidence layer; and because every field is persisted on the step trace, the whole
+chain **re-projects identically on replay** and an offline fork can re-audit it with zero
+model calls.

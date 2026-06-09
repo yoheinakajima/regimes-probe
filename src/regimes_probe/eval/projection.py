@@ -201,11 +201,37 @@ def _project_llm_frontier(g: "_GraphBuilder", aid: str, tf_node: str, a_node: st
             sel_by_id[str(pid)] = pn
         selp = st.get("selected", {})
         if selp.get("proposal_id"):
-            sn = g.obj(f"llm_frontier_selection#{aid}#{si}", Objects.LLM_FRONTIER_SELECTION,
-                       {"proposal_id": selp.get("proposal_id"), "score": selp.get("score")})
+            integ = st.get("integrity", {}) or {}
+            pc = st.get("progress_components", {}) or {}
+            # The selection node exposes the proposal->action->evidence audit fields
+            # (req 8): proposal vs executed slot/constraints, integrity, normalized tool,
+            # repair trigger reason, and progress components — all replay-reconstructable.
+            sn = g.obj(f"llm_frontier_selection#{aid}#{si}", Objects.LLM_FRONTIER_SELECTION, {
+                "proposal_id": selp.get("proposal_id"), "score": selp.get("score"),
+                "proposal_slot_id": st.get("proposal_slot_id"),
+                "executed_slot_id": st.get("executed_slot_id"),
+                "proposal_constraint_ids": st.get("proposal_constraint_ids", []),
+                "executed_constraint_ids": st.get("executed_constraint_ids", []),
+                "integrity_passed": st.get("integrity_passed"),
+                "repair_trigger_reason": st.get("repair_trigger_reason", ""),
+                "normalized_tool": st.get("normalized_tool", ""),
+                "normalized_tool_family": st.get("normalized_tool_family", ""),
+                "progress_components": pc,
+                "evidence_linked_to_selected_slot": integ.get("evidence_linked_to_selected_slot"),
+                "evidence_linked_to_selected_constraints":
+                    integ.get("evidence_linked_to_selected_constraints")})
             pn = sel_by_id.get(str(selp.get("proposal_id")))
             if pn:
                 g.rel(pn, sn, Relations.PROPOSAL_SELECTED_FOR_ACTION)
+                # evidence actually attached to the selected slot -> auditable link.
+                exslot = st.get("executed_slot_id")
+                if integ.get("evidence_linked_to_selected_slot") and exslot:
+                    g.rel(pn, f"latent_slot#{aid}#{exslot}",
+                          Relations.EVIDENCE_LINKED_TO_LLM_PROPOSAL)
+                if (exslot and pc.get("selected_slot_candidate_count", 0)
+                        and st.get("execution_success")):
+                    g.rel(pn, f"latent_slot#{aid}#{exslot}",
+                          Relations.CANDIDATE_PROMOTED_FROM_LLM_FRONTIER)
     # each tool call driven by an LLM proposal links to its proposal node.
     for i, c in enumerate(calls or []):
         fa = c.get("frontier_action_id") or ""

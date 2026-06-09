@@ -395,3 +395,22 @@ set — and the risk surface. Keep the experiment honest:
   `llm_frontier_validation` / `tool_call_from_llm_frontier_proposal`), so none of it is
   taken on faith. The whole layer is OFF by default; the synthetic demo never constructs the
   proposer, so the committed demo artifacts are unaffected.
+
+- **A good proposal is worthless if it is mistranslated — and that failure is silent.** The
+  first repair run made this concrete: the LLM proposed well, but the selected proposal's
+  slot/constraints were dropped on the way to execution (repair kept the *deterministic*
+  action and swapped only the query), so evidence linked to the wrong slot, support stayed
+  at zero, and a correct candidate (`Cristina Ortiz`) was never promoted — a result that
+  *looks* like "the LLM didn't help" but is really a plumbing bug. The lesson: an
+  LLM-proposes/code-disposes design must prove the **disposal** is faithful, not just the
+  proposal. The guardrails now do: the executed action is built from the proposal's own
+  fields and materialized as `lfp_<proposal_id>`; a deterministic integrity gate refuses
+  (and falls back) on any slot/constraint/query/evidence-link mismatch
+  (`frontier_action_integrity_error`); and execution "success" is redefined to require
+  progress on the *selected* slot/constraint, so an unrelated candidate can no longer make a
+  wasted action look productive. Watch `llm_proposal_to_action_integrity_rate` (must be 1.0)
+  and `candidate_promoted_from_llm_frontier_count`; a sub-1.0 integrity rate means the
+  comparison is measuring a translation bug, not the LLM. Repair triggering was also too
+  narrow (only one-word generics) — it now fires on repeated zero-progress, stale/noise
+  candidates, and missing high-priority anchors, with the reason recorded, so "the
+  deterministic query was bad but not *generic*" no longer slips through unrepaired.

@@ -117,7 +117,9 @@
     "proposal_based_on_state_card",
     "proposal_selected_for_action",
     "proposal_rejected_because",
-    "tool_call_from_llm_frontier_proposal"
+    "tool_call_from_llm_frontier_proposal",
+    "evidence_linked_to_llm_proposal",
+    "candidate_promoted_from_llm_frontier"
   ],
   "detail_limit": 60,
   "event_log": {

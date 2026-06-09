@@ -10,11 +10,11 @@
     "stop_verify_rewards.csv": "de7bf88b1d4ad70a73120499e3b4903f8e52c55dcf7c30bc442fdde9d7626d4f",
     "memory_snapshot.json": "955a26b8e284b9b9c136eb0711313b5227c4a66e1b02f6233a0d670ad267a79e",
     "policy_updates.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-    "run_manifest.json": "3f3247c96734fb78efac9f80fa08b584ff86b1b3edb2d56d68571ead151edd30",
+    "run_manifest.json": "a6c0081ae357cb733bdaca3f4b7aef0c24299ab968cf70486ec62e1b429f205f",
     "replay_check.md": "a67759c17be90dff137bbba7680bdf2f60101479dccf334b6459fa60b3198b2f",
     "config_snapshot.yaml": "d92919238e640051150befa004d58c8e7a5dbae81a061955cefa67104092e965",
-    "debug_questions.jsonl": "33ffbc4c0da9473e5540b01c4d943442928ec75d4be2ce838eeda7eaca93e273",
-    "graph_projection.json": "662ffc5bc9f40ee89a3033698ef5f44edc2a5cd62d557bb60a9fb32b5ac624f6"
+    "debug_questions.jsonl": "979f9d78338010cdecc71857490abd9056c60d10517e13b9ee36d4a960129c5a",
+    "graph_projection.json": "eafc0c14b6e35e6ceb4f3b6f6cb0db2316510cec38c6fcf8851e86bfece6c68b"
   },
   "missing": []
 }

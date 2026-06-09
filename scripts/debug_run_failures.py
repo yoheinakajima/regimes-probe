@@ -176,6 +176,8 @@ def main() -> int:
                 dr = st.get("det_recommendation", {}) or {}
                 print(f"      det_rec: {dr.get('action_type')} q={dr.get('query')!r} "
                       f"slot={dr.get('target_slot_id')} generic={dr.get('is_generic_query')}")
+                if st.get("repair_trigger_reason"):
+                    print(f"      repair_trigger: {st.get('repair_trigger_reason')}")
                 if st.get("skipped_reason"):
                     print(f"      (skipped: {st.get('skipped_reason')})")
                 print(f"      cache_hit={st.get('cache_hit')} model_called={st.get('model_called')} "
@@ -183,10 +185,14 @@ def main() -> int:
                       + (f" fallback={st.get('fallback_reason')}" if st.get('fallback_reason') else ""))
                 for p in st.get("proposals", []):
                     mark = "✓" if p.get("status") == "accepted" else "✗"
+                    toolinfo = ""
+                    if p.get("tool_normalized"):
+                        toolinfo = (f" tool[{p.get('proposed_tool') or p.get('proposed_tool_family')}"
+                                    f"→{p.get('normalized_tool')}]")
                     print(f"      {mark} {p.get('proposal_id')} [{p.get('action_type')}] "
                           f"q={p.get('proposed_query')!r} slot={p.get('target_slot_id')} "
                           f"constraints={p.get('constraint_ids')} anchors={p.get('anchors_used')} "
-                          f"score={p.get('score')}"
+                          f"score={p.get('score')}{toolinfo}"
                           + (f" REJECT={p.get('rejection_reason')}" if p.get('status') == "rejected" else ""))
                 sel = st.get("selected", {}) or {}
                 if sel:
@@ -194,6 +200,26 @@ def main() -> int:
                           f"anchors={sel.get('anchors_used')} "
                           f"repaired_generic={st.get('repaired_generic')} "
                           f"expected_evidence={sel.get('expected_evidence')!r}")
+                    # proposal -> action -> evidence INTEGRITY (the bug-fix layer).
+                    integ = st.get("integrity", {}) or {}
+                    print(f"      INTEGRITY passed={st.get('integrity_passed')}: "
+                          f"proposal_slot={st.get('proposal_slot_id')} "
+                          f"executed_slot={st.get('executed_slot_id')} | "
+                          f"proposal_cons={st.get('proposal_constraint_ids')} "
+                          f"executed_cons={st.get('executed_constraint_ids')}")
+                    if integ:
+                        print(f"        checks: slot_match={integ.get('selected_proposal_slot_matches_executed_action')} "
+                              f"con_match={integ.get('selected_proposal_constraints_match_executed_action')} "
+                              f"query_match={integ.get('selected_proposal_query_matches_tool_call')} "
+                              f"fa_id={integ.get('tool_call_frontier_action_id_present')} "
+                              f"ev→slot={integ.get('evidence_linked_to_selected_slot')} "
+                              f"ev→cons={integ.get('evidence_linked_to_selected_constraints')}")
+                    if st.get("normalized_tool"):
+                        print(f"        tool={st.get('normalized_tool')} "
+                              f"({st.get('normalized_tool_family')})")
+                    pc = st.get("progress_components")
+                    if pc:
+                        print(f"        progress: {pc}  execution_success={st.get('execution_success')}")
         elif lf.get("skipped_reason"):
             print(f"  LLM FRONTIER: skipped ({lf.get('skipped_reason')})")
         # Stage chain (iterative clue resolution): query -> results -> typed candidates.

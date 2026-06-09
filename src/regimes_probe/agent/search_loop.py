@@ -145,6 +145,8 @@ class CallRecord:
     evidence_record: dict[str, Any] = field(default_factory=dict)
     # Level 5 frontier controller: the frontier_action this tool call executed
     frontier_action_id: Optional[str] = None
+    # Level 5c: the LLM frontier proposal this tool call was translated from (if any)
+    llm_frontier_proposal_id: Optional[str] = None
 
     @property
     def contaminated_results(self) -> int:
@@ -450,6 +452,7 @@ class SearchLoop:
             task_action_info: dict[str, Any] = {}
             evidence_record_info: dict[str, Any] = {}
             current_selected_norm = None
+            cur_lf_meta: dict[str, Any] | None = None    # LLM-frontier meta for this step
             # Decide whether/how to READ a pending URL (Level 3) before anything else.
             # The reading policy (tool choice + gating/dedup) engages only when a
             # scrape tool is available or in iterative mode; otherwise the legacy
@@ -516,6 +519,7 @@ class SearchLoop:
                     lf_steps.append(lf_meta)
                     if lf_plan is not None:
                         step_plan = lf_plan
+                        cur_lf_meta = lf_meta          # for post-execution evidence integrity
             if frontier_controller and step_plan is not None and step_plan.executable:
                 if ctrl["first_action_discriminative"] is None and step_plan.kind == "search":
                     ctrl["first_action_discriminative"] = step_plan.is_discriminative_constraint
@@ -812,18 +816,33 @@ class SearchLoop:
                 # Fold the same evidence into the candidate-slate frontier (multi-hop)
                 # and let the frontier scheduler record its next action by info gain.
                 if frontier is not None:
+                    # DIRECTED ingest: when an LLM proposal drove this call, link the
+                    # evidence to the proposal's SELECTED slot/constraints (req 3).
+                    lf_pid = task_action_info.get("llm_frontier_proposal_id")
                     fev = frontier.ingest_evidence(
                         obs, source_tool=tool, stage=ci + 1,
                         read_depth=(2 if scrape_info.get("is_scrape") else (1 if scrape_info else 0)),
-                        action_id=task_action_info.get("action_id"))
+                        action_id=task_action_info.get("action_id"),
+                        directed_slot_id=(task_action_info.get("target_slot_id") if lf_pid else None),
+                        directed_constraint_ids=(task_action_info.get("tested_constraint_ids")
+                                                 if lf_pid else None),
+                        proposal_id=lf_pid)
                     if not progressed:
                         for s in frontier.slates:
                             frontier.note_no_progress_for_slate(s)
-                    # When the controller drove this call, record its execution outcome
-                    # (success = the tool ran AND produced evidence progress).
+                    # When the controller drove this call, record its execution outcome.
+                    # For an LLM-frontier action, success requires progress on the SELECTED
+                    # slot/constraint — NOT an arbitrary unrelated candidate (req 7).
                     if controller_handled and step_plan is not None:
-                        ok = (not call_failed) and float(
-                            getattr(fev, "evidence_progress_score", 0.0)) > 0
+                        pc = getattr(fev, "progress_components", {}) or {}
+                        if lf_pid:
+                            ok = (not call_failed) and bool(
+                                pc.get("selected_slot_candidate_count", 0) > 0
+                                or pc.get("selected_constraint_support_count", 0) > 0
+                                or pc.get("hypothesis_score_delta", 0.0) > 0)
+                        else:
+                            ok = (not call_failed) and float(
+                                getattr(fev, "evidence_progress_score", 0.0)) > 0
                         frontier.record_execution(step_plan.frontier_action_id, success=ok,
                                                   kind=step_plan.kind,
                                                   evidence_progress=getattr(fev, "evidence_progress_score", 0.0))
@@ -832,6 +851,21 @@ class SearchLoop:
                             ctrl["frontier_action_execution_success_count"] += 1
                         else:
                             ctrl["frontier_action_execution_failure_count"] += 1
+                        # Post-execution evidence-linkage integrity (req 2/3): did the
+                        # evidence actually attach to the proposal's slot/constraints?
+                        if lf_pid and cur_lf_meta is not None:
+                            sel_slot = task_action_info.get("target_slot_id")
+                            sel_cons = set(task_action_info.get("tested_constraint_ids") or [])
+                            linked_slot = sel_slot in (getattr(fev, "supports_slot_ids", []) or [])
+                            linked_cons = bool(sel_cons & set(
+                                getattr(fev, "supports_constraint_ids", []) or []))
+                            integ = dict(cur_lf_meta.get("integrity", {}))
+                            integ["evidence_linked_to_selected_slot"] = linked_slot
+                            integ["evidence_linked_to_selected_constraints"] = (
+                                linked_cons or not sel_cons)
+                            cur_lf_meta["integrity"] = integ
+                            cur_lf_meta["progress_components"] = dict(pc)
+                            cur_lf_meta["execution_success"] = ok
                     frontier.select_frontier_action(
                         budget_remaining=config.budget - len(calls),
                         reading_available=bool(reading_tools))
@@ -870,6 +904,7 @@ class SearchLoop:
                     scrape=scrape_info,
                     task_action=task_action_info,
                     frontier_action_id=task_action_info.get("frontier_action_id"),
+                    llm_frontier_proposal_id=task_action_info.get("llm_frontier_proposal_id"),
                     evidence_record=evidence_record_info,
                 )
             )

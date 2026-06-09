@@ -348,3 +348,23 @@ fork can re-score the cached proposals under a different policy. A win is "fewer
 queries and more anchored, evidence-advancing tool calls at equal/better accuracy,"
 auditable from the `tool_call_from_llm_frontier_proposal` edges — and the model never
 touches policy memory, so it cannot leak an answer into the learned signal.
+
+**Audit proposal → action → evidence integrity, not just query quality (Level 5c).** The
+first repair run produced good queries but mistranslated them — the selected proposal's
+slot/constraints were dropped, so evidence attached to the wrong slot and support stayed
+at zero (a correct `Cristina Ortiz` candidate even went un-promoted). So a Level-5c run is
+only trustworthy if the integrity metrics are clean: `llm_proposal_to_action_integrity_rate`
+and `llm_proposal_slot_match_rate` / `llm_proposal_constraint_match_rate` should be **1.0**
+(any drop means executed actions diverged from the proposals, with
+`frontier_action_integrity_error` events marking the refused-and-fell-back steps);
+`evidence_linked_to_selected_constraint_rate`,
+`llm_frontier_progress_slot_compatible_candidate_rate`, and
+`llm_frontier_selected_constraint_support_rate` show the evidence actually advanced the
+*selected* slot/constraint rather than an arbitrary candidate; `candidate_promoted_from_llm_
+frontier_count` counts genuine promotions; `llm_frontier_repair_trigger_reason_counts`
+shows *why* repair fired (now also on repeated zero-progress / stale-candidate / noise /
+missing-anchor queries, not just one-word generics); and `llm_frontier_tool_normalization_
+count` shows enabled concrete tools (`serper_search`/`exa_search`) being accepted rather
+than spuriously rejected. Read these together with `has_gold_but_not_promoted` in the
+analysis artifacts (gold lives only there, never in the card) to catch the
+"right answer present but never scored" failure the bug produced.

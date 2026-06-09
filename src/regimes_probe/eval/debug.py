@@ -191,6 +191,7 @@ def build_debug_record(*, item, trace, grade, reward, condition: str, budget: in
             "task_action": dict(getattr(c, "task_action", {})),
             "evidence_record": dict(getattr(c, "evidence_record", {})),
             "frontier_action_id": getattr(c, "frontier_action_id", None),
+            "llm_frontier_proposal_id": getattr(c, "llm_frontier_proposal_id", None),
             "n_results": n_ok, "contaminated_results": c_cont,
             "failed": bool(getattr(c, "failed", False)),
             "error_type": getattr(c, "error_type", None),

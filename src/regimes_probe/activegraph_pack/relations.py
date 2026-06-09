@@ -83,6 +83,8 @@ class Relations:
     PROPOSAL_SELECTED_FOR_ACTION = "proposal_selected_for_action"
     PROPOSAL_REJECTED_BECAUSE = "proposal_rejected_because"
     TOOL_CALL_FROM_LLM_FRONTIER_PROPOSAL = "tool_call_from_llm_frontier_proposal"
+    EVIDENCE_LINKED_TO_LLM_PROPOSAL = "evidence_linked_to_llm_proposal"
+    CANDIDATE_PROMOTED_FROM_LLM_FRONTIER = "candidate_promoted_from_llm_frontier"
     UPDATE_FROM_REWARD = "update_from_reward"
     REGIME_FOR_FAILURE = "regime_for_failure"
     PROMOTION_FOR_UPDATE = "promotion_for_update"
@@ -171,4 +173,6 @@ PROJECTION_RELATIONS: tuple[str, ...] = (
     Relations.PROPOSAL_SELECTED_FOR_ACTION,
     Relations.PROPOSAL_REJECTED_BECAUSE,
     Relations.TOOL_CALL_FROM_LLM_FRONTIER_PROPOSAL,
+    Relations.EVIDENCE_LINKED_TO_LLM_PROPOSAL,
+    Relations.CANDIDATE_PROMOTED_FROM_LLM_FRONTIER,
 )

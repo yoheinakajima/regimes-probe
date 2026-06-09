@@ -69,6 +69,14 @@ class Events:
     LLM_FRONTIER_PROPOSAL_EXECUTED = "llm_frontier_proposal_executed"
     LLM_FRONTIER_REPAIR_INVOKED = "llm_frontier_repair_invoked"
     LLM_FRONTIER_CACHE_HIT = "llm_frontier_cache_hit"
+    # Level 5c proposal->action integrity + evidence linkage (the bug-fix layer)
+    FRONTIER_ACTION_INTEGRITY_CHECKED = "frontier_action_integrity_checked"
+    FRONTIER_ACTION_INTEGRITY_ERROR = "frontier_action_integrity_error"
+    SELECTED_PROPOSAL_TRANSLATED_TO_ACTION = "selected_proposal_translated_to_action"
+    EVIDENCE_LINKED_TO_LLM_PROPOSAL = "evidence_linked_to_llm_proposal"
+    CANDIDATE_PROMOTED_FROM_LLM_FRONTIER_EVIDENCE = "candidate_promoted_from_llm_frontier_evidence"
+    LLM_FRONTIER_REPAIR_TRIGGERED_REASON = "llm_frontier_repair_triggered_reason"
+    TOOL_FAMILY_NORMALIZED = "tool_family_normalized"
 
 
 #: Candidate-slate / frontier event-type strings (trace + projection only).
@@ -89,6 +97,10 @@ LLM_FRONTIER_EVENTS: tuple[str, ...] = (
     Events.LLM_FRONTIER_PROPOSAL_VALIDATED, Events.LLM_FRONTIER_PROPOSAL_REJECTED,
     Events.LLM_FRONTIER_PROPOSAL_SELECTED, Events.LLM_FRONTIER_PROPOSAL_EXECUTED,
     Events.LLM_FRONTIER_REPAIR_INVOKED, Events.LLM_FRONTIER_CACHE_HIT,
+    Events.FRONTIER_ACTION_INTEGRITY_CHECKED, Events.FRONTIER_ACTION_INTEGRITY_ERROR,
+    Events.SELECTED_PROPOSAL_TRANSLATED_TO_ACTION, Events.EVIDENCE_LINKED_TO_LLM_PROPOSAL,
+    Events.CANDIDATE_PROMOTED_FROM_LLM_FRONTIER_EVIDENCE,
+    Events.LLM_FRONTIER_REPAIR_TRIGGERED_REASON, Events.TOOL_FAMILY_NORMALIZED,
 )
 
 

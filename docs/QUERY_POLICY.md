@@ -723,3 +723,51 @@ model (default `--answer-model`). The proposer's settings (`mode|model|prompt-fi
 are stamped into `ConditionSpec.llm_frontier_settings` so the **same-conditions** check
 requires them to be **identical** across the compared `no_memory` / `policy_memory` arms —
 the only intended difference stays memory access.
+
+#### Proposal → action → evidence integrity (and broader repair triggers)
+
+The first repair run (`browsecomp-llm-frontier-repair-001`) confirmed the LLM composes far
+better queries (e.g. `"multinomial logistic regression" "1.7 million" employed census
+"usual resident population"`) and cut mean tool calls — but it exposed a **critical
+integration bug**: the *selected* proposal's slot/constraints were not carried into the
+executed action. A proposal for `slot=s2, constraints=[C1]` executed as
+`slot=s0, constraints=[C4]` (repair mode kept the *deterministic* action and only swapped
+the query string), so evidence attached to the wrong slot and support stayed at zero. A
+WHO case even returned a correct candidate (`Cristina Ortiz`) that was never promoted. The
+fix makes the proposal → action → evidence chain **faithful and auditable**:
+
+- **Selected proposal becomes the executed action.** `_to_step_plan` now builds the
+  `StepPlan` from the **proposal's** `action_type`/`target_slot_id`/`candidate_id`/
+  `constraint_ids`/`proposed_query`/tool/anchors in **both** modes (repair only *means* the
+  deterministic query was the trigger). The frontier materializes it as a first-class
+  `FrontierAction` (`register_proposal_action`, id `lfp_<proposal_id>`), and the tool call /
+  `CallRecord` carries `llm_frontier_proposal_id` + `frontier_action_id` +
+  `target_slot_id` + `constraint_ids` + `anchors_used`.
+- **Integrity gate.** Before executing, `check_proposal_action_integrity` asserts the
+  executed action's slot/constraints/query match the selected proposal and a frontier-action
+  id is present; post-execution it checks the evidence actually linked to the selected
+  slot/constraints. **Any mismatch** records `frontier_action_integrity_error` and **refuses
+  the proposal, falling back to the deterministic planner** — never a silent stale execution.
+- **Directed evidence linking.** Evidence from an LLM-driven call is ingested *directed* at
+  the proposal's slot/constraints: a role-compatible candidate (a person entity binds a
+  free-form `graphic_designer`/`author` slot, but a date never binds a person) is bound to
+  the **selected** slot and the **selected** constraints are evaluated + linked
+  (`evidence_linked_to_llm_proposal`), so `Cristina Ortiz` lands on the cover-designer slot
+  with its education/employment constraints supported (the answer-support gate is still
+  required to *answer*).
+- **Broader repair triggers.** Repair no longer fires only on one-word generic queries. It
+  also fires (recording a `repair_trigger_reason`) when the deterministic query repeats a
+  zero-progress query, leans on a rejected/stale/no-progress or slot-incompatible candidate,
+  rides a retrieval-noise candidate (`generic_definition_noise` / `source_platform_noise` /
+  `ui_navigation_noise`), lacks any high-priority unresolved-constraint anchor, or keeps
+  searching after N actions with zero supported constraints.
+- **Honest progress / execution success.** Progress is decomposed
+  (`raw` vs `slot_compatible` vs `selected_slot` candidate counts, `selected_constraint`
+  support, `hypothesis_score_delta`, `noise_candidate_count`); an LLM action counts as a
+  **success only** when it adds a slot-compatible candidate to the *selected* slot, supports
+  a *selected* constraint, or improves the hypothesis — never on an arbitrary unrelated
+  candidate.
+- **Tool normalization.** A proposal naming an **enabled** concrete tool (`serper_search`,
+  `exa_search`, `firecrawl_search`, …) is accepted as-is; a family (`search`/`scrape`/
+  `fetch`) resolves to an enabled tool in that family; only a non-enabled or unknown tool is
+  rejected — fixing spurious `disallowed_tool:serper_search` rejections.

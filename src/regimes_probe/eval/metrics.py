@@ -296,7 +296,11 @@ def _llm_frontier_metrics(stats: list[dict]) -> dict[str, Any]:
     constraint_anchor = known_anchor = sel_total = agree = agree_total = 0
     realized = 0.0
     answer_from = 0
+    # proposal->action->evidence integrity (the bug-fix layer, req 9).
+    integ_total = integ_pass = slot_match = con_match = ev_con_linked = 0
+    progress_slot_compat = sel_con_support = promoted = tool_norm = 0
     rej: Counter = Counter()
+    trig: Counter = Counter()
     for s in used:
         for st in s.get("steps", []):
             if st.get("model_called"):
@@ -307,6 +311,8 @@ def _llm_frontier_metrics(stats: list[dict]) -> dict[str, Any]:
                     e.get("event_type") == "llm_frontier_repair_invoked"
                     for e in st.get("events", [])):
                 repair_invoked += 1
+            if st.get("repair_trigger_reason"):
+                trig[st["repair_trigger_reason"]] += 1
             props = st.get("proposals", [])
             proposals += len(props)
             accepted += sum(1 for p in props if p.get("status") == "accepted")
@@ -332,10 +338,31 @@ def _llm_frontier_metrics(stats: list[dict]) -> dict[str, Any]:
                     answer_from += 1
                 if st.get("repaired_generic"):
                     generic_repaired += 1
+                if sel.get("tool_normalized"):
+                    tool_norm += 1
                 if st.get("det_action_type") is not None:
                     agree_total += 1
                     if sel.get("action_type") == st.get("det_action_type"):
                         agree += 1
+                # integrity + evidence-linkage + progress (only for executed selections).
+                integ = st.get("integrity") or {}
+                if integ:
+                    integ_total += 1
+                    if st.get("integrity_passed"):
+                        integ_pass += 1
+                    if integ.get("selected_proposal_slot_matches_executed_action"):
+                        slot_match += 1
+                    if integ.get("selected_proposal_constraints_match_executed_action"):
+                        con_match += 1
+                    if integ.get("evidence_linked_to_selected_constraints"):
+                        ev_con_linked += 1
+                pc = st.get("progress_components") or {}
+                if pc.get("slot_compatible_candidate_count", 0) > 0:
+                    progress_slot_compat += 1
+                if pc.get("selected_constraint_support_count", 0) > 0:
+                    sel_con_support += 1
+                if pc.get("selected_slot_candidate_count", 0) > 0 and st.get("execution_success"):
+                    promoted += 1
     return {
         "llm_frontier_model_calls": model_calls,
         "llm_frontier_cache_hits": cache_hits,
@@ -353,6 +380,17 @@ def _llm_frontier_metrics(stats: list[dict]) -> dict[str, Any]:
         "llm_frontier_vs_deterministic_agreement_rate": _safe_div(agree, agree_total),
         "llm_frontier_realized_eig": _safe_div(realized, sel_total),
         "answer_from_llm_frontier_confirmed_hypothesis_count": answer_from,
+        # proposal -> action -> evidence integrity (the bug-fix layer, req 9).
+        "llm_proposal_to_action_integrity_rate": _safe_div(integ_pass, integ_total),
+        "llm_proposal_slot_match_rate": _safe_div(slot_match, integ_total),
+        "llm_proposal_constraint_match_rate": _safe_div(con_match, integ_total),
+        "evidence_linked_to_selected_constraint_rate": _safe_div(ev_con_linked, integ_total),
+        "llm_frontier_repair_trigger_reason_counts": dict(trig),
+        "llm_frontier_tool_normalization_count": tool_norm,
+        "llm_frontier_progress_slot_compatible_candidate_rate":
+            _safe_div(progress_slot_compat, sel_total),
+        "llm_frontier_selected_constraint_support_rate": _safe_div(sel_con_support, sel_total),
+        "candidate_promoted_from_llm_frontier_count": promoted,
     }
 
 

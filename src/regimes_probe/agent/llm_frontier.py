@@ -167,6 +167,7 @@ class FrontierProposal:
     constraint_ids: list[str] = field(default_factory=list)
     proposed_query: str = ""
     proposed_tool_family: str = "search"
+    proposed_tool: str = ""
     expected_evidence: str = ""
     success_criteria: str = ""
     why_this_action: str = ""
@@ -179,6 +180,10 @@ class FrontierProposal:
     rejection_reason: str = ""
     score: float = 0.0
     score_components: dict[str, float] = field(default_factory=dict)
+    #: resolved tool/family after :func:`normalize_tool` (req 6) + whether it was changed.
+    normalized_tool_family: str = ""
+    normalized_tool: str = ""
+    tool_normalized: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {"proposal_id": self.proposal_id, "action_type": self.action_type,
@@ -186,6 +191,10 @@ class FrontierProposal:
                 "hypothesis_id": self.hypothesis_id, "constraint_ids": list(self.constraint_ids),
                 "proposed_query": self.proposed_query[:160],
                 "proposed_tool_family": self.proposed_tool_family,
+                "proposed_tool": self.proposed_tool,
+                "normalized_tool_family": self.normalized_tool_family,
+                "normalized_tool": self.normalized_tool,
+                "tool_normalized": self.tool_normalized,
                 "expected_evidence": self.expected_evidence[:160],
                 "anchors_used": list(self.anchors_used)[:8],
                 "avoids_generic_query": self.avoids_generic_query,
@@ -222,6 +231,120 @@ def _anchor_terms(frame) -> set[str]:
     return terms
 
 
+# --------------------------------------------------------------------------- tools (req 6)
+#: concrete tool name -> family. Mirrors tools/metadata families; kept local + minimal.
+_TOOL_FAMILY = {
+    "serper_search": "search", "exa_search": "search", "firecrawl_search": "search",
+    "generic_web_search": "search", "news_search": "search", "academic_search": "search",
+    "firecrawl_scrape": "scrape", "page_fetch": "fetch"}
+_FAMILY_ALIASES = {"search": "search", "web_search": "search", "web": "search",
+                   "scrape": "scrape", "crawl": "scrape", "fetch": "fetch",
+                   "page_fetch": "fetch", "read": "fetch", "browse": "fetch"}
+
+
+def normalize_tool(raw_tool: str, raw_family: str,
+                   available_tools: list[str]) -> dict[str, Any]:
+    """Normalize a proposal's tool/family against the ENABLED tools (req 6).
+
+    - A concrete enabled tool (``serper_search``/``exa_search``/…), named in either field,
+      is accepted as-is.
+    - A family (``search``/``scrape``/``fetch``) resolves to an enabled tool in that family.
+    - A concrete but non-enabled tool, or an unknown family, is rejected with a clear reason.
+    Returns ``{ok, tool, family, reason, normalized}``.
+    """
+    avail = list(available_tools or [])
+    raw_tool = (raw_tool or "").strip().lower()
+    raw_family = (raw_family or "").strip().lower()
+    # a value in either field that names a KNOWN concrete tool wins.
+    concrete = next((t for t in (raw_tool, raw_family) if t in _TOOL_FAMILY), "")
+    if concrete:
+        fam = _TOOL_FAMILY[concrete]
+        if concrete not in avail:
+            return {"ok": False, "tool": "", "family": fam,
+                    "reason": f"tool_not_enabled:{concrete}", "normalized": False}
+        normalized = (concrete != raw_tool) or (raw_family not in ("", fam))
+        return {"ok": True, "tool": concrete, "family": fam,
+                "reason": "concrete_enabled_tool", "normalized": normalized}
+    # otherwise treat the value as a family hint.
+    fam_raw = raw_family or raw_tool or "search"
+    fam = _FAMILY_ALIASES.get(fam_raw, "")
+    if fam not in ("search", "scrape", "fetch"):
+        return {"ok": False, "tool": "", "family": fam_raw,
+                "reason": f"disallowed_tool:{fam_raw}", "normalized": False}
+    pick = next((t for t in avail if _TOOL_FAMILY.get(t) == fam), "")
+    if not pick:
+        return {"ok": False, "tool": "", "family": fam,
+                "reason": f"no_enabled_tool_in_family:{fam}", "normalized": False}
+    return {"ok": True, "tool": pick, "family": fam, "reason": "family_resolved_to_enabled",
+            "normalized": True}
+
+
+# --------------------------------------------------------------------------- repair (req 5)
+def repair_trigger_reason(det_plan, frame, frontier, *, no_progress_norms: set[str],
+                          min_actions_no_support: int = 2) -> str:
+    """Why LLM repair should fire for this deterministic plan (or '' to skip).
+
+    Beyond one-word generic queries, repair also fires on *low-quality* deterministic
+    queries: ones that repeat a zero-progress query, lean on a rejected/stale/no-progress
+    or slot-incompatible candidate, ride retrieval-noise candidates, lack any high-priority
+    unresolved-constraint anchor, or keep searching after N actions with zero supported
+    constraints. The first matching reason is returned (most specific first)."""
+    from regimes_probe.agent.candidate_frontier import (
+        _noise_kind, _role_compatible)
+    if det_plan is None or det_plan.kind == "unexecutable":
+        return "deterministic_unexecutable"
+    q = det_plan.query or ""
+    if not q.strip():
+        return "empty_deterministic_query"
+    if det_plan.is_generic_query or _is_generic_query(q):
+        return "generic_query"
+    if _norm_q(q) in no_progress_norms:
+        return "repeats_zero_progress_query"
+    cand = (frontier.candidates_by_id.get(det_plan.candidate_id)
+            if (frontier is not None and det_plan.candidate_id) else None)
+    if cand is not None:
+        if cand.status in ("rejected", "stale") or cand.no_progress_count > 0:
+            return "uses_stale_or_no_progress_candidate"
+        slate = frontier.slates.get(cand.slot_id) if frontier is not None else None
+        if slate is not None and not _role_compatible(cand.inferred_role, slate.slot_role):
+            return "candidate_not_slot_compatible"
+        nk = _noise_kind(cand.candidate_text)
+        if nk:
+            return f"noise_candidate:{nk}"
+    # high-priority unresolved constraint anchor missing from the query.
+    hp_terms: set[str] = set()
+    for c in frame.constraints:
+        if c.status != "resolved" and (getattr(c, "blocks_answer_if_unresolved", False)
+                                       or getattr(c, "priority", "") == "high"):
+            hp_terms.update(t.lower() for t in c.normalized_terms if len(t) >= 4)
+    if hp_terms:
+        qtok = {w.lower() for w in _WORD.findall(q)}
+        if not (qtok & hp_terms):
+            return "no_high_priority_constraint_anchor"
+    if frontier is not None and len(frontier.evidence) >= min_actions_no_support:
+        any_support = any(c.constraints_supported for c in frontier.candidates_by_id.values())
+        if not any_support:
+            return "no_supported_constraints_after_n_actions"
+    return ""
+
+
+# --------------------------------------------------------------------------- integrity (req 2)
+def check_proposal_action_integrity(p: FrontierProposal, step_plan) -> tuple[dict, bool]:
+    """Translation-time integrity: the executed action must faithfully carry the SELECTED
+    proposal's slot/constraints/query, and link a frontier_action id (req 2)."""
+    is_search = step_plan.kind == "search"
+    checks = {
+        "selected_proposal_slot_matches_executed_action":
+            step_plan.target_slot_id == p.target_slot_id,
+        "selected_proposal_constraints_match_executed_action":
+            (set(step_plan.constraint_ids) == set(p.constraint_ids)) if is_search else True,
+        "selected_proposal_query_matches_tool_call":
+            (_norm_q(step_plan.query) == _norm_q(p.proposed_query)) if is_search else True,
+        "tool_call_frontier_action_id_present": bool(step_plan.frontier_action_id),
+    }
+    return checks, all(checks.values())
+
+
 def validate_proposal(p: FrontierProposal, frame, frontier, *, failed_norms: set[str],
                       available_tools: list[str], remaining_budget: int) -> tuple[bool, str]:
     """Deterministic gate before a proposal may be scored/executed."""
@@ -246,10 +369,14 @@ def validate_proposal(p: FrontierProposal, frame, frontier, *, failed_norms: set
         return True, ""
     if remaining_budget <= 0:
         return False, "exceeds_budget"
-    if p.proposed_tool_family and p.proposed_tool_family not in ("search", "scrape", "fetch"):
-        return False, f"disallowed_tool:{p.proposed_tool_family}"
-    if p.proposed_tool_family == "scrape" and "firecrawl_scrape" not in available_tools:
-        return False, "tool_unavailable:scrape"
+    # tool/family normalization (req 6): accept enabled concrete tools (serper_search,
+    # exa_search, …) and resolve families to an enabled tool; reject only truly bad tools.
+    tn = normalize_tool(p.proposed_tool, p.proposed_tool_family, available_tools)
+    if not tn["ok"]:
+        return False, tn["reason"]
+    p.normalized_tool_family = tn["family"]
+    p.normalized_tool = tn["tool"]
+    p.tool_normalized = bool(tn["normalized"])
     # search/read actions need a real, non-generic, anchored, non-duplicate query.
     q = p.proposed_query.strip()
     if not q:
@@ -279,6 +406,7 @@ def score_proposal(p: FrontierProposal, frame, frontier, *, failed_norms: set[st
     qtok = {w.lower() for w in _WORD.findall(p.proposed_query)}
     con_terms = {t.lower() for c in cons for t in c.normalized_terms if len(t) >= 4}
     kc = {w for t in frame.known_context_terms for w in _WORD.findall(t.lower()) if len(w) >= 3}
+    fam = p.normalized_tool_family or p.proposed_tool_family
     comps = {
         "constraint_anchor_score": 1.0 if (qtok & con_terms) else 0.0,
         "known_context_anchor_score": 1.0 if (qtok & kc) else 0.0,
@@ -287,8 +415,8 @@ def score_proposal(p: FrontierProposal, frame, frontier, *, failed_norms: set[st
         "hypothesis_relevance": 0.5 if p.hypothesis_id else 0.0,
         "novelty": 1.0 if _norm_q(p.proposed_query) not in failed_norms else 0.0,
         "duplicate_penalty": -1.0 if _norm_q(p.proposed_query) in failed_norms else 0.0,
-        "expected_cost": -1.0 if p.proposed_tool_family in ("scrape", "fetch") else -0.25,
-        "tool_reliability": 0.5 if p.proposed_tool_family == "search" else 0.2,
+        "expected_cost": -1.0 if fam in ("scrape", "fetch") else -0.25,
+        "tool_reliability": 0.5 if fam == "search" else 0.2,
         "no_progress_penalty": -0.5 * len([f for f in p.risk_flags if "no_progress" in f]),
         "confidence": 0.25 * float(p.confidence or 0.0),
     }
@@ -316,7 +444,11 @@ class LLMFrontierProposer:
         self.selected_count = 0
         self.repair_invoked_count = 0
         self.fallback_count = 0
+        self.integrity_checked_count = 0
+        self.integrity_error_count = 0
+        self.tool_normalized_count = 0
         self.rejection_counts: Counter = Counter()
+        self.repair_trigger_reasons: Counter = Counter()
 
     def stats(self) -> dict[str, Any]:
         return {"llm_frontier_model": self.model, "llm_frontier_model_calls": self.model_calls,
@@ -327,7 +459,11 @@ class LLMFrontierProposer:
                 "llm_frontier_selected_count": self.selected_count,
                 "llm_frontier_repair_invocation_count": self.repair_invoked_count,
                 "llm_frontier_fallback_count": self.fallback_count,
-                "llm_frontier_rejection_counts": dict(self.rejection_counts)}
+                "llm_frontier_integrity_checked_count": self.integrity_checked_count,
+                "llm_frontier_integrity_error_count": self.integrity_error_count,
+                "llm_frontier_tool_normalized_count": self.tool_normalized_count,
+                "llm_frontier_rejection_counts": dict(self.rejection_counts),
+                "llm_frontier_repair_trigger_reason_counts": dict(self.repair_trigger_reasons)}
 
     def _input_hash(self, card: ResearchStateCard) -> str:
         return _sha(f"{self.prompt.fingerprint()}|{self.model}|{card.card_hash()}")
@@ -386,17 +522,21 @@ class LLMFrontierProposer:
             meta["events"].append({"event_type": t, **d})
 
         _ev("llm_frontier_state_card_created", card_hash=card.card_hash())
-        # repair mode only fires when the deterministic query is generic / blocked.
+        # repair mode fires on generic OR low-quality / no-progress deterministic queries
+        # (req 5: not just one-word generics). The reason is recorded for audit.
         if mode == "repair":
-            generic = det_plan is not None and (det_plan.is_generic_query
-                                                or det_plan.kind == "unexecutable"
-                                                or not det_plan.query.strip()
-                                                or _is_generic_query(det_plan.query))
-            if not generic:
+            no_progress_norms = {_norm_q(q) for q in (card.no_progress_queries or [])} | {
+                _norm_q(q) for q in failed_queries}
+            trigger = repair_trigger_reason(det_plan, frame, frontier,
+                                            no_progress_norms=no_progress_norms)
+            meta["repair_trigger_reason"] = trigger
+            if not trigger:
                 meta["skipped_reason"] = "deterministic_query_ok"
                 return None, meta
             self.repair_invoked_count += 1
+            self.repair_trigger_reasons[trigger] += 1
             _ev("llm_frontier_repair_invoked")
+            _ev("llm_frontier_repair_triggered_reason", reason=trigger)
 
         raw = self._call(card, meta)
         if raw is None:
@@ -433,6 +573,10 @@ class LLMFrontierProposer:
         meta["selected"] = best.to_dict()
         self.selected_count += 1
         _ev("llm_frontier_proposal_selected", proposal_id=best.proposal_id)
+        if best.tool_normalized:
+            self.tool_normalized_count += 1
+            _ev("tool_family_normalized", proposal_id=best.proposal_id,
+                tool=best.normalized_tool, family=best.normalized_tool_family)
 
         plan = self._to_step_plan(best, det_plan, mode=mode, frame=frame, frontier=frontier,
                                   observations=observations, scraped_urls=scraped_urls,
@@ -444,6 +588,37 @@ class LLMFrontierProposer:
             self.fallback_count += 1
             meta["fallback_reason"] = "selected_proposal_unexecutable"
             return None, meta
+        # INTEGRITY (req 2): the executed action must faithfully carry the proposal's
+        # slot/constraints/query. On mismatch, refuse + fall back to the deterministic plan.
+        checks, ok_integrity = check_proposal_action_integrity(best, plan)
+        meta["integrity"] = checks
+        meta["integrity_passed"] = ok_integrity
+        meta["proposal_slot_id"] = best.target_slot_id
+        meta["executed_slot_id"] = plan.target_slot_id
+        meta["proposal_constraint_ids"] = list(best.constraint_ids)
+        meta["executed_constraint_ids"] = list(plan.constraint_ids)
+        meta["normalized_tool"] = best.normalized_tool
+        meta["normalized_tool_family"] = best.normalized_tool_family
+        if not ok_integrity:
+            self.integrity_error_count += 1
+            self.fallback_count += 1
+            meta["fallback_reason"] = "frontier_action_integrity_error"
+            _ev("frontier_action_integrity_error", proposal_id=best.proposal_id,
+                data={"checks": checks})
+            return None, meta
+        self.integrity_checked_count += 1
+        _ev("frontier_action_integrity_checked", proposal_id=best.proposal_id)
+        # Materialize the proposal as a first-class FrontierAction (req 1/8) so the executed
+        # tool call links to it and record_execution finds the matching action.
+        if frontier is not None and plan.kind in ("search", "read"):
+            frontier.register_proposal_action(
+                proposal_id=best.proposal_id, action_type=best.action_type,
+                target_slot_id=best.target_slot_id, candidate_id=best.candidate_id,
+                hypothesis_id=best.hypothesis_id, constraint_ids=list(plan.constraint_ids),
+                query=plan.query, tool=best.normalized_tool,
+                tool_family=best.normalized_tool_family, anchors_used=best.anchors_used)
+            _ev("selected_proposal_translated_to_action", proposal_id=best.proposal_id,
+                action_id=plan.frontier_action_id)
         _ev("llm_frontier_proposal_executed", proposal_id=best.proposal_id, kind=plan.kind)
         meta["selected_proposal_id"] = best.proposal_id
         meta["repaired_generic"] = (mode == "repair")
@@ -452,11 +627,24 @@ class LLMFrontierProposer:
     def _to_step_plan(self, p: FrontierProposal, det_plan, *, mode, frame, frontier, observations,
                       scraped_urls, no_progress_domains, page_fetch_available, scrape_available,
                       allow_social, force_page_fetch) -> Optional[StepPlan]:
+        """Translate the SELECTED proposal into an executable step plan.
+
+        The executed action carries the **proposal's** slot/constraints/query (req 1) in
+        BOTH modes — repair no longer keeps the deterministic action's stale slot/constraints,
+        it only means the deterministic query was the trigger. The frontier_action id is
+        ``lfp_<proposal_id>`` so the tool call links straight to its proposal."""
         fa_id = f"lfp_{p.proposal_id}"
+        arm = "llm_frontier_repair" if mode == "repair" else "llm_frontier_planner"
+        common = dict(llm_frontier_proposal_id=p.proposal_id, anchors_used=list(p.anchors_used),
+                      expected_evidence=p.expected_evidence,
+                      proposed_tool_family=p.normalized_tool_family or p.proposed_tool_family)
         if p.action_type == "answer_from_confirmed_hypothesis":
-            return StepPlan(fa_id, p.action_type, "answer", reason="llm_frontier_proposal")
+            return StepPlan(fa_id, p.action_type, "answer", target_slot_id=p.target_slot_id,
+                            constraint_ids=list(p.constraint_ids), reason="llm_frontier_proposal",
+                            **common)
         if p.action_type == "abstain_no_viable_hypothesis":
-            return StepPlan(fa_id, p.action_type, "abstain", reason="llm_frontier_proposal")
+            return StepPlan(fa_id, p.action_type, "abstain", reason="llm_frontier_proposal",
+                            **common)
         if p.action_type == "read_candidate_source":
             chosen = frontier._resolve_read(observations, scraped_urls, no_progress_domains,
                                             page_fetch_available, scrape_available, allow_social,
@@ -466,23 +654,17 @@ class LLMFrontierProposer:
             o, rd, tested = chosen
             return StepPlan(fa_id, p.action_type, "read", read_obs=o, read_decision=rd,
                             target_slot_id=p.target_slot_id, candidate_id=p.candidate_id,
-                            constraint_ids=tested, reason="llm_frontier_proposal")
-        # search-like: REPAIR keeps the deterministic action and swaps the query.
+                            constraint_ids=tested, reason="llm_frontier_proposal", **common)
+        # search-like: carry the PROPOSAL's slot/constraints/query (never the det plan's).
         query = _cap(p.proposed_query.strip())
-        if mode == "repair" and det_plan is not None:
-            return StepPlan(det_plan.frontier_action_id or fa_id, det_plan.action_type, "search",
-                            query=query, query_arm="llm_frontier_repair",
-                            target_slot_id=det_plan.target_slot_id, candidate_id=det_plan.candidate_id,
-                            constraint_ids=list(det_plan.constraint_ids),
-                            reason="llm_frontier_repair", is_discriminative_constraint=True,
-                            is_generic_query=False)
-        return StepPlan(fa_id, p.action_type, "search", query=query, query_arm="llm_frontier_planner",
+        return StepPlan(fa_id, p.action_type, "search", tool=(p.normalized_tool or None),
+                        query=query, query_arm=arm,
                         target_slot_id=p.target_slot_id, candidate_id=p.candidate_id,
                         constraint_ids=list(p.constraint_ids), reason="llm_frontier_proposal",
                         is_discriminative_constraint=bool(
                             any(_is_discriminative_constraint(c) for c in frame.constraints
                                 if c.constraint_id in p.constraint_ids)),
-                        is_generic_query=False)
+                        is_generic_query=False, **common)
 
 
 def _proposal_from_dict(d: dict, i: int) -> FrontierProposal:
@@ -495,6 +677,7 @@ def _proposal_from_dict(d: dict, i: int) -> FrontierProposal:
         constraint_ids=[str(x) for x in (d.get("constraint_ids") or [])],
         proposed_query=str(d.get("proposed_query", "") or ""),
         proposed_tool_family=str(d.get("proposed_tool_family", "search") or "search"),
+        proposed_tool=str(d.get("proposed_tool", "") or ""),
         expected_evidence=str(d.get("expected_evidence", "") or ""),
         success_criteria=str(d.get("success_criteria", "") or ""),
         why_this_action=str(d.get("why_this_action", "") or ""),

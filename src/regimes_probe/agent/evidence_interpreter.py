@@ -55,6 +55,34 @@ HARD_NOISE_ROLES = frozenset(
     {"generic_definition_page", "ui_or_navigation_noise", "benchmark_contaminated"})
 #: Weak sources: allowed, but candidate confidence is downweighted.
 WEAK_ROLES = frozenset({"social_page", "forum_page"})
+#: Sources trustworthy enough that ONE distinctive constraint anchor (not two-term
+#: overlap) plus a role-compatible candidate is enough to attach constraint support.
+CORROBORATING_ROLES = frozenset({"professional_profile", "official_page", "scholarly_paper",
+                                 "database_record", "primary_source", "directory_listing"})
+
+_MONTHS = frozenset({"january", "february", "march", "april", "may", "june", "july",
+                     "august", "september", "october", "november", "december"})
+_WEEKDAYS = frozenset({"monday", "tuesday", "wednesday", "thursday", "friday",
+                       "saturday", "sunday"})
+#: generic category/type words that, ALONE, are not a task entity (need a local predicate).
+_GENERIC_TYPE_WORDS = frozenset({
+    "tv", "show", "shows", "series", "film", "films", "movie", "movies", "publication",
+    "publications", "article", "articles", "report", "reports", "page", "pages", "website",
+    "site", "overview", "summary", "list", "lists", "category", "categories", "results",
+    "answers", "answer", "visit", "select", "available", "religious", "religion", "various",
+    "general", "related", "more", "other", "news", "story", "stories", "topic", "topics"})
+_TEMPORAL_PREDICATES = ("opened", "open", "founded", "established", "launched", "aired",
+                        "premiered", "released", "published", "born", "built", "created",
+                        "incorporated", "debuted", "started", "began", "formed")
+#: venue/organization SUFFIX words that type an entity by its own name (a local predicate):
+#: "Pecos Trail Inn"/"Pecos Trail Cafe" are organizations, not persons.
+_ORG_SUFFIX = frozenset({
+    "inn", "cafe", "café", "hotel", "motel", "lodge", "resort", "restaurant", "diner",
+    "bistro", "tavern", "bar", "pub", "grill", "cantina", "museum", "gallery", "theatre",
+    "theater", "church", "cathedral", "temple", "monastery", "library", "observatory",
+    "company", "corporation", "inc", "corp", "ltd", "llc", "foundation", "institute",
+    "university", "college", "school", "hospital", "society", "association", "consortium",
+    "agency", "bureau", "department", "ministry", "commission", "club", "academy"})
 
 # --- generic source-TYPE host lexicons (role typing only, NOT a rejection stoplist) ---
 _DEFINITION_HOSTS = frozenset({
@@ -146,6 +174,7 @@ class CandidateAssertion:
     candidate_text: str
     normalized_text_hash: str
     inferred_role: str
+    assertion_id: str = ""
     proposed_slot_ids: list[str] = field(default_factory=list)
     supports_constraint_ids: list[str] = field(default_factory=list)
     contradicts_constraint_ids: list[str] = field(default_factory=list)
@@ -154,6 +183,12 @@ class CandidateAssertion:
     confidence: float = 0.0
     rejection_reason: str = ""               # "" => accepted
     from_ctx: bool = False                   # role inferred from surrounding context
+    #: filled after the canonical SlotCandidate is materialized (req 1): the id the
+    #: frontier/hypothesis registry knows this candidate by, per accepted slot.
+    canonical_candidate_ids: dict[str, str] = field(default_factory=dict)
+    #: per-slot (supported, contradicted) constraint ids, computed by the support
+    #: recognizers and APPLIED verbatim by the frontier (not recomputed from overlap).
+    slot_support: dict[str, list[list[str]]] = field(default_factory=dict)
 
     @property
     def accepted(self) -> bool:
@@ -161,6 +196,7 @@ class CandidateAssertion:
 
     def to_dict(self) -> dict[str, Any]:
         return {"candidate_text": _prev(self.candidate_text, 80),
+                "assertion_id": self.assertion_id,
                 "normalized_text_hash": self.normalized_text_hash,
                 "inferred_role": self.inferred_role,
                 "proposed_slot_ids": list(self.proposed_slot_ids),
@@ -168,7 +204,8 @@ class CandidateAssertion:
                 "contradicts_constraint_ids": list(self.contradicts_constraint_ids),
                 "evidence_quote_or_span": _prev(self.evidence_quote_or_span, 160),
                 "source_role": self.source_role, "confidence": round(self.confidence, 3),
-                "rejection_reason": self.rejection_reason}
+                "rejection_reason": self.rejection_reason,
+                "canonical_candidate_ids": dict(self.canonical_candidate_ids)}
 
 
 @dataclass
@@ -239,6 +276,107 @@ def _quote_for(terms: list[str], title: str, snippet: str) -> str:
                 start = max(0, i - 30)
                 return _prev((field_text or "")[start:i + len(t) + 40], 160)
     return _prev(snippet or title, 120)
+
+
+_YEAR = re.compile(r"\b(1[5-9]\d{2}|20\d{2})\b")
+
+
+def _tokens(text: str) -> set[str]:
+    return {w.lower() for w in _WORD.findall(text or "")}
+
+
+def _distinctive_anchors(con) -> set[str]:
+    """A constraint's *distinctive* anchor terms — proper-cased / rare / year tokens — that
+    a result must contain to count as evidence (not generic glue words like 'the'/'report')."""
+    from regimes_probe.policy.query_decomposition import _is_rare
+    anchors: set[str] = set()
+    span = getattr(con, "text_span", "") or ""
+    proper = {w.lower() for w in re.findall(r"[A-Z][A-Za-z'&]{3,}", span)}
+    for t in getattr(con, "normalized_terms", []):
+        tl = str(t).lower()
+        if len(tl) < 4:
+            continue
+        if tl in proper or _is_rare(t) or str(t)[:1].isupper():
+            anchors.add(tl)
+    anchors |= set(_YEAR.findall(span))
+    return anchors
+
+
+def recognize_constraint_support(con, cand_text, cand_role, source_role, title, snippet,
+                                 *, contaminated: bool):
+    """Generic deterministic recognizer: does THIS evidence support/contradict the
+    constraint for this candidate? Support requires real anchors + an acceptable source —
+    never arbitrary term overlap on a noise/contaminated page. Returns ``(status, quote)``."""
+    text_l = f"{title} {snippet}".lower()
+    if contaminated or source_role in HARD_NOISE_ROLES:
+        return "irrelevant", ""
+    if _contradicts(con, text_l, (cand_text or "").lower()):
+        return "contradicts", _quote_for([str(t).lower() for t in con.normalized_terms],
+                                          title, snippet)
+    terms = [str(t) for t in getattr(con, "normalized_terms", [])]
+    quote = _quote_for([t.lower() for t in terms], title, snippet)
+    # (a) strong: the existing >=2-anchor-term overlap rule (preserves prior behavior).
+    if _supports(con, text_l):
+        return "supports", quote
+    anchors = _distinctive_anchors(con)
+    present = anchors & _tokens(text_l)
+    # (b) temporal pattern: a constraint year present + an opening/founding/etc. predicate.
+    cyears = set(_YEAR.findall(getattr(con, "text_span", "") or ""))
+    if cyears and (cyears & set(_YEAR.findall(text_l))) and \
+            any(p in text_l for p in _TEMPORAL_PREDICATES):
+        return "supports", quote
+    # (c) corroborated: ONE distinctive anchor from a trustworthy source typing a real
+    #     entity (a professional profile / official / scholarly / db record / directory).
+    if present and source_role in CORROBORATING_ROLES and cand_role not in ("unknown", ""):
+        return "supports", quote
+    if present:
+        return "insufficient", quote
+    return "irrelevant", ""
+
+
+def _normalize_role(text: str, role_e: str, title: str, snippet: str) -> str:
+    """Tighten the inferred role using local predicates so chrome/dates don't bind wrong
+    slots: months/weekdays -> date_or_time; an explicit 'in <X>' location cue -> location."""
+    tl = text.lower().strip()
+    if tl in _MONTHS or tl in _WEEKDAYS:
+        return "date_or_time"
+    # an entity whose own last word is a venue/org type is an organization, not a person.
+    words = [w.lower() for w in _WORD.findall(text)]
+    if words and words[-1] in _ORG_SUFFIX:
+        return "organization"
+    if role_e in ("person", "unknown"):
+        ctx = f"{title} {snippet}"
+        if re.search(rf"\bin {re.escape(text)}\b", ctx) or re.search(
+                rf"{re.escape(text)},\s+[A-Z]", ctx):
+            # "located in <X>" / "<X>, State" reads as a place, not a person.
+            return "location"
+    return role_e
+
+
+def _hygiene_reason(text: str, role_e: str) -> str:
+    """Reject obvious non-entities BEFORE slot assignment (generic, not domain-specific)."""
+    toks = [w.lower() for w in _WORD.findall(text or "")]
+    content = [t for t in toks if len(t) >= 2]
+    if not content:
+        return "insufficient_context"
+    # a phrase made up ENTIRELY of generic type/category words is not a task entity.
+    if all(t in _GENERIC_TYPE_WORDS for t in content):
+        return "generic_type_without_predicate"
+    # a lone month/weekday is not a person/org candidate.
+    if len(content) == 1 and (content[0] in _MONTHS or content[0] in _WEEKDAYS):
+        return "date_or_weekday_not_entity"
+    return ""
+
+
+def _slot_compatible(role_e: str, slot_role: str) -> bool:
+    """Stricter than ``_role_compatible``: unknown never fans out, and a date/time entity
+    only binds a date/time (or untyped) slot."""
+    from regimes_probe.agent.candidate_frontier import _role_compatible
+    if role_e in ("", "unknown"):
+        return False
+    if role_e == "date_or_time":
+        return slot_role in ("date_or_time", "unknown")
+    return _role_compatible(role_e, slot_role)
 
 
 # --------------------------------------------------------------------------- interpreter
@@ -328,23 +466,44 @@ class EvidenceInterpreter:
                 role_e, from_ctx = classify_entity_role(e), False
             else:
                 role_e, from_ctx = _context_role(e, title, snippet)
+            role_e = _normalize_role(e, role_e, title, snippet)
             assertion = self._assert_candidate(
                 e, norm, role_e, frame, frontier, dslot, sel_cons, role, noise_reasons,
-                text_l, title, snippet, is_known=is_known, from_ctx=from_ctx)
+                text_l, title, snippet, is_known=is_known, from_ctx=from_ctx,
+                contaminated=contaminated)
+            assertion.assertion_id = f"{interp.interpretation_id}_a{len(interp.candidate_assertions)}"
             interp.candidate_assertions.append(assertion)
-        # constraint assertions: only the SELECTED/tested constraints, with quotes.
+        # constraint assertions: the SELECTED/tested constraints, reflecting whether an
+        # ACCEPTED candidate actually supports/contradicts them (req 2: support flows from
+        # interpreted candidate evidence, not standalone overlap).
+        supported_by_cand = {cid for a in interp.candidate_assertions if a.accepted
+                             for cid in a.supports_constraint_ids}
+        contradicted_by_cand = {cid for a in interp.candidate_assertions if a.accepted
+                                for cid in a.contradicts_constraint_ids}
         for cid in sel_cons:
             con = next((c for c in frame.constraints if c.constraint_id == cid), None)
             if con is None:
                 continue
-            interp.constraint_assertions.append(
-                self._assert_constraint(con, role, text_l, title, snippet))
+            if cid in contradicted_by_cand:
+                interp.constraint_assertions.append(ConstraintAssertion(
+                    cid, "contradicts", reason="candidate_contradicts",
+                    evidence_quote_or_span=_quote_for(
+                        [str(t).lower() for t in con.normalized_terms], title, snippet)))
+            elif cid in supported_by_cand:
+                interp.constraint_assertions.append(ConstraintAssertion(
+                    cid, "supports", confidence=0.8, reason="supported_by_accepted_candidate",
+                    evidence_quote_or_span=_quote_for(
+                        [str(t).lower() for t in con.normalized_terms], title, snippet)))
+            else:
+                interp.constraint_assertions.append(
+                    self._assert_constraint(con, role, text_l, title, snippet))
         self._tally(interp)
         return interp
 
     def _assert_candidate(self, text, norm, role_e, frame, frontier, dslot, sel_cons,
                           source_role, noise_reasons, text_l, title, snippet,
-                          *, is_known: bool, from_ctx: bool = False) -> CandidateAssertion:
+                          *, is_known: bool, from_ctx: bool = False,
+                          contaminated: bool = False) -> CandidateAssertion:
         a = CandidateAssertion(candidate_text=text, normalized_text_hash=_hash(norm),
                                inferred_role=role_e, source_role=source_role,
                                from_ctx=from_ctx)
@@ -353,34 +512,52 @@ class EvidenceInterpreter:
         if nk:
             a.rejection_reason = nk
             return a
-        # 2) source-role noise: definition / ui / contaminated pages identify no entities.
+        # 2) hygiene: generic-type-only phrases / lone dates+weekdays are not entities.
+        hr = _hygiene_reason(text, role_e)
+        if hr:
+            a.rejection_reason = hr
+            return a
+        # 3) source-role noise: definition / ui / contaminated pages identify no entities.
         if source_role in HARD_NOISE_ROLES:
             a.rejection_reason = (noise_reasons[0] if noise_reasons
                                   else "no_slot_compatible_evidence")
             return a
-        # 3) slot compatibility: role-compatible target/intermediate or selected slot.
+        # 4) unknown role does NOT fan out into every slate (req 4): a weak observation
+        #    only becomes a candidate once a local predicate disambiguates its role.
+        if role_e in ("", "unknown"):
+            a.rejection_reason = "weak_observation_not_candidate"
+            return a
+        # 5) slot compatibility: role-compatible target/intermediate or selected slot
+        #    (date/location typing respected; no unknown wildcard).
         slots = [s for s in frame.all_slots
-                 if s.slot_id in frontier.slates and _role_compatible(role_e, s.slot_role)]
+                 if s.slot_id in frontier.slates and _slot_compatible(role_e, s.slot_role)]
         if dslot is not None and dslot.slot_id in frontier.slates and dslot not in slots \
-                and _role_compatible(role_e, dslot.slot_role):
+                and _slot_compatible(role_e, dslot.slot_role):
             slots.append(dslot)
         if not slots:
             a.rejection_reason = "role_incompatible"
             return a
+        # 6) per-slot constraint support via the generic recognizers (NOT raw overlap).
         proposed, supports, contradicts = [], set(), set()
         for slot in slots:
             cons = list(frontier._constraints_for_slot(slot.slot_id))
             if slot.slot_id == (dslot.slot_id if dslot else None):
                 cons += [c for c in (frontier._con(cid) for cid in sel_cons)
                          if c is not None and c not in cons]
-            sup = [c.constraint_id for c in cons if _supports(c, text_l)
-                   and any(t in norm for t in c.normalized_terms if len(t) >= 4)] if is_known else \
-                  [c.constraint_id for c in cons if _supports(c, text_l)]
+            sup, con = [], []
+            for c in cons:
+                status, _q = recognize_constraint_support(
+                    c, text, role_e, source_role, title, snippet, contaminated=contaminated)
+                if status == "supports":
+                    sup.append(c.constraint_id)
+                elif status == "contradicts":
+                    con.append(c.constraint_id)
             if is_known and not sup:
                 continue                # a known constant binds a slot only via support
             proposed.append(slot.slot_id)
+            a.slot_support[slot.slot_id] = [sorted(sup), sorted(con)]
             supports.update(sup)
-            contradicts.update(c.constraint_id for c in cons if _contradicts(c, text_l, text.lower()))
+            contradicts.update(con)
         if not proposed:
             a.rejection_reason = ("unsupported_by_selected_constraint" if is_known
                                   else "no_slot_compatible_evidence")

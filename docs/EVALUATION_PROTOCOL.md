@@ -385,3 +385,17 @@ it onto slates. The debug-only `has_gold_but_not_promoted_count` (computed in
 check for the WHO `Cristina Ortiz` failure: a correct candidate present in results but not
 promoted. A healthy interpreter run rejects most chrome, accepts role-compatible entities on
 the selected slot, and raises constraint support via quoted assertions.
+
+**The evidence→candidate→constraint path has first-class link invariants (Level 5d.1).** A
+trace where evidence reaches slots but never constraints is a *bug to surface, not absorb*:
+read `evidence_to_slot_link_rate` vs `evidence_to_constraint_link_rate` together with
+`ev_slot_true_cons_false_count` and `accepted_candidate_without_constraint_support_count` —
+a large slot/constraint gap means accepted candidates carry no constraint anchor and should
+be investigated, and every such case is explained by an `ev_slot_true_cons_false_explained`
+event. The verifier↔registry desync (an extracted candidate later called "nonexistent") is
+caught by `canonical_candidate_resolution_rate` (should be ≈1.0) and
+`verifier_nonexistent_but_extracted_candidate_count` (should be 0); a non-zero count means
+the proposal and registry namespaces diverged. `deterministic_query_marked_ok_but_repaired_count`
+and `deterministic_query_bad_but_not_repaired_count` measure whether repair fires on
+evidence-quality failures (noise/no-progress/prompt-language queries), not just one-word
+generics.

@@ -83,6 +83,16 @@ class Events:
     CANDIDATE_ASSERTION_MADE = "candidate_assertion_made"
     CANDIDATE_ASSERTION_REJECTED = "candidate_assertion_rejected"
     CONSTRAINT_ASSERTION_MADE = "constraint_assertion_made"
+    # Level 5d.1 canonical candidate registry + constraint-support attachment
+    CANDIDATE_ASSERTION_MATERIALIZED = "candidate_assertion_materialized"
+    CANONICAL_CANDIDATE_CREATED = "canonical_candidate_created"
+    CANONICAL_CANDIDATE_UPDATED = "canonical_candidate_updated"
+    EVIDENCE_CONSTRAINT_SUPPORT_ATTACHED = "evidence_constraint_support_attached"
+    EVIDENCE_CONSTRAINT_SUPPORT_REJECTED = "evidence_constraint_support_rejected"
+    WEAK_OBSERVATION_RECORDED = "weak_observation_recorded"
+    CANDIDATE_LOOKUP_RESOLVED = "candidate_lookup_resolved"
+    CANDIDATE_LOOKUP_FAILED = "candidate_lookup_failed"
+    EV_SLOT_TRUE_CONS_FALSE_EXPLAINED = "ev_slot_true_cons_false_explained"
 
 
 #: Candidate-slate / frontier event-type strings (trace + projection only).
@@ -114,6 +124,11 @@ EVIDENCE_INTERPRETATION_EVENTS: tuple[str, ...] = (
     Events.EVIDENCE_INTERPRETED, Events.SOURCE_CLASSIFIED,
     Events.CANDIDATE_ASSERTION_MADE, Events.CANDIDATE_ASSERTION_REJECTED,
     Events.CONSTRAINT_ASSERTION_MADE,
+    Events.CANDIDATE_ASSERTION_MATERIALIZED, Events.CANONICAL_CANDIDATE_CREATED,
+    Events.CANONICAL_CANDIDATE_UPDATED, Events.EVIDENCE_CONSTRAINT_SUPPORT_ATTACHED,
+    Events.EVIDENCE_CONSTRAINT_SUPPORT_REJECTED, Events.WEAK_OBSERVATION_RECORDED,
+    Events.CANDIDATE_LOOKUP_RESOLVED, Events.CANDIDATE_LOOKUP_FAILED,
+    Events.EV_SLOT_TRUE_CONS_FALSE_EXPLAINED,
 )
 
 

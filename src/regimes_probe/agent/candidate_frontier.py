@@ -67,12 +67,16 @@ def _noise_kind(text: str) -> str:
     words = {w.lower() for w in re.findall(r"[A-Za-z]+", text or "")}
     if not words:
         return ""
-    norm = " ".join(w.lower() for w in re.findall(r"[A-Za-z]+", text or ""))
-    if words & _NOISE_DEFINITION:
+    ordered = [w.lower() for w in re.findall(r"[A-Za-z]+", text or "")]
+    norm = " ".join(ordered)
+    lead = ordered[0] if ordered else ""
+    if words & _NOISE_DEFINITION or lead in _NOISE_DEFINITION:
         return "generic_definition_noise"
-    if norm in _NOISE_PLATFORM_PHRASES or (words & _NOISE_PLATFORM and len(words) <= 2):
+    if norm in _NOISE_PLATFORM_PHRASES or lead in _NOISE_PLATFORM or (
+            words & _NOISE_PLATFORM and len(words) <= 2):
         return "source_platform_noise"
-    if words & _NOISE_UI and len(words) <= 2:
+    # a leading navigation/chrome word ("Browse …", "Search …", "Login …") is page chrome.
+    if lead in _NOISE_UI or (words & _NOISE_UI and len(words) <= 2):
         return "ui_navigation_noise"
     return ""
 
@@ -313,6 +317,10 @@ class CandidateFrontier:
         #: interpreter is created lazily to avoid an import cycle.
         self.interpreter = interpreter
         self.interpretations: list[Any] = []
+        #: canonical candidate registry indexes (req 1/6): resolve proposal/verifier
+        #: candidate TEXT -> canonical SlotCandidate id, and assertion_id -> candidate_id.
+        self.candidate_text_index: dict[str, dict[str, str]] = {}   # slot_id -> {norm: cid}
+        self.assertion_to_candidate: dict[str, str] = {}
         self._cc = self._ec = self._hc = self._ac = self._evc = 0
         self._known = {_norm(t) for t in frame.known_context_terms}
         # one slate per slot that NEEDS binding (every unbound variable).
@@ -432,26 +440,32 @@ class CandidateFrontier:
                 self._emit("candidate_assertion_rejected", evidence_id=ev.evidence_id,
                            data={"text": _prev(a.candidate_text, 60),
                                  "reason": a.rejection_reason})
+                if a.rejection_reason == "weak_observation_not_candidate":
+                    self._emit("weak_observation_recorded", evidence_id=ev.evidence_id,
+                               data={"text": _prev(a.candidate_text, 60)})
             for ca in interp.constraint_assertions:
                 self._emit("constraint_assertion_made", evidence_id=ev.evidence_id,
                            data={"constraint_id": ca.constraint_id, "status": ca.status})
-            # apply accepted candidate assertions -> slates (deterministic _assign).
-            for a in interp.accepted_candidates():
-                self._emit("candidate_assertion_made", evidence_id=ev.evidence_id,
-                           data={"text": _prev(a.candidate_text, 60),
-                                 "role": a.inferred_role,
-                                 "proposed_slot_ids": list(a.proposed_slot_ids)})
-                for sid in a.proposed_slot_ids:
-                    slot = self.frame.slot(sid)
-                    if slot is None or sid not in self.slates:
-                        continue
-                    cons = self._cons_for(sid, directed_slot_id, directed_constraint_ids)
-                    self._assign(slot, a.candidate_text, _norm(a.candidate_text),
-                                 a.inferred_role, ev, source_tool, action_id, stage,
-                                 _host(url), authority, contaminated, a.from_ctx,
-                                 text_l, cons, directed_slot_id=directed_slot_id,
-                                 directed_constraint_ids=directed_constraint_ids,
-                                 proposal_id=proposal_id)
+                if ca.status in ("irrelevant", "insufficient") and ca.constraint_id in (
+                        directed_constraint_ids or []):
+                    self._emit("evidence_constraint_support_rejected", evidence_id=ev.evidence_id,
+                               data={"constraint_id": ca.constraint_id, "reason": ca.reason})
+            # materialize accepted candidate assertions into canonical SlotCandidates and
+            # attach their (recognizer-computed) constraint support — slates and support
+            # come from interpreted assertions, never raw n-grams (req 1/2).
+            self.attach_constraint_support_from_interpretation(
+                interp, ev, source_tool=source_tool, action_id=action_id, stage=stage,
+                url=url, authority=authority, contaminated=contaminated,
+                directed_slot_id=directed_slot_id,
+                directed_constraint_ids=directed_constraint_ids, proposal_id=proposal_id)
+            # explain an ev->slot-true / ev->cons-false interpretation (req 7 invariant).
+            acc = interp.accepted_candidates()
+            if acc and any(a.proposed_slot_ids for a in acc) and not any(
+                    a.supports_constraint_ids for a in acc):
+                self._emit("ev_slot_true_cons_false_explained", evidence_id=ev.evidence_id,
+                           data={"interpretation_id": interp.interpretation_id,
+                                 "source_role": interp.source_role,
+                                 "reason": "accepted_candidate_no_constraint_anchor_present"})
             for hint in self.frame.answer_shape_hints:
                 if hint.lower() in text_l and hint not in ev.answer_shape_hints_found:
                     ev.answer_shape_hints_found.append(hint)
@@ -497,16 +511,88 @@ class CandidateFrontier:
             supported.update(set(c.constraints_supported) & cset)
         return len(supported)
 
+    @staticmethod
+    def _norm_key(text: str) -> str:
+        return " ".join(w.lower() for w in re.findall(r"[A-Za-z0-9]+", text or ""))
+
+    def resolve_candidate(self, text_or_id: str, *, slot_id: Optional[str] = None) -> dict:
+        """Resolve a candidate TEXT or id to its canonical SlotCandidate id (req 1/6).
+
+        Returns ``{candidate_id, found, searched_slot_ids, close_matches, other_slot}`` so a
+        verifier can resolve a candidate the evidence interpreter created — or record a rich
+        ``nonexistent_candidate`` debug when it genuinely cannot."""
+        debug = {"candidate_id": None, "found": False, "normalized": self._norm_key(text_or_id),
+                 "searched_slot_ids": [], "close_matches": [], "other_slot": None}
+        if text_or_id in self.candidates_by_id:
+            debug.update(candidate_id=text_or_id, found=True)
+            return debug
+        key = self._norm_key(text_or_id)
+        order = ([slot_id] if slot_id else []) + [s for s in self.slates if s != slot_id]
+        for sid in order:
+            debug["searched_slot_ids"].append(sid)
+            cid = self.candidate_text_index.get(sid, {}).get(key)
+            if cid:
+                debug.update(candidate_id=cid, found=True)
+                if slot_id and sid != slot_id:
+                    debug["other_slot"] = sid
+                return debug
+        # close matches (substring/variant) for debug only.
+        for sid in order:
+            for k, cid in self.candidate_text_index.get(sid, {}).items():
+                if key and (key in k or k in key):
+                    debug["close_matches"].append({"slot_id": sid, "text": k, "candidate_id": cid})
+        return debug
+
+    def attach_constraint_support_from_interpretation(
+            self, interp, ev, *, source_tool, action_id, stage, url, authority,
+            contaminated, directed_slot_id=None, directed_constraint_ids=None,
+            proposal_id=None) -> None:
+        """Materialize accepted candidate assertions into canonical SlotCandidates and
+        attach the recognizer-computed constraint support (the single support path)."""
+        title = getattr(ev, "title_preview", "") or ""
+        for a in interp.accepted_candidates():
+            self._emit("candidate_assertion_made", evidence_id=ev.evidence_id,
+                       data={"assertion_id": a.assertion_id, "text": _prev(a.candidate_text, 60),
+                             "role": a.inferred_role, "proposed_slot_ids": list(a.proposed_slot_ids)})
+            for sid in a.proposed_slot_ids:
+                slot = self.frame.slot(sid)
+                if slot is None or sid not in self.slates:
+                    continue
+                cons = self._cons_for(sid, directed_slot_id, directed_constraint_ids)
+                sup, con = (a.slot_support.get(sid) or [[], []])
+                cid = self._assign(
+                    slot, a.candidate_text, _norm(a.candidate_text), a.inferred_role, ev,
+                    source_tool, action_id, stage, _host(url), authority, contaminated,
+                    a.from_ctx, f"{title} {ev.snippet_preview}".lower(), cons,
+                    supported=list(sup), contradicted=list(con),
+                    directed_slot_id=directed_slot_id,
+                    directed_constraint_ids=directed_constraint_ids, proposal_id=proposal_id)
+                a.canonical_candidate_ids[sid] = cid
+                if a.assertion_id:
+                    self.assertion_to_candidate[a.assertion_id] = cid
+                self._emit("candidate_assertion_materialized", candidate_id=cid,
+                           slot_id=sid, evidence_id=ev.evidence_id,
+                           data={"assertion_id": a.assertion_id})
+                if sup:
+                    self._emit("evidence_constraint_support_attached", candidate_id=cid,
+                               slot_id=sid, evidence_id=ev.evidence_id,
+                               data={"constraint_ids": list(sup)})
+
     def _assign(self, slot, text, norm, role, ev, source_tool, action_id, stage,
                 domain, authority, contaminated, from_ctx, text_l, cons,
+                *, supported=None, contradicted=None,
                 directed_slot_id=None, directed_constraint_ids=None,
-                proposal_id=None) -> None:
+                proposal_id=None) -> str:
         slate = self.slates[slot.slot_id]
         existing = next((c for c in slate.candidates.values()
                          if c.normalized_text_hash == _hash(norm)), None)
         cand_l = text.lower()
-        supported = [c.constraint_id for c in cons if _supports(c, text_l)]
-        contradicted = [c.constraint_id for c in cons if _contradicts(c, text_l, cand_l)]
+        # Support is ATTACHED from the interpreter's recognizers (req 2); fall back to the
+        # overlap rule only when a direct caller did not supply it.
+        if supported is None:
+            supported = [c.constraint_id for c in cons if _supports(c, text_l)]
+        if contradicted is None:
+            contradicted = [c.constraint_id for c in cons if _contradicts(c, text_l, cand_l)]
         if existing is None:
             self._cc += 1
             cand = SlotCandidate(
@@ -517,10 +603,14 @@ class CandidateFrontier:
                 novelty_score=0.75 if from_ctx else 1.0)
             slate.candidates[cand.candidate_id] = cand
             self.candidates_by_id[cand.candidate_id] = cand
+            self.candidate_text_index.setdefault(slot.slot_id, {})[
+                self._norm_key(text)] = cand.candidate_id
             ev.newly_introduced_candidates.append(cand.candidate_id)
             self._emit("candidate.extracted", candidate_id=cand.candidate_id,
                        slot_id=slot.slot_id, evidence_id=ev.evidence_id, action_id=action_id,
                        data={"text_preview": _prev(text, 60), "role": role})
+            self._emit("canonical_candidate_created", candidate_id=cand.candidate_id,
+                       slot_id=slot.slot_id, evidence_id=ev.evidence_id)
             self._emit("candidate.assigned_to_slot", candidate_id=cand.candidate_id,
                        slot_id=slot.slot_id, evidence_id=ev.evidence_id)
         else:
@@ -562,12 +652,16 @@ class CandidateFrontier:
                              "constraint_ids": list(directed_constraint_ids or []),
                              "supported_constraint_ids": list(supported)})
         was_confirmed = cand.status == "confirmed"
+        if existing is not None:
+            self._emit("canonical_candidate_updated", candidate_id=cand.candidate_id,
+                       slot_id=slot.slot_id, evidence_id=ev.evidence_id)
         self._update_status(cand, contaminated)
         if (proposal_id and slot.slot_id == directed_slot_id
                 and cand.status == "confirmed" and not was_confirmed):
             self._emit("candidate_promoted_from_llm_frontier_evidence",
                        candidate_id=cand.candidate_id, slot_id=slot.slot_id,
                        data={"proposal_id": proposal_id})
+        return cand.candidate_id
 
     def _update_status(self, cand: SlotCandidate, contaminated: bool) -> None:
         old = cand.status

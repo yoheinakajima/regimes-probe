@@ -95,6 +95,12 @@ class Relations:
     SOURCE_CLASSIFIED_AS = "source_classified_as"
     EVIDENCE_UPDATES_CANDIDATE_SLATE = "evidence_updates_candidate_slate"
     EVIDENCE_UPDATES_CONSTRAINT_STATUS = "evidence_updates_constraint_status"
+    # Level 5d.1 canonical candidate registry
+    ASSERTION_MATERIALIZES_CANDIDATE = "assertion_materializes_candidate"
+    CANONICAL_CANDIDATE_FOR_SLOT = "canonical_candidate_for_slot"
+    EVIDENCE_SUPPORTS_SELECTED_CONSTRAINT = "evidence_supports_selected_constraint"
+    PROPOSAL_RESOLVES_CANDIDATE = "proposal_resolves_candidate"
+    WEAK_OBSERVATION_NOT_CANDIDATE = "weak_observation_not_candidate"
     UPDATE_FROM_REWARD = "update_from_reward"
     REGIME_FOR_FAILURE = "regime_for_failure"
     PROMOTION_FOR_UPDATE = "promotion_for_update"
@@ -194,4 +200,9 @@ PROJECTION_RELATIONS: tuple[str, ...] = (
     Relations.SOURCE_CLASSIFIED_AS,
     Relations.EVIDENCE_UPDATES_CANDIDATE_SLATE,
     Relations.EVIDENCE_UPDATES_CONSTRAINT_STATUS,
+    Relations.ASSERTION_MATERIALIZES_CANDIDATE,
+    Relations.CANONICAL_CANDIDATE_FOR_SLOT,
+    Relations.EVIDENCE_SUPPORTS_SELECTED_CONSTRAINT,
+    Relations.PROPOSAL_RESOLVES_CANDIDATE,
+    Relations.WEAK_OBSERVATION_NOT_CANDIDATE,
 )

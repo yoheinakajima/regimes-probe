@@ -817,3 +817,40 @@ adds a **cached/replayable** LLM hook that may only re-classify a result's sourc
 bounded snippets — it never answers, is keyed by `prompt_hash | evidence_hash | frame_hash |
 model`, and replay/dry-run make **zero** model calls. Nothing the interpreter sees or emits
 reaches policy memory.
+
+#### One canonical candidate registry + support attached from evidence (Level 5d.1)
+
+The first interpreter run was far more inspectable but exposed three generic gaps, fixed by
+tightening the evidence → candidate → constraint path (no new architecture, no
+benchmark-specific rules):
+
+- **Candidate assertions ARE canonical candidates, not a sidecar.** When an assertion is
+  accepted it immediately materializes (or updates) the canonical `SlotCandidate`
+  (`attach_constraint_support_from_interpretation`), records `assertion_id → candidate_id`,
+  and indexes the candidate text per slot. The verifier resolves a proposal's candidate by
+  **text or id** (`resolve_candidate`, exact + normalized variants, per-slot then
+  cross-slot), so an LLM proposal that names `Cristina Ortiz` is no longer rejected as
+  `nonexistent_candidate` when the interpreter already extracted it — it resolves to the
+  canonical id (or records a rich `candidate_lookup_failed` debug with close matches).
+- **Constraint support is ATTACHED from interpreted evidence, never raw overlap.** Generic
+  deterministic recognizers decide support: the existing ≥2-anchor-term rule, a temporal
+  pattern (a constraint year present with an opening/founding/etc. predicate), and a
+  *corroborated single anchor* (one distinctive constraint anchor from a trustworthy source
+  — professional_profile / official / scholarly / database / directory — typing a
+  role-compatible entity). Support requires an acceptable, non-contaminated source and a
+  role-compatible candidate; a definition/UI/contaminated page contributes none. The
+  candidate's `constraints_supported` is set from these recognizer decisions (not recomputed
+  from arbitrary overlap), so `ev→cons` reflects real evidence.
+- **Unknown-role observations are not candidates.** An entity whose role stays `unknown`
+  after local disambiguation is recorded as a `weak_observation_not_candidate` and never
+  fans out into every slate. Months/weekdays type as `date_or_time` (only date slots),
+  venue-suffix names ("Pecos Trail Inn"/"Cafe") type as organizations, leading page-chrome
+  ("Browse …"/"Login …") and generic-type-only phrases ("TV Shows") are rejected — all
+  generic, predicate/role-based, not a domain stoplist.
+- **Repair triggers on evidence-quality failures, not just generic query strings.** Beyond
+  one-word generics, repair fires when the deterministic query carries a retrieval-noise
+  term, leans on a stale/no-progress/slot-incompatible candidate, or is "prompt-language"
+  (a bag of common words with no distinctive anchor — no quoted phrase, proper noun, or
+  year). `deterministic_query_marked_ok_but_repaired_count` /
+  `deterministic_query_bad_but_not_repaired_count` track the gap between the cheap
+  generic-string check and the evidence-quality check.

@@ -60,6 +60,19 @@ def _is_generic_query(q: str) -> bool:
     return all(t in _GENERIC_WORDS for t in content)
 
 
+def _query_lacks_distinctive_anchor(q: str) -> bool:
+    """A 'prompt-language' / crossword-like query: words but no distinctive retrieval anchor
+    (no quoted phrase, proper noun, or year). Generic, not BrowseComp-specific."""
+    if '"' in q:
+        return False
+    if re.search(r"\b(1[5-9]\d{2}|20\d{2})\b", q):
+        return False
+    for w in re.findall(r"[A-Za-z][A-Za-z'&]+", q):
+        if w[:1].isupper() and w.lower() not in _GENERIC_WORDS:
+            return False
+    return True
+
+
 # --------------------------------------------------------------------------- card
 @dataclass
 class ResearchStateCard:
@@ -184,6 +197,8 @@ class FrontierProposal:
     normalized_tool_family: str = ""
     normalized_tool: str = ""
     tool_normalized: bool = False
+    #: candidate text->id resolution debug (req 6), set during validation.
+    candidate_lookup_debug: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {"proposal_id": self.proposal_id, "action_type": self.action_type,
@@ -300,6 +315,10 @@ def repair_trigger_reason(det_plan, frame, frontier, *, no_progress_norms: set[s
         return "generic_query"
     if _norm_q(q) in no_progress_norms:
         return "repeats_zero_progress_query"
+    # the query string itself leans on retrieval-noise / chrome / source language.
+    for tok in re.findall(r'"[^"]+"|\S+', q):
+        if _noise_kind(tok.strip('"')):
+            return "noise_term_in_query"
     cand = (frontier.candidates_by_id.get(det_plan.candidate_id)
             if (frontier is not None and det_plan.candidate_id) else None)
     if cand is not None:
@@ -311,6 +330,10 @@ def repair_trigger_reason(det_plan, frame, frontier, *, no_progress_norms: set[s
         nk = _noise_kind(cand.candidate_text)
         if nk:
             return f"noise_candidate:{nk}"
+    # prompt-language / crossword-like query: a bag of common words with NO distinctive
+    # anchor (no quoted phrase, proper noun, rare term, or year) on a multi-hop frame.
+    if len(frame.constraints) >= 1 and _query_lacks_distinctive_anchor(q):
+        return "query_lacks_distinctive_anchor"
     # high-priority unresolved constraint anchor missing from the query.
     hp_terms: set[str] = set()
     for c in frame.constraints:
@@ -357,7 +380,17 @@ def validate_proposal(p: FrontierProposal, frame, frontier, *, failed_norms: set
     for cid in p.constraint_ids:
         if cid not in con_ids:
             return False, f"nonexistent_constraint:{cid}"
-    if p.candidate_id and frontier is not None and p.candidate_id not in frontier.candidates_by_id:
+    # Candidate may be referenced by TEXT (what an LLM emits) — resolve it to the canonical
+    # SlotCandidate the evidence interpreter created (req 6). Do NOT reject an extracted
+    # candidate just because its id is its text. An exact/dependent-slot match is allowed.
+    if p.candidate_id and frontier is not None and hasattr(frontier, "resolve_candidate"):
+        dbg = frontier.resolve_candidate(p.candidate_id, slot_id=p.target_slot_id)
+        p.candidate_lookup_debug = dbg
+        if dbg.get("found"):
+            p.candidate_id = dbg["candidate_id"]
+        else:
+            return False, "nonexistent_candidate"
+    elif p.candidate_id and frontier is not None and p.candidate_id not in frontier.candidates_by_id:
         return False, f"nonexistent_candidate:{p.candidate_id}"
     if p.hypothesis_id and frontier is not None and p.hypothesis_id not in frontier.hypotheses:
         return False, f"nonexistent_hypothesis:{p.hypothesis_id}"
@@ -530,9 +563,15 @@ class LLMFrontierProposer:
             trigger = repair_trigger_reason(det_plan, frame, frontier,
                                             no_progress_norms=no_progress_norms)
             meta["repair_trigger_reason"] = trigger
+            det_q = (det_plan.query if det_plan else "") or ""
+            det_marked_ok = not (det_plan and det_plan.is_generic_query) and not _is_generic_query(det_q)
             if not trigger:
                 meta["skipped_reason"] = "deterministic_query_ok"
+                # skipped but the query still looks low-quality -> a missed repair (req 8).
+                meta["query_suspect_but_not_repaired"] = bool(_query_lacks_distinctive_anchor(det_q))
                 return None, meta
+            # repaired despite the one-word-generic check passing -> a context-only repair.
+            meta["marked_ok_but_repaired"] = bool(det_marked_ok)
             self.repair_invoked_count += 1
             self.repair_trigger_reasons[trigger] += 1
             _ev("llm_frontier_repair_invoked")
@@ -549,6 +588,14 @@ class LLMFrontierProposer:
             ok, reason = validate_proposal(p, frame, frontier, failed_norms=failed_norms,
                                            available_tools=card.available_tools,
                                            remaining_budget=card.remaining_budget)
+            if p.candidate_lookup_debug:
+                if p.candidate_lookup_debug.get("found"):
+                    _ev("candidate_lookup_resolved", proposal_id=p.proposal_id,
+                        candidate_id=p.candidate_lookup_debug.get("candidate_id"))
+                else:
+                    _ev("candidate_lookup_failed", proposal_id=p.proposal_id,
+                        data={k: p.candidate_lookup_debug.get(k) for k in
+                              ("normalized", "searched_slot_ids", "close_matches")})
             if ok:
                 p.status = "accepted"
                 score_proposal(p, frame, frontier, failed_norms=failed_norms)

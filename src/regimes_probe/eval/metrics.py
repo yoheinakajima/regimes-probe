@@ -301,6 +301,8 @@ def _llm_frontier_metrics(stats: list[dict]) -> dict[str, Any]:
     # proposal->action->evidence integrity (the bug-fix layer, req 9).
     integ_total = integ_pass = slot_match = con_match = ev_con_linked = 0
     progress_slot_compat = sel_con_support = promoted = tool_norm = 0
+    lookup_resolved = lookup_failed = lookup_failed_but_extracted = 0
+    marked_ok_repaired = bad_not_repaired = 0
     rej: Counter = Counter()
     trig: Counter = Counter()
     for s in used:
@@ -309,6 +311,18 @@ def _llm_frontier_metrics(stats: list[dict]) -> dict[str, Any]:
                 model_calls += 1
             if st.get("cache_hit"):
                 cache_hits += 1
+            if st.get("marked_ok_but_repaired"):
+                marked_ok_repaired += 1
+            if st.get("query_suspect_but_not_repaired"):
+                bad_not_repaired += 1
+            for e in st.get("events", []):
+                et = e.get("event_type")
+                if et == "candidate_lookup_resolved":
+                    lookup_resolved += 1
+                elif et == "candidate_lookup_failed":
+                    lookup_failed += 1
+                    if (e.get("close_matches") or e.get("data", {}).get("close_matches")):
+                        lookup_failed_but_extracted += 1
             if st.get("mode") == "repair" and any(
                     e.get("event_type") == "llm_frontier_repair_invoked"
                     for e in st.get("events", [])):
@@ -393,6 +407,13 @@ def _llm_frontier_metrics(stats: list[dict]) -> dict[str, Any]:
             _safe_div(progress_slot_compat, sel_total),
         "llm_frontier_selected_constraint_support_rate": _safe_div(sel_con_support, sel_total),
         "candidate_promoted_from_llm_frontier_count": promoted,
+        # verifier <-> evidence-candidate registry resolution (req 7).
+        "canonical_candidate_resolution_rate": _safe_div(
+            lookup_resolved, lookup_resolved + lookup_failed),
+        "verifier_nonexistent_but_extracted_candidate_count": lookup_failed_but_extracted,
+        "extracted_candidate_not_in_registry_count": lookup_failed,
+        "deterministic_query_marked_ok_but_repaired_count": marked_ok_repaired,
+        "deterministic_query_bad_but_not_repaired_count": bad_not_repaired,
     }
 
 
@@ -409,6 +430,7 @@ def _evidence_interpretation_metrics(stats: list[dict]) -> dict[str, Any]:
     if not used:
         return {}
     interp = candidate = accepted = rejected = supp = contra = promoted = 0
+    slot_link = cons_link = slot_true_cons_false = acc_no_support = 0
     roles: Counter = Counter()
     rej: Counter = Counter()
     for s in used:
@@ -419,6 +441,10 @@ def _evidence_interpretation_metrics(stats: list[dict]) -> dict[str, Any]:
         supp += int(s.get("constraint_assertion_support_count", 0))
         contra += int(s.get("constraint_assertion_contradiction_count", 0))
         promoted += int(s.get("candidate_promotion_from_evidence_count", 0))
+        slot_link += int(s.get("interpretation_slot_link_count", 0))
+        cons_link += int(s.get("interpretation_constraint_link_count", 0))
+        slot_true_cons_false += int(s.get("ev_slot_true_cons_false_count", 0))
+        acc_no_support += int(s.get("accepted_candidate_without_constraint_support_count", 0))
         for k, v in (s.get("source_role_counts") or {}).items():
             roles[k] += int(v)
         for k, v in (s.get("candidate_assertion_rejection_counts") or {}).items():
@@ -438,6 +464,11 @@ def _evidence_interpretation_metrics(stats: list[dict]) -> dict[str, Any]:
         "noise_candidate_rejection_rate": _safe_div(noise_rej, candidate),
         "source_role_noise_rate": _safe_div(noise_roles, interp),
         "candidate_promotion_from_evidence_count": promoted,
+        # ev->slot vs ev->cons link invariants (req 7).
+        "evidence_to_slot_link_rate": _safe_div(slot_link, interp),
+        "evidence_to_constraint_link_rate": _safe_div(cons_link, interp),
+        "ev_slot_true_cons_false_count": slot_true_cons_false,
+        "accepted_candidate_without_constraint_support_count": acc_no_support,
     }
 
 

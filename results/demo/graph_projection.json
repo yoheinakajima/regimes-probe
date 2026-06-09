@@ -133,7 +133,12 @@
     "candidate_assertion_rejected_because",
     "source_classified_as",
     "evidence_updates_candidate_slate",
-    "evidence_updates_constraint_status"
+    "evidence_updates_constraint_status",
+    "assertion_materializes_candidate",
+    "canonical_candidate_for_slot",
+    "evidence_supports_selected_constraint",
+    "proposal_resolves_candidate",
+    "weak_observation_not_candidate"
   ],
   "detail_limit": 60,
   "event_log": {

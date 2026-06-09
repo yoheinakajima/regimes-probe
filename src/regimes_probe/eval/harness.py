@@ -96,6 +96,21 @@ def _interpretation_stats(trace) -> dict:
     # how many confirmed candidates trace back to an interpreted (non-noise) source.
     confirmed = sum(len(s.get("confirmed_candidate_ids", [])) for s in cf.get("slates", []))
     st["candidate_promotion_from_evidence_count"] = confirmed
+    # ev->slot vs ev->cons link invariants (req 7): an interpretation "links a slot" when an
+    # accepted candidate proposes a slot, and "links a constraint" when it supports one.
+    slot_link = cons_link = slot_true_cons_false = acc_no_support = 0
+    for it in cf.get("interpretations", []):
+        acc = [a for a in it.get("candidate_assertions", []) if not a.get("rejection_reason")]
+        has_slot = any(a.get("proposed_slot_ids") for a in acc)
+        has_cons = any(a.get("supports_constraint_ids") for a in acc)
+        acc_no_support += sum(1 for a in acc if not a.get("supports_constraint_ids"))
+        slot_link += bool(has_slot)
+        cons_link += bool(has_cons)
+        slot_true_cons_false += bool(has_slot and not has_cons)
+    st["interpretation_slot_link_count"] = slot_link
+    st["interpretation_constraint_link_count"] = cons_link
+    st["ev_slot_true_cons_false_count"] = slot_true_cons_false
+    st["accepted_candidate_without_constraint_support_count"] = acc_no_support
     return st
 
 

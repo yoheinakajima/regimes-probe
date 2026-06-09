@@ -339,3 +339,20 @@ cached by `prompt_hash | evidence_hash | frame_hash | model`, so even with it en
 replay makes no model call and an offline fork can re-interpret cached results for free.
 Because slates are populated from assertions on non-noise sources only, no answer text from
 a definition/UI/contaminated page can leak into policy memory.
+
+**One canonical candidate registry (Level 5d.1).** An accepted candidate assertion is not a
+sidecar record — it *materializes* the canonical `SlotCandidate` the frontier, hypotheses,
+and verifier all share, and that link is event-sourced. New **events**
+(`EVIDENCE_INTERPRETATION_EVENTS`): `candidate_assertion_materialized`,
+`canonical_candidate_created`, `canonical_candidate_updated`,
+`evidence_constraint_support_attached`, `evidence_constraint_support_rejected`,
+`weak_observation_recorded`, `candidate_lookup_resolved`, `candidate_lookup_failed`,
+`ev_slot_true_cons_false_explained`. New **relations** (`PROJECTION_RELATIONS`):
+`assertion_materializes_candidate`, `canonical_candidate_for_slot`,
+`evidence_supports_selected_constraint`, `proposal_resolves_candidate`,
+`weak_observation_not_candidate`. So `graph_projection.json` shows, for each result, which
+assertion became which canonical candidate, which selected constraint it supported (with a
+quote), which proposal a verifier resolved to that same candidate, and why an
+`ev→slot-true / ev→cons-false` interpretation produced no constraint support. The
+resolution (`resolve_candidate`) and recognizer support are pure deterministic functions of
+the recorded text + frame, so the whole registry re-projects identically on replay.

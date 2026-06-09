@@ -194,6 +194,10 @@ def _project_llm_frontier(g: "_GraphBuilder", aid: str, tf_node: str, a_node: st
                 g.rel(pn, f"constraint#{aid}#{cid}", Relations.PROPOSAL_TESTS_CONSTRAINT)
             if p.get("candidate_id"):
                 g.rel(pn, f"slot_candidate#{aid}#{p['candidate_id']}", Relations.PROPOSAL_USES_CANDIDATE)
+                # the verifier RESOLVED this proposal's candidate text to a canonical id (req 6).
+                if g.has(f"slot_candidate#{aid}#{p['candidate_id']}"):
+                    g.rel(pn, f"slot_candidate#{aid}#{p['candidate_id']}",
+                          Relations.PROPOSAL_RESOLVES_CANDIDATE)
             if p.get("status") == "rejected":
                 v = g.obj(f"llm_frontier_validation#{aid}#{si}#{pid}", Objects.LLM_FRONTIER_VALIDATION,
                           {"rejection_reason": p.get("rejection_reason")})
@@ -281,12 +285,22 @@ def _project_evidence_interpretation(g: "_GraphBuilder", aid: str, cf: dict[str,
             g.rel(inode, an, Relations.INTERPRETATION_ASSERTS_CANDIDATE)
             if a.get("rejection_reason"):
                 g.rel(an, sr, Relations.CANDIDATE_ASSERTION_REJECTED_BECAUSE)
+                if a.get("rejection_reason") == "weak_observation_not_candidate":
+                    g.rel(an, inode, Relations.WEAK_OBSERVATION_NOT_CANDIDATE)
             else:
+                # the assertion MATERIALIZED a canonical SlotCandidate (req 1) — link to it.
+                canon = a.get("canonical_candidate_ids", {}) or {}
                 for sid in a.get("proposed_slot_ids", []):
                     g.rel(an, f"latent_slot#{aid}#{sid}",
                           Relations.CANDIDATE_ASSERTION_ASSIGNED_TO_SLOT)
                     g.rel(inode, f"latent_slot#{aid}#{sid}",
                           Relations.EVIDENCE_UPDATES_CANDIDATE_SLATE)
+                    cc = canon.get(sid)
+                    if cc and g.has(f"slot_candidate#{aid}#{cc}"):
+                        g.rel(an, f"slot_candidate#{aid}#{cc}",
+                              Relations.ASSERTION_MATERIALIZES_CANDIDATE)
+                        g.rel(f"slot_candidate#{aid}#{cc}", f"latent_slot#{aid}#{sid}",
+                              Relations.CANONICAL_CANDIDATE_FOR_SLOT)
         for ci, c in enumerate(interp.get("constraint_assertions", [])):
             cn = g.obj(f"constraint_assertion#{aid}#{ii}#{ci}", Objects.CONSTRAINT_ASSERTION, {
                 "constraint_id": c.get("constraint_id"), "status": c.get("status"),
@@ -296,6 +310,9 @@ def _project_evidence_interpretation(g: "_GraphBuilder", aid: str, cf: dict[str,
             if c.get("status") == "supports":
                 g.rel(inode, cn, Relations.INTERPRETATION_SUPPORTS_CONSTRAINT)
                 g.rel(inode, f"constraint#{aid}#{cid}", Relations.EVIDENCE_UPDATES_CONSTRAINT_STATUS)
+                if cid in (interp.get("tested_constraint_ids") or []):
+                    g.rel(inode, f"constraint#{aid}#{cid}",
+                          Relations.EVIDENCE_SUPPORTS_SELECTED_CONSTRAINT)
             elif c.get("status") == "contradicts":
                 g.rel(inode, cn, Relations.INTERPRETATION_CONTRADICTS_CONSTRAINT)
                 g.rel(inode, f"constraint#{aid}#{cid}", Relations.EVIDENCE_UPDATES_CONSTRAINT_STATUS)

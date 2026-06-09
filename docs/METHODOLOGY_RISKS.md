@@ -436,3 +436,21 @@ set — and the risk surface. Keep the experiment honest:
   the score. The interpreter is deterministic by default (no model dependence); the optional
   LLM source-role hook is cached/replayable and answer-free, so it cannot leak or
   de-reproduce a run.
+
+- **Two candidate namespaces silently desync the system.** The first interpreter run made
+  this concrete: the evidence interpreter extracted `Cristina Ortiz`, but the verifier — which
+  knew candidates only by their `cand{N}` id — rejected a proposal naming `Cristina Ortiz` as
+  `nonexistent_candidate`. A sidecar "assertion" layer that does not *materialize* the
+  canonical candidate is worse than nothing: it looks productive while the rest of the system
+  can't see its candidates, and evidence reaches slots (`ev→slot`) but never constraints
+  (`ev→cons`) because support was computed by a different, overlap-only path. The defenses:
+  an accepted assertion materializes/updates the **one** canonical `SlotCandidate` (with an
+  `assertion_id → candidate_id` link and a per-slot text index), the verifier resolves a
+  candidate by text *or* id across slots before declaring it nonexistent, and constraint
+  support is attached from the interpreter's recognizers (acceptable source + role-compatible
+  candidate + a real anchor) rather than recomputed from term overlap. Watch
+  `canonical_candidate_resolution_rate` (≈1.0), `verifier_nonexistent_but_extracted_candidate_count`
+  (0), and `evidence_to_constraint_link_rate`; a regression here means the layers have drifted
+  apart again. And because permissive role typing (`unknown` → every slot) quietly poisons
+  every slate, an unknown-role observation is now a recorded `weak_observation`, not a
+  candidate — fan-out into all slates is itself treated as a bug.

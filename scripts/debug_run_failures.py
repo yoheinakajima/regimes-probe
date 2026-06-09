@@ -167,20 +167,28 @@ def main() -> int:
                     print(f"    [{it.get('source_role')}] {it.get('source_domain')} "
                           f"{it.get('source_title_preview')!r}"
                           + (f" noise={it.get('noise_reasons')}" if it.get('noise_reasons') else ""))
+                    acc_has_slot = acc_has_cons = False
                     for a in it.get("candidate_assertions", []):
                         mark = "✓" if not a.get("rejection_reason") else "✗"
-                        line = (f"        {mark} {a.get('candidate_text')!r} "
+                        line = (f"        {mark} {a.get('candidate_text')!r}[{a.get('assertion_id')}] "
                                 f"role={a.get('inferred_role')} → slots {a.get('proposed_slot_ids')}")
                         if a.get("rejection_reason"):
                             line += f"  REJECT={a.get('rejection_reason')}"
                         else:
-                            line += (f" supports={a.get('supports_constraint_ids')} "
+                            canon = a.get("canonical_candidate_ids", {})
+                            acc_has_slot = acc_has_slot or bool(a.get("proposed_slot_ids"))
+                            acc_has_cons = acc_has_cons or bool(a.get("supports_constraint_ids"))
+                            line += (f" → candidate_id={canon} "
+                                     f"supports={a.get('supports_constraint_ids')} "
                                      f"quote={a.get('evidence_quote_or_span')!r}")
                         print(line)
                     for c in it.get("constraint_assertions", []):
                         if c.get("status") in ("supports", "contradicts"):
                             print(f"        constraint {c.get('constraint_id')} [{c.get('status')}] "
                                   f"quote={c.get('evidence_quote_or_span')!r} ({c.get('reason')})")
+                    if acc_has_slot and not acc_has_cons:
+                        print("        ⚠ ev→slot=true ev→cons=false: accepted candidate but no "
+                              "constraint anchor present in this result")
         # Level 5c LLM frontier proposer: per-step proposals, validation, selection.
         lf = r.get("llm_frontier") or {}
         if lf.get("enabled"):

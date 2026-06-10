@@ -117,13 +117,25 @@ def main() -> int:
               f"body_located={pm.get('body_located_count')} "
               f"passages_scanned={pm.get('passages_scanned_count')} "
               f"judged={pm.get('judged_count')} closed={pm.get('closed_count')}; "
+              f"debug_snippet_scanned={pm.get('debug_snippet_scanned_count')} "
+              f"(diagnostic only, never counts as a located body); "
               f"beyond_4000={pm.get('passages_found_beyond_4000_count')}")
+        print(f"   body_sources: {json.dumps(pm.get('body_source_counts', {}))} "
+              f"url_match: {json.dumps(pm.get('url_match_method_counts', {}))}")
         print(f"   stage_reasons: {json.dumps(pm.get('stage_reason_counts', {}))}")
+        cr = pm.get("cache_report", {})
+        if cr:
+            print(f"   cache: files={cr.get('n_files')} entries={cr.get('n_entries')} "
+                  f"by_provider={json.dumps(cr.get('entries_by_provider', {}))} "
+                  f"raw_entries={cr.get('raw_payload_entries')} "
+                  f"unrecognized={cr.get('unrecognized_schema_count')}")
     for nnote in av.notes:
         print(f"   note: {nnote}")
     live_n = int(av.metrics.get("live_model_calls", 0))
-    print(f"\nLive judge tier: enabled={args.allow_live_judge} "
-          f"(default offline); live_model_calls={live_n}, live_provider_calls=0.")
+    skip = tier.get("live_judge_skipped_reason")
+    print(f"\nLive judge tier: enabled={tier.get('enabled')} "
+          f"(default offline){f'; skipped: {skip}' if skip else ''}; "
+          f"live_model_calls={live_n}, live_provider_calls=0.")
     if not args.allow_live_judge:
         print("No live provider/model calls were made.")
     print("No benchmark/accuracy/memory/generalization claim is made.")

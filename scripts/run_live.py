@@ -34,6 +34,10 @@ from regimes_probe.live.providers import (
     build_live_answerer, build_live_providers, missing_keys)
 from regimes_probe.live.cache import RecordingCache
 from regimes_probe.live.runner import ALL_CONDITIONS, build_plan, run_live_pipeline
+from regimes_probe.agent.read_judgment import DEFAULT_READ_CONFIG as _READ_CFG
+
+#: bounded raw-payload cap for read-class tools when --read-cache-store-raw is set (5m-7).
+_DEFAULT_READ_RAW_CHARS = _READ_CFG.read_cache_raw_chars
 
 
 def _load_dataset(name, path, cfg):
@@ -168,6 +172,17 @@ def main() -> int:
                     help="REQUIRED to actually call providers (spends money)")
     ap.add_argument("--recording-cache", default=None)
     ap.add_argument("--cache-mode", default="auto", choices=["auto", "replay", "record", "off"])
+    # 5m-7: read-class persistence for replay validation. Bounded raw storage of read-tool
+    # payloads (sanitized by the recording cache; no secrets/gold) + configurable read caps,
+    # so future validation never falls back to debug snippets.
+    ap.add_argument("--read-cache-store-raw", action="store_true",
+                    help="store bounded RAW payloads for read-class tools in the recording "
+                         "cache (enables beyond-cap passage validation in offline replay)")
+    ap.add_argument("--read-max-chars", type=int, default=0,
+                    help="override the read-class adapter caps (page_fetch/firecrawl_scrape); "
+                         "0 keeps the conservative 4000 default. Judge input stays bounded by "
+                         "passage windows regardless, so a larger retrieval body does not grow "
+                         "judge prompts (recommended for read-judgment-backed runs: 20000)")
     ap.add_argument("--resume-from-snapshot", default=None)
     ap.add_argument("--strict-preflight", action="store_true")
     ap.add_argument("--results-root", default=str(ROOT / "results" / "live"))
@@ -362,12 +377,17 @@ def main() -> int:
         print("\nREFUSING (strict preflight): same-conditions check failed.")
         return 2
 
-    cache = RecordingCache(args.recording_cache, mode=args.cache_mode)
+    cache = RecordingCache(args.recording_cache, mode=args.cache_mode,
+                           store_raw=bool(args.read_cache_store_raw))
     providers = build_live_providers(tools, cache=cache, armed=True,
                                      web_search_model=settings.web_search_model,
                                      web_search_context=settings.web_search_context_size,
                                      allow_stateful_or_paid=args.allow_stateful_or_paid_tools,
-                                     enable_browserish=args.enable_browserish_tools)
+                                     enable_browserish=args.enable_browserish_tools,
+                                     read_max_chars=int(args.read_max_chars or 0),
+                                     read_raw_chars=(
+                                         _DEFAULT_READ_RAW_CHARS
+                                         if args.read_cache_store_raw else 0))
     agent_cfg = AgentConfig(available_tools=tools,
                             query_mode=cfg["policy"]["query_mode"],
                             stop_mode=cfg["policy"]["stop_mode"],

@@ -84,8 +84,10 @@ def test_live_judge_tier_closes_and_records_then_replays_offline(tmp_path):
     r1 = load_legacy_run(run, allow_live_judge=True, max_judge_calls=20)
     o = r1.obligations[0]
     assert o.pipeline_status == "judged" and o.stage_reason == "closed_by_live_rejudgment"
-    assert r1.metrics["live_model_calls"] == 1
-    # the verdict was recorded into the run's judge cache -> a re-run is fully offline.
+    assert o.live_rejudgment_source in ("cache_stored_text", "cache_raw_payload",
+                                        "call_embedded_body")   # never debug_snippet_only
+    assert 1 <= r1.metrics["live_model_calls"] <= len(r1.obligations)
+    # the verdicts were recorded into the run's judge cache -> a re-run is fully offline.
     r2 = load_legacy_run(run)
     assert r2.metrics["live_model_calls"] == 0
     assert r2.obligations[0].pipeline_status in ("judged", "closed")

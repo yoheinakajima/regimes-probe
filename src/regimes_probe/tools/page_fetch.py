@@ -49,11 +49,15 @@ class PageFetch(SearchProvider):
     deterministic = False
     is_fetch = True
 
-    def __init__(self, *, cost_per_call: Decimal | str = "0.001", max_chars: int = 4000) -> None:
+    def __init__(self, *, cost_per_call: Decimal | str = "0.001", max_chars: int = 4000,
+                 raw_chars: int = 0) -> None:
         self.cost_per_call = (
             cost_per_call if isinstance(cost_per_call, Decimal) else Decimal(str(cost_per_call))
         )
         self.max_chars = max_chars
+        #: 5m-7: when > 0, expose a BOUNDED raw body via fetch_meta["raw_text"] so the
+        #: recording cache (store_raw) can persist it for offline replay validation.
+        self.raw_chars = raw_chars
 
     def available(self) -> bool:
         return True
@@ -96,6 +100,8 @@ class PageFetch(SearchProvider):
                 "body_truncated_for_storage": len(full) > self.max_chars,
                 "truncation_origin": "page_fetch_adapter_max_chars",
             }
+            if self.raw_chars > 0:
+                fetch_meta["raw_text"] = full[: self.raw_chars]
         except Exception as exc:  # network failure surfaces as an error response
             results = ()
             err = str(exc)

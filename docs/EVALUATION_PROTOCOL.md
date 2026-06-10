@@ -578,3 +578,25 @@ The live-judge tier state is unambiguous: with `--allow-live-judge` the output a
 `live_judge_tier.enabled=true` plus a `live_judge_skipped_reason` when there is nothing to judge.
 Default mode still makes zero live calls; no benchmark/accuracy/memory/generalization claim
 follows.
+
+**Level 5m — strict body-location semantics (a debug snippet is never a body).** The 5l
+local run showed the validator substituting 148-char debug previews for read bodies and then
+reporting passage scans / truncation / "validated" from them. 5m makes the semantics strict:
+the provider recording cache is discovered RECURSIVELY (manifest `cache.path` + everything
+under `cache/` + top-level `*cache*.json`, with unparseable files counted as
+`unrecognized_schema_count`, never skipped); bodies are located by priority — call-embedded
+body fields, then the recording cache (`cache_stored_text`/`cache_raw_payload`), and a debug
+snippet only as a LAST-RESORT DIAGNOSTIC (`debug_snippet_scanned_count`) that never counts in
+`body_located_count`/`passages_scanned_count`, never triggers a truncation claim, and is never
+live-judged. `matched_read=true` requires a URL relation (pinned 0
+`matched_read_with_no_url_match_method_count`), and `overall_status` is `validated` only when
+an obligation was judged/closed on an ACTUAL body — otherwise
+`reconstructed_passages_scanned_rejudgment_pending` / `reconstructed_debug_only` /
+`reconstructed_body_missing`. The live-judge tier reports `enabled=true` with
+`live_judge_skipped_reason=no_body_passages_to_judge` (and `live_model_calls=0`) when only
+debug snippets exist. For future runs, `run_live` gains `--read-cache-store-raw` (bounded raw
+bodies for read-class tools, cap 40000 chars, sanitized by the recording cache) and
+`--read-max-chars` (configurable read-adapter caps; recommended 20000 for
+read-judgment-backed runs — judge input stays bounded by passage windows, so a larger
+retrieval body does not grow judge prompts). Zero live calls in default mode; no
+benchmark/accuracy/memory/generalization claim follows.

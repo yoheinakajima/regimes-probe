@@ -66,8 +66,16 @@ class CachedProvider(SearchProvider):
         resp = safe_search(self.inner, query, limit=limit, **opts)   # the only network
         self.cache.calls += 1
         if self.cache.mode != "off":               # cache failures too, so reruns/replay
+            payload = resp.to_dict()
+            # 5m-7: a read-class adapter may expose a BOUNDED raw body (fetch_meta.raw_text);
+            # move it into the cache entry's `raw` field (persisted only when store_raw=True)
+            # so the stored response payload itself stays bounded.
+            raw_text = None
+            fm = payload.get("fetch_meta")
+            if isinstance(fm, dict) and "raw_text" in fm:
+                raw_text = fm.pop("raw_text")
             self.cache.store(h, provider=self.name, name=self.name,   # don't re-trigger them
-                             request_meta=meta, response_payload=resp.to_dict())
+                             request_meta=meta, response_payload=payload, raw=raw_text)
         return resp
 
 
@@ -167,7 +175,9 @@ class LiveClosedBookAnswerer(_BaseLiveAnswerer):
 def _build_inner(name: str, *, web_search_model: str = "gpt-5.4-mini",
                  web_search_context: str = "low",
                  allow_stateful_or_paid: bool = False,
-                 enable_browserish: bool = False) -> Optional[SearchProvider]:
+                 enable_browserish: bool = False,
+                 read_max_chars: int = 0,
+                 read_raw_chars: int = 0) -> Optional[SearchProvider]:
     if name in ("openai_web_search", "openai_web_search_low_context"):
         from regimes_probe.tools.openai_web_search import (
             openai_web_search, openai_web_search_low_context)
@@ -180,8 +190,10 @@ def _build_inner(name: str, *, web_search_model: str = "gpt-5.4-mini",
         from regimes_probe.tools.firecrawl import firecrawl_search
         return firecrawl_search()
     if name == "firecrawl_scrape":
-        from regimes_probe.tools.firecrawl import firecrawl_scrape
-        return firecrawl_scrape()
+        from regimes_probe.tools.firecrawl import FirecrawlScrape
+        # 5m-7: read-class adapter cap + bounded raw exposure are config-driven
+        # (0 = adapter default of 4000 / no raw).
+        return FirecrawlScrape(max_chars=read_max_chars or 4000, raw_chars=read_raw_chars)
     if name == "firecrawl_interact":   # browser-like; only callable if enabled
         from regimes_probe.tools.firecrawl import firecrawl_interact
         return firecrawl_interact(enabled=enable_browserish)
@@ -204,7 +216,7 @@ def _build_inner(name: str, *, web_search_model: str = "gpt-5.4-mini",
         return wokelo_company_lookup()
     if name == "page_fetch":
         from regimes_probe.tools.page_fetch import PageFetch
-        return PageFetch()
+        return PageFetch(max_chars=read_max_chars or 4000, raw_chars=read_raw_chars)
     if name == "brave_search":
         from regimes_probe.tools.brave_search import BraveSearch
         return BraveSearch()
@@ -232,20 +244,26 @@ def build_live_providers(tool_names: list[str], *, cache: RecordingCache, armed:
                          web_search_model: str = "gpt-5.4-mini",
                          web_search_context: str = "low",
                          allow_stateful_or_paid: bool = False,
-                         enable_browserish: bool = False) -> dict[str, SearchProvider]:
+                         enable_browserish: bool = False,
+                         read_max_chars: int = 0,
+                         read_raw_chars: int = 0) -> dict[str, SearchProvider]:
     """Construct + cache-wrap the requested live providers (no network at build).
 
     Each provider becomes a separate bandit arm. ``web_search_model``/
     ``web_search_context`` apply to the OpenAI hosted adapter only. Stateful/paid
     (``monid_run``) and browser-like (``firecrawl_interact``) tools are built in a
-    DISABLED state unless their allow flag is set.
+    DISABLED state unless their allow flag is set. ``read_max_chars`` (5m-7) overrides the
+    read-class adapter caps (page_fetch / firecrawl_scrape) from run config; 0 keeps the
+    conservative adapter defaults.
     """
     providers: dict[str, SearchProvider] = {}
     for name in tool_names:
         inner = _build_inner(name, web_search_model=web_search_model,
                              web_search_context=web_search_context,
                              allow_stateful_or_paid=allow_stateful_or_paid,
-                             enable_browserish=enable_browserish)
+                             enable_browserish=enable_browserish,
+                             read_max_chars=read_max_chars,
+                             read_raw_chars=read_raw_chars)
         if inner is None:
             continue
         providers[name] = CachedProvider(inner, cache, armed=armed)

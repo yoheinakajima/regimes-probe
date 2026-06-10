@@ -81,7 +81,13 @@ def test_missing_cache_body_reports_read_event_found_but_body_missing(tmp_path):
     res = load_legacy_run(run)
     reasons = {o.stage_reason for o in res.obligations}
     assert reasons & {"read_event_found_but_body_missing", "source_url_mismatch"}
-    assert all(o.pipeline_status == "reconstructed" for o in res.obligations)  # not body_located
+    # the read call still URL-matches, but with no body nothing advances further (5m-5):
+    assert all(o.pipeline_status in ("reconstructed", "read_matched")
+               for o in res.obligations)
+    assert res.metrics["body_located_count"] == 0
+    assert res.metrics["passages_scanned_count"] == 0
+    assert all(o.body_source == "not_found" for o in res.obligations)
+    assert res.overall_status == "reconstructed_body_missing"
     assert res.metrics["live_model_calls"] == 0
 
 

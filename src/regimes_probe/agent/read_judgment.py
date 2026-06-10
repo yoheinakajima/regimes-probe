@@ -45,17 +45,24 @@ class ReadJudgmentConfig:
     judge cost — it only widens where a passage can be found). A single bounded RE-READ at
     ``reread_max_chars`` is allowed (live runs only) when a truncated read cannot close a pending
     obligation; replay never fetches."""
-    read_max_chars_total: int = 20000
+    read_max_chars_total: int = 24000
     read_passage_window_chars: int = 400
     read_max_passages_per_pending_judgment: int = 4
     #: global adapter default (kept conservative/cheap).
     page_fetch_default_max_chars: int = 4000
-    #: higher cap for a read-judgment-backed read (judge input still bounded by passage windows).
-    read_judgment_max_chars: int = 12000
+    #: higher cap for a read-judgment-backed read (5m-7: 20000, since judge input stays
+    #: bounded by passage windows — a bigger retrieval body widens where a passage can be
+    #: found without increasing the judge prompt size; storage cost is the only growth).
+    read_judgment_max_chars: int = 20000
     #: single bounded re-read cap when a truncated read cannot close a pending obligation.
-    reread_max_chars: int = 16000
+    reread_max_chars: int = 24000
     #: never re-read unboundedly; a re-read fires at most once per obligation.
     max_rereads_per_pending_judgment: int = 1
+    #: 5m-7: store bounded RAW payloads for read-class tools in live runs (config-gated;
+    #: contamination-safe via the recording cache's sanitizer), so future replay validation
+    #: never has to fall back to debug snippets.
+    store_raw_read_tools: bool = False
+    read_cache_raw_chars: int = 40000
 
 
 DEFAULT_READ_CONFIG = ReadJudgmentConfig()

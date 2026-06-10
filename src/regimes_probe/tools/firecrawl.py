@@ -61,11 +61,15 @@ class FirecrawlScrape(_FirecrawlBase):
     is_fetch = True
     cost_per_call = Decimal("0.003")
 
-    def __init__(self, *, enabled: bool = False, max_chars: int = 4000) -> None:
+    def __init__(self, *, enabled: bool = False, max_chars: int = 4000,
+                 raw_chars: int = 0) -> None:
         # 5l-8: the stored-snippet cap is now CONFIGURABLE (was a hardcoded [:4000]). A run can
         # set a larger cap for read-judgment-backed reads (judge input stays bounded by passage
         # windows regardless). Default stays conservative for ordinary reads.
         self.max_chars = max_chars
+        #: 5m-7: when > 0, expose a BOUNDED raw body via fetch_meta["raw_text"] so the
+        #: recording cache (store_raw) can persist it for offline replay validation.
+        self.raw_chars = raw_chars
 
     def search(self, query: str, *, limit: int = 1, **opts: Any) -> SearchResponse:
         # ``query`` is the URL to scrape.
@@ -86,6 +90,8 @@ class FirecrawlScrape(_FirecrawlBase):
         fetch_meta = {"fetched_chars": len(md), "stored_body_chars": len(md[:cap]),
                       "adapter_max_chars": cap, "body_truncated_for_storage": len(md) > cap,
                       "truncation_origin": "firecrawl_scrape_adapter_max_chars"}
+        if self.raw_chars > 0:
+            fetch_meta["raw_text"] = md[: self.raw_chars]
         return SearchResponse(provider=self.name, query=query, results=(result,),
                               cost=self.cost_per_call, latency_s=time.monotonic() - t0,
                               fetch_meta=fetch_meta)

@@ -90,6 +90,12 @@ class ObligationOutcome:
     url_match_method: str = "none"             # exact|prefix|host_only|none
     store_raw_was_enabled: Optional[bool] = None
     raw_unavailable: bool = False
+    # Level 5m strict body semantics: read-url vs body-url provenance, debug-snippet split,
+    # and the source actually fed to a live re-judgment (never debug_snippet_only by default).
+    matched_read_url: str = ""
+    matched_body_url: str = ""
+    debug_snippet_chars: int = 0
+    live_rejudgment_source: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {k: getattr(self, k) for k in (
@@ -102,7 +108,9 @@ class ObligationOutcome:
             "candidate_text", "source_role", "source_domain", "requires_read_reason",
             "judgment_id", "prompt_hash", "reconstruction_method",
             "reconstruction_missing_fields", "matched_read", "read_tool", "read_success",
-            "read_chars", "url_match_method", "store_raw_was_enabled", "raw_unavailable")}
+            "read_chars", "url_match_method", "store_raw_was_enabled", "raw_unavailable",
+            "matched_read_url", "matched_body_url", "debug_snippet_chars",
+            "live_rejudgment_source")}
 
 
 @dataclass
@@ -366,6 +374,8 @@ STAGE_REASONS = (
     "reconstructed_and_passages_scanned", "closed_by_live_rejudgment", "other")
 
 _ADAPTER_CAP_DEFAULT = 4000
+#: a call-embedded "body" shorter than this is a bounded preview, not a real page body (5m-2).
+_MIN_REAL_BODY_CHARS = 600
 
 #: read→judge lifecycle events persisted for exact future replay (5k-5).
 _PERSIST_EVENT_TYPES = (
@@ -386,6 +396,9 @@ def export_read_judge_replay(frontier, *, item_id: str = "", max_passage_chars: 
     pend = []
     for p in getattr(frontier, "pending_read_judgments", {}).values():
         rec = p.to_dict() if hasattr(p, "to_dict") else dict(p)
+        # 5m-7: persist the FULL, untruncated source_url (to_dict keeps only the host) and the
+        # actual passage window used for the targeted re-judgment (bounded, contamination-safe).
+        rec["source_url"] = getattr(p, "source_url", "") or rec.get("source_url", "")
         rec["passage_preview"] = (getattr(p, "passage_preview", "") or "")[:max_passage_chars]
         rec["closure_code"] = _RESOLUTION_TO_CLOSURE.get(
             getattr(p, "resolution", "open"), "requires_read_still_open")
@@ -405,48 +418,137 @@ def export_read_judge_replay(frontier, *, item_id: str = "", max_passage_chars: 
     }
 
 
-def _load_provider_bodies(run_dir: Path) -> dict[str, dict[str, Any]]:
-    """Build ``url -> {stored_body, raw_payload?}`` from any RecordingCache JSON under the run
-    dir (``cache/`` + top-level ``*_cache.json``). Robust to the recording schema in
-    ``live/cache.py`` (``entries[].response.results[].snippet`` is the stored page body)."""
-    out: dict[str, dict[str, Any]] = {}
-    candidates: list[Path] = []
+#: response fields a tool-specific schema adapter recognises as a page BODY (5m item 1/2).
+_BODY_FIELDS = ("snippet", "markdown", "text", "content", "body", "html")
+#: read-class tools whose cache entries carry page bodies.
+_READ_TOOLS = ("firecrawl_scrape", "page_fetch", "firecrawl_search", "exa_search",
+               "serper_search")
+
+
+def _extract_entry_bodies(entry: dict) -> list[tuple[str, str]]:
+    """Tool-schema adapter: extract ``(url, body)`` pairs from one RecordingCache entry.
+    Recognises the standard SearchResponse shape (``response.results[].snippet``) plus
+    common body field aliases (markdown/text/content/body) at the result or response level."""
+    resp = (entry or {}).get("response") or {}
+    pairs: list[tuple[str, str]] = []
+    results = resp.get("results") or []
+    for r in results:
+        if not isinstance(r, dict):
+            continue
+        url = r.get("url") or resp.get("query") or ""
+        body = ""
+        for f in _BODY_FIELDS:
+            v = r.get(f)
+            if isinstance(v, str) and len(v) > len(body):
+                body = v
+        if url and body:
+            pairs.append((url, body))
+    # response-level body fields (some scrape schemas put the document on the response).
+    url0 = resp.get("query") or ""
+    if url0 and _looks_url(url0):
+        for f in _BODY_FIELDS:
+            v = resp.get(f)
+            if isinstance(v, str) and v:
+                pairs.append((url0, v))
+    return pairs
+
+
+def _discover_cache_files(run_dir: Path) -> list[Path]:
+    """All candidate cache files: the run_manifest's recorded ``cache.path``, EVERYTHING under
+    ``cache/`` (recursive, any extension — never silently ignored), and top-level
+    ``*cache*.json`` files (5m item 1)."""
+    files: list[Path] = []
+    manifest = run_dir / "run_manifest.json"
+    if manifest.exists():
+        try:
+            mp = ((json.loads(manifest.read_text(encoding="utf-8")) or {})
+                  .get("cache") or {}).get("path")
+            if mp:
+                for cand in (Path(mp), run_dir / Path(mp).name, run_dir / mp):
+                    if cand.exists() and cand.is_file():
+                        files.append(cand)
+                        break
+        except Exception:
+            pass
     cdir = run_dir / "cache"
     if cdir.is_dir():
-        candidates += sorted(cdir.glob("*.json"))
-    candidates += sorted(run_dir.glob("*provider*cache*.json"))
-    candidates += sorted(run_dir.glob("*tool*cache*.json"))
-    for cf in candidates:
+        files += sorted(p for p in cdir.rglob("*") if p.is_file())
+    files += sorted(run_dir.glob("*cache*.json"))
+    seen: set[Path] = set()
+    out = []
+    for f in files:
+        rp = f.resolve()
+        if rp not in seen:
+            seen.add(rp)
+            out.append(f)
+    return out
+
+
+def _load_provider_bodies(run_dir: Path) -> tuple[dict[str, dict[str, Any]], dict[str, Any]]:
+    """Build ``url -> {stored_body, raw_payload?, store_raw, provider}`` from the run's
+    recording cache(s), plus a CACHE REPORT (files/entries by provider, body/raw presence,
+    unrecognised schemas) shared with ``inspect_run_schema``. Never silently ignores a cache
+    file: unparseable / unrecognised files are counted and named (5m item 1)."""
+    out: dict[str, dict[str, Any]] = {}
+    report: dict[str, Any] = {"files": [], "n_files": 0, "n_entries": 0,
+                              "entries_by_provider": {}, "bodies_by_provider": {},
+                              "raw_payload_entries": 0, "store_raw_headers": [],
+                              "unrecognized_schema_files": []}
+    by_prov: Counter = Counter()
+    bodies_prov: Counter = Counter()
+    for cf in _discover_cache_files(run_dir):
+        finfo = {"file": str(cf.relative_to(run_dir)) if str(cf).startswith(str(run_dir))
+                 else str(cf), "entries": 0, "any_raw": False, "store_raw_header": None}
         try:
             data = json.loads(cf.read_text(encoding="utf-8"))
         except Exception:
+            finfo["error"] = "not_json"
+            report["unrecognized_schema_files"].append(finfo["file"])
+            report["files"].append(finfo)
             continue
         entries = data.get("entries") if isinstance(data, dict) else None
         if not isinstance(entries, list):
+            # a flat ParserCache (LLM caches) is recognised but carries no page bodies.
+            finfo["schema"] = ("flat_kv_llm_cache" if isinstance(data, dict)
+                               else "unknown")
+            if finfo["schema"] == "unknown":
+                report["unrecognized_schema_files"].append(finfo["file"])
+            report["files"].append(finfo)
             continue
         store_raw = bool(data.get("store_raw"))     # cache file header (live/cache.py)
+        finfo["schema"] = "recording_cache"
+        finfo["store_raw_header"] = store_raw
+        finfo["entries"] = len(entries)
+        report["n_entries"] += len(entries)
+        report["store_raw_headers"].append({finfo["file"]: store_raw})
         for e in entries:
-            resp = (e or {}).get("response") or {}
-            results = resp.get("results") or []
-            raw = e.get("raw")
-            # the read url for a fetch/scrape is the response query (a URL); search results
-            # carry their own urls. Cover both schemas (page_fetch/firecrawl/serper/exa).
-            for r in results:
-                url = (r or {}).get("url") or resp.get("query") or ""
-                if not url:
-                    continue
+            prov = (e or {}).get("provider") or (e or {}).get("name") or "?"
+            by_prov[prov] += 1
+            raw = (e or {}).get("raw")
+            rawtext = raw if isinstance(raw, str) else (json.dumps(raw) if raw else "")
+            if rawtext:
+                finfo["any_raw"] = True
+                report["raw_payload_entries"] += 1
+            pairs = _extract_entry_bodies(e)
+            if pairs:
+                bodies_prov[prov] += 1
+            for url, body in pairs:
                 rec = out.setdefault(url, {})
                 rec["store_raw"] = store_raw or rec.get("store_raw", False)
-                body = (r or {}).get("snippet") or ""
+                rec["provider"] = prov
                 if len(body) > len(rec.get("stored_body", "")):
                     rec["stored_body"] = body
-                fm = resp.get("fetch_meta") or {}
+                fm = ((e or {}).get("response") or {}).get("fetch_meta") or {}
                 if fm.get("fetched_chars"):
                     rec["fetch_meta"] = fm
-                rawtext = raw if isinstance(raw, str) else (json.dumps(raw) if raw else "")
                 if rawtext and len(rawtext) > len(rec.get("raw_payload", "")):
                     rec["raw_payload"] = rawtext
-    return out
+        report["files"].append(finfo)
+    report["n_files"] = len(report["files"])
+    report["entries_by_provider"] = dict(by_prov)
+    report["bodies_by_provider"] = dict(bodies_prov)
+    report["unrecognized_schema_count"] = len(report["unrecognized_schema_files"])
+    return out, report
 
 
 def _anchor_terms_for_constraint(record: dict, constraint_id: str, slot_id: str,
@@ -649,10 +751,26 @@ def _match_url(stored: str, candidates: list[str]) -> tuple[str, str]:
     return "", "none"
 
 
+def _call_embedded_body(call: dict) -> str:
+    """Any page body persisted ON the read call itself (evidence_record body fields). Debug
+    records usually keep only bounded previews, but a future run may embed the body."""
+    er = call.get("evidence_record") or {}
+    best = ""
+    for f in ("body", "text", "markdown", "content", "snippet"):
+        v = er.get(f)
+        if isinstance(v, str) and len(v) > len(best):
+            best = v
+    return best
+
+
 def _match_read_call(record: dict, candidate_id: str, source_url: str) -> dict:
-    """Find the read CALL for an obligation (5l item 2): a call whose tool is a read-class tool
-    or whose task_action is a read, recovering tool / success / chars + the read url."""
-    sh = _norm_url(source_url)[0]
+    """Find the read CALL for an obligation (5l item 2 / 5m item 3). INVARIANT:
+    ``matched_read=True`` requires a URL relation (exact|prefix|host_only) between the
+    obligation's source_url and the call's read url — a candidate-id coincidence with no URL
+    relation is NOT a match (``matched_read_with_no_url_match_method_count`` pinned 0)."""
+    no_match = {"matched_read": False, "read_tool": "", "read_success": None, "read_chars": 0,
+                "read_url": "", "read_url_match_method": "none", "call_body": ""}
+    best = None
     for c in record.get("calls", []) or []:
         tool = c.get("tool", "") or ""
         ta = c.get("task_action") or {}
@@ -663,14 +781,26 @@ def _match_read_call(record: dict, candidate_id: str, source_url: str) -> dict:
         er = c.get("evidence_record") or {}
         url = er.get("url") or (ta.get("query_text_preview", "")
                                 if _looks_url(ta.get("query_text_preview", "")) else "")
-        if ta.get("candidate_id") == candidate_id or (url and _norm_url(url)[0] == sh):
-            scrape = c.get("scrape") or {}
-            return {"matched_read": True, "read_tool": tool,
-                    "read_success": (not c.get("failed", False)) if "failed" in c else None,
-                    "read_chars": int(scrape.get("scrape_chars", 0) or 0),
-                    "read_url": url}
-    return {"matched_read": False, "read_tool": "", "read_success": None, "read_chars": 0,
-            "read_url": ""}
+        if not url:
+            continue
+        # both urls may be truncated — try matching in BOTH directions, keep the best method.
+        _, m1 = _match_url(source_url, [url])
+        _, m2 = _match_url(url, [source_url])
+        method = min((m for m in (m1, m2) if m != "none"),
+                     key=lambda m: ("exact", "prefix", "host_only").index(m), default="none")
+        if method == "none":
+            continue                              # URL relation REQUIRED for matched_read
+        scrape = c.get("scrape") or {}
+        cand = {"matched_read": True, "read_tool": tool,
+                "read_success": (not c.get("failed", False)) if "failed" in c else None,
+                "read_chars": int(scrape.get("scrape_chars", 0) or 0),
+                "read_url": url, "read_url_match_method": method,
+                "call_body": _call_embedded_body(c)}
+        rank = ("exact", "prefix", "host_only").index(method) \
+            - (1 if ta.get("candidate_id") == candidate_id else 0)
+        if best is None or rank < best[0]:
+            best = (rank, cand)
+    return best[1] if best else no_match
 
 
 def _read_url_for(record: dict, candidate_id: str) -> str:
@@ -721,7 +851,7 @@ def load_legacy_run(run_dir: str | Path, *, allow_live_judge: bool = False,
     dqf = run_dir / "debug_questions.jsonl"
     if not dqf.exists():
         return _absent_or_unknown(run_dir, res)
-    bodies = _load_provider_bodies(run_dir)
+    bodies, cache_report = _load_provider_bodies(run_dir)
     judge_cache_path = run_dir / "llm_evidence_judge_cache.json"
     live_judge = None
     live_calls = 0
@@ -770,46 +900,74 @@ def load_legacy_run(run_dir: str | Path, *, allow_live_judge: bool = False,
                 o.stage_reason = "legacy_missing_candidate_slot_or_constraint"
                 res.obligations.append(o)
                 continue
-            # 5l-2: match the read CALL (tool/success/chars) for provenance.
+            # 5l-2 / 5m-3: match the read CALL. matched_read REQUIRES a URL relation
+            # (exact|prefix|host_only) — never a candidate-id coincidence alone.
             rc = _match_read_call(record, o.candidate_id, o.source_url)
             o.matched_read, o.read_tool = rc["matched_read"], rc["read_tool"]
             o.read_success, o.read_chars = rc["read_success"], rc["read_chars"]
+            o.matched_read_url = rc.get("read_url", "")
+            if o.matched_read:
+                o.url_match_method = rc["read_url_match_method"]
+                o.pipeline_status = "read_matched"
             stored_url = o.source_url or rc.get("read_url", "") or _read_url_for(record, o.candidate_id)
             o.source_url = stored_url
             if not stored_url:
                 o.stage_reason = "read_event_found_but_body_missing"
                 res.obligations.append(o)
                 continue
-            # 5l-3: normalized (prefix) URL match against full cache urls.
-            matched_url, method = _match_url(stored_url, cache_urls)
-            o.url_match_method = method
-            body_rec = bodies.get(matched_url) if matched_url else None
-            from_preview = False
-            if not body_rec:
+            # 5m-2 body locator priority: (A) call-embedded body, (B) provider recording
+            # cache (normalized prefix URL match), (C) debug snippet — DIAGNOSTIC ONLY.
+            body, raw = "", ""
+            body_rec: dict = {}
+            if rc.get("call_body") and len(rc["call_body"]) >= _MIN_REAL_BODY_CHARS:
+                body = rc["call_body"]
+                o.body_source = "call_embedded_body"
+                o.matched_body_url = o.matched_read_url
+            else:
+                matched_url, method = _match_url(stored_url, cache_urls)
+                if not o.matched_read:
+                    o.url_match_method = method
+                if matched_url:
+                    o.matched_body_url = matched_url
+                    body_rec = bodies.get(matched_url) or {}
+                    stored = body_rec.get("stored_body", "")
+                    raw = body_rec.get("raw_payload", "")
+                    body = raw if len(raw) > len(stored) else stored
+                    o.body_source = ("cache_raw_payload" if len(raw) > len(stored)
+                                     else "cache_stored_text")
+            o.stored_body_chars = (len(body_rec.get("stored_body", ""))
+                                   if body_rec else len(body))
+            o.cached_payload_chars = len(raw)
+            o.store_raw_was_enabled = body_rec.get("store_raw") if body_rec else None
+            o.raw_unavailable = not bool(raw)
+            fm = body_rec.get("fetch_meta") or {}
+            if not body:
+                # (C) debug snippet: last-resort DIAGNOSTIC preview — does NOT count as a
+                # located body, does NOT advance to passages_scanned, NOT live-judged.
                 prev = ""
                 for ev in (record.get("evidence") or []):
                     if _match_url(ev.get("url", ""), [stored_url])[1] != "none" \
                             or _norm_url(ev.get("url", ""))[0] == _norm_url(stored_url)[0]:
                         prev = ev.get("snippet_preview", "") or prev
                 if prev:
-                    body_rec, from_preview = {"stored_body": prev}, True
                     o.body_source = "debug_snippet_only"
+                    o.debug_snippet_chars = len(prev)
+                    scan = extract_passages(prev, _anchor_terms_for_constraint(
+                        record, o.constraint_id, o.slot_id, candidate_text=o.candidate_text))
+                    o.passage_anchor_hits = scan.passage_anchor_hits
+                    o.pipeline_status = "debug_snippet_scanned"
+                    o.stage_reason = ("read_event_found_but_body_missing" if o.matched_read
+                                      else "debug_snippet_only_no_body")
+                    if o.matched_read:
+                        o.stage_reason = "read_body_not_persisted_legacy_run"
                 else:
-                    o.stage_reason = ("source_url_mismatch" if method == "none"
+                    o.body_source = "not_found"
+                    o.stage_reason = ("source_url_mismatch" if o.url_match_method == "none"
+                                      and not o.matched_read
                                       else "read_event_found_but_body_missing")
-                    res.obligations.append(o)
-                    continue
-            stored = body_rec.get("stored_body", "")
-            raw = body_rec.get("raw_payload", "")
-            o.stored_body_chars = len(stored)
-            o.cached_payload_chars = len(raw)
-            o.store_raw_was_enabled = body_rec.get("store_raw")
-            o.raw_unavailable = not bool(raw)
-            # use the FULLER raw payload when present (validates beyond-cap retrieval, no spend).
-            body = raw if len(raw) > len(stored) else stored
-            if not from_preview:
-                o.body_source = ("cache_raw_payload" if len(raw) > len(stored)
-                                 else "cache_stored_text")
+                res.obligations.append(o)
+                continue
+            # an ACTUAL body (call-embedded / cache stored / cache raw) was located.
             o.pipeline_status = "body_located"
             anchors = _anchor_terms_for_constraint(
                 record, o.constraint_id, o.slot_id, candidate_text=o.candidate_text)
@@ -820,15 +978,20 @@ def load_legacy_run(run_dir: str | Path, *, allow_live_judge: bool = False,
             o.passages_found_beyond_4000 = scan.first_hit_offset > _ADAPTER_CAP_DEFAULT
             o.used_full_body_not_snippet = o.body_source == "cache_raw_payload"
             o.pipeline_status = "passages_scanned"
-            # truncation: only assertable when the FULLER raw payload is ALSO unavailable —
-            # we only know the CACHED portion lacks the passage, not the page (raw_unavailable).
-            if not scan.hit and o.raw_unavailable and len(stored) <= _ADAPTER_CAP_DEFAULT + 1:
+            # truncation diagnosis (5m-4): only for an ACTUAL stored body that appears capped
+            # (at/near the adapter cap or fetch_meta says truncated), with raw unavailable and
+            # no anchor hits. States the CACHED portion lacks the passage, not the page.
+            near_cap = (abs(o.stored_body_chars - _ADAPTER_CAP_DEFAULT) <= 16
+                        or bool(fm.get("body_truncated_for_storage")))
+            if not scan.hit and o.raw_unavailable and near_cap:
                 o.body_truncated_before_relevant_passage = True
                 o.stage_reason = "body_truncated_before_relevant_passage(raw_unavailable)"
             # judged/closed: new computation -> needs the live-judge tier (opt-in, capped).
-            recorded = _recorded_rejudgment(judge_cache_path)
+            recorded = _recorded_rejudgment(judge_cache_path, o.pending_read_judgment_id)
             if recorded:
-                o.pipeline_status, o.closure_code = "judged", "resolved_full_support"
+                o.pipeline_status = "judged"
+                o.closure_code = _RESOLUTION_TO_CLOSURE.get(recorded, "requires_read_still_open")
+                o.live_rejudgment_source = "recorded_rejudgment_cache"
                 o.stage_reason = "reconstructed_and_passages_scanned"
             elif allow_live_judge and scan.passages:
                 if live_calls >= max_judge_calls:          # hard cap, fail-closed (0 = none)
@@ -840,31 +1003,34 @@ def load_legacy_run(run_dir: str | Path, *, allow_live_judge: bool = False,
                                                       scan.passages[0], judge_cache_path)
                     live_calls += int(was_live)
                     o.pipeline_status = "judged"
+                    o.live_rejudgment_source = o.body_source
                     o.closure_code = _RESOLUTION_TO_CLOSURE.get(verdict, "requires_read_still_open")
                     o.stage_reason = "closed_by_live_rejudgment"
                     res.replay_events.append({"event_type": "read_judged_after_read",
-                                              "item_id": item_id, "verdict": verdict})
+                                              "item_id": item_id, "verdict": verdict,
+                                              "rejudgment_source": o.body_source})
             else:
                 o.stage_reason = o.stage_reason or "rejudgment_prompt_not_in_cache"
             res.obligations.append(o)
 
     _summarize_legacy(res, n_items, live_calls, coverage_bounded=coverage_bounded,
-                      allow_live_judge=allow_live_judge)
+                      allow_live_judge=allow_live_judge, cache_report=cache_report)
     return res
 
 
-def _recorded_rejudgment(judge_cache_path: Path) -> bool:
+def _recorded_rejudgment(judge_cache_path: Path, obligation_id: str = "") -> Optional[str]:
     """A pre-5h cache cannot contain the 5h targeted re-judgment prompt; this hook lets a
-    FUTURE run that DID persist one be recognised. Conservative: returns False unless a
-    re-judgment marker key is present."""
+    PREVIOUS live-judge validation (or a future run) that recorded one be recognised —
+    PER OBLIGATION (5m: never close every obligation from one cached verdict). Returns the
+    recorded verdict string, or None."""
     if not judge_cache_path.exists():
-        return False
+        return None
     try:
         store = json.loads(judge_cache_path.read_text(encoding="utf-8"))
     except Exception:
-        return False
-    return any("rejudgment" in str(k).lower() or "pending_read" in str(k).lower()
-               for k in (store or {}))
+        return None
+    v = (store or {}).get(f"rejudgment::{obligation_id}")
+    return str(v) if v else None
 
 
 def _candidate_text(record: dict, candidate_id: str, url: str) -> str:
@@ -913,51 +1079,74 @@ def _live_rejudge(judge, o: ObligationOutcome, record: dict, candidate_text: str
     return jd.judgment, was_live
 
 
+#: body sources counted as ACTUAL bodies (debug_snippet_only is diagnostic-only — 5m-2/5).
+_REAL_BODY_SOURCES = ("cache_stored_text", "cache_raw_payload", "call_embedded_body")
+
+
 def _summarize_legacy(res: ReplayValidationResult, n_items: int, live_calls: int, *,
-                      coverage_bounded: bool = False, allow_live_judge: bool = False) -> None:
+                      coverage_bounded: bool = False, allow_live_judge: bool = False,
+                      cache_report: Optional[dict] = None) -> None:
     obs = res.obligations
     stage = Counter(o.pipeline_status for o in obs)
     reasons = Counter(o.stage_reason for o in obs if o.stage_reason)
     methods = Counter(o.reconstruction_method for o in obs if o.reconstruction_method)
-    n_scanned = sum(1 for o in obs if o.pipeline_status in ("passages_scanned", "judged", "closed"))
+    # STRICT semantics (5m-5): only ACTUAL bodies count toward body_located/passages_scanned;
+    # debug snippets are reported separately and never advance the pipeline.
+    real_body = [o for o in obs if o.body_source in _REAL_BODY_SOURCES]
+    n_scanned = sum(1 for o in real_body
+                    if o.pipeline_status in ("passages_scanned", "judged", "closed"))
     res.metrics = {
         "n_items_inspected": n_items,
         "replay_pending_read_judgment_count": len(obs),
         "reconstructed_count": sum(1 for o in obs if o.reconstructed_from_legacy_trace),
         "reconstruction_method_counts": dict(methods),
-        "body_located_count": sum(1 for o in obs
-                                  if o.pipeline_status in ("body_located", "passages_scanned",
-                                                           "judged", "closed")),
+        "read_matched_count": sum(1 for o in obs if o.matched_read),
+        "body_located_count": len(real_body),
         "passages_scanned_count": n_scanned,
-        "passages_found_beyond_4000_count": sum(1 for o in obs if o.passages_found_beyond_4000),
+        "debug_snippet_scanned_count": sum(
+            1 for o in obs if o.pipeline_status == "debug_snippet_scanned"),
+        "passages_found_beyond_4000_count": sum(
+            1 for o in real_body if o.passages_found_beyond_4000),
         "body_truncated_before_relevant_passage_count":
-            sum(1 for o in obs if o.body_truncated_before_relevant_passage),
+            sum(1 for o in real_body if o.body_truncated_before_relevant_passage),
         "judged_count": sum(1 for o in obs if o.pipeline_status in ("judged", "closed")),
         "closed_count": sum(1 for o in obs if o.closure_code in _CLOSED),
         "pipeline_status_counts": dict(stage),
         "stage_reason_counts": dict(reasons),
         "url_match_method_counts": dict(Counter(o.url_match_method for o in obs)),
+        "body_source_counts": dict(Counter(o.body_source for o in obs if o.body_source)),
+        # INVARIANT (5m-3): matched_read=True always carries a URL match method (pinned 0).
+        "matched_read_with_no_url_match_method_count": sum(
+            1 for o in obs if o.matched_read and o.url_match_method == "none"),
         "reconstruction_coverage_bounded": coverage_bounded,
+        "cache_report": dict(cache_report or {}),
         "live_provider_calls": 0, "live_model_calls": live_calls,
     }
-    # 5l-6: unambiguous live-judge tier state.
+    # 5l-6 / 5m-6: unambiguous live-judge tier state; never judges debug snippets.
     if allow_live_judge:
         skip = None
         if not obs:
             skip = "no_reconstructed_obligations"
-        elif n_scanned == 0:
-            skip = "no_passages_to_judge"
+        elif not real_body or n_scanned == 0:
+            skip = "no_body_passages_to_judge"
         res.metrics["live_judge_tier"] = {"enabled": True, "live_judge_skipped_reason": skip,
                                           "live_model_calls": live_calls}
     else:
         res.metrics["live_judge_tier"] = {"enabled": False, "live_judge_skipped_reason": None,
                                           "live_model_calls": 0}
+    # overall status (5m-5): "validated" only when something was JUDGED/CLOSED on an actual
+    # body; debug-snippet-only runs get a partial status, never "validated".
     if not obs:
         res.overall_status = "unvalidated_cache_miss"
-    elif any(o.pipeline_status in ("judged", "closed") for o in obs):
+    elif any(o.pipeline_status in ("judged", "closed") and o.body_source in _REAL_BODY_SOURCES
+             for o in obs):
         res.overall_status = "validated"
-    else:
+    elif n_scanned > 0:
         res.overall_status = "reconstructed_passages_scanned_rejudgment_pending"
+    elif any(o.pipeline_status == "debug_snippet_scanned" for o in obs):
+        res.overall_status = "reconstructed_debug_only"
+    else:
+        res.overall_status = "reconstructed_body_missing"
 
 
 def inspect_run_schema(run_dir: str | Path) -> dict[str, Any]:
@@ -996,20 +1185,13 @@ def inspect_run_schema(run_dir: str | Path) -> dict[str, Any]:
                 "events_truncated": cf.get("events_truncated", 0),
                 "calls_by_tool": dict(Counter(c.get("tool", "?") for c in (rec.get("calls") or []))),
             })
-    cdir = run_dir / "cache"
-    cfiles = (sorted(cdir.glob("*.json")) if cdir.is_dir() else []) \
-        + sorted(run_dir.glob("*_cache.json"))
-    for cfp in cfiles:
-        info = {"file": cfp.name, "entries": 0, "any_raw": False, "store_raw_header": None}
-        try:
-            data = json.loads(cfp.read_text(encoding="utf-8"))
-            if isinstance(data, dict) and isinstance(data.get("entries"), list):
-                info["entries"] = len(data["entries"])
-                info["any_raw"] = any(e.get("raw") for e in data["entries"])
-                info["store_raw_header"] = bool(data.get("store_raw"))
-        except Exception:
-            info["error"] = "not_json_or_unknown_schema"
-        out["cache_files"].append(info)
+    # 5m-1: the provider recording cache under cache/ is inspected RECURSIVELY via the same
+    # discovery the body locator uses (manifest cache.path + cache/ rglob + *cache*.json) —
+    # never silently ignored.
+    bodies, cache_report = _load_provider_bodies(run_dir)
+    out["cache_files"] = cache_report.get("files", [])
+    out["cache_report"] = {k: v for k, v in cache_report.items() if k != "files"}
+    out["cache_report"]["urls_with_bodies"] = len(bodies)
     return out
 
 

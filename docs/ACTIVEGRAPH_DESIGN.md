@@ -410,3 +410,22 @@ event with a distinctive anchor supported it, so
 the projected constraint state and is pinned 0. Reads against a candidate's recorded clean
 `source_urls` re-project identically. (Projecting each read-intent state as its own graph
 *object* is the documented follow-up; the events are already in the log.)
+
+Level 5h promotes the read→judge **obligation** to a persistent, event-sourced object: a judge
+`requires_read` emits `read_required_by_judge` and creates a `PendingReadJudgment` keyed by the
+`(candidate, slot, constraint, source_url)` triple. When the source is later read, the body is
+routed back into a re-judgment of that *same* triple — `read_selected_for_pending_judgment` →
+`read_completed_for_pending_judgment` → `read_passage_selected` → `read_judged_after_read` →
+`read_judgment_resolved`/`read_judgment_still_unresolved` — so a reviewer can reconstruct, from
+the log alone, that a requires_read was actually *closed against the fetched page*, which
+passage closed it, and why (or why not). The targeted passage selection is deterministic and
+pure (`extract_passages`), so the re-judgment re-projects identically; the judge never sees the
+truncated snippet that created the obligation, which makes
+`judge_reused_truncated_excerpt_after_full_read_count` and `read_head_only_judgment_count`
+deterministic projection invariants pinned 0. The new target-binding, seed-floor,
+abstain-admissibility, source-hygiene, dependency-staging, and anchor-gate-relaxation decisions
+are all event-backed too (`bind_target_answer_slot_*`, `seed_query_generic_blocked`,
+`abstain_withheld_executable_action_available`, `source_acquisition_rejected`,
+`dependent_slot_search_deferred`, `proposal_gate_relaxed`/`generic_fallback_blocked`), and the
+candidate-local support label is `slot_candidate_supported` (never confused, in the projection,
+with the global answer-support gate).

@@ -902,7 +902,9 @@ class SearchLoop:
                         directed_slot_id=(task_action_info.get("target_slot_id") if lf_pid else None),
                         directed_constraint_ids=(task_action_info.get("tested_constraint_ids")
                                                  if lf_pid else None),
-                        proposal_id=lf_pid)
+                        proposal_id=lf_pid,
+                        read_candidate_id=(task_action_info.get("candidate_id")
+                                           if scrape_info else None))
                     if not progressed:
                         for s in frontier.slates:
                             frontier.note_no_progress_for_slate(s)

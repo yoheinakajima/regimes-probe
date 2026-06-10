@@ -465,3 +465,27 @@ success criterion; loop consistency and these pinned-0 invariants are. Deferred 
 (`bind_target_answer_slot`, parser-fallback variable/constant classifier, exa/firecrawl
 alternate-URL fallback, read-intent graph-object projection) are tracked but not gated this
 iteration.
+
+**Level 5h — read→judge loop closure, target binding, anti-pollution.** The 5h smoke audits
+that the evidence loop *closes*, not just that reads execute. Check, from the projection:
+`requires_read_count` vs `requires_read_resolved_by_read_count` and
+`requires_read_unresolved_after_successful_read_count` (a successful read tied to a pending
+judgment must produce a `read_judged_after_read` event and either close or stay open with an
+explicit reason); the hard invariants `judge_reused_truncated_excerpt_after_full_read_count`
+and `read_head_only_judgment_count` (both **0** — the judge re-reads *passages*, never the
+truncated snippet or only the head); `read_loop_open_count` /
+`read_success_no_evidence_added_count` (the read-loop-open seam should drop or be explained).
+For target binding, `bind_target_answer_slot_actions` / `..._selected_count` should be > 0 when
+a subject is supported and an answer-shaped target is unbound, with
+`target_answer_slot_filled_with_subject_count` and `blocking_target_slot_starved_count` pinned
+**0**. For anti-pollution: `generic_single_token_seed_executed_count`,
+`generic_definition_source_read_count`, `generic_fallback_after_all_proposals_rejected_count`,
+`premature_founder_search_before_place_supported_count`, and
+`premature_birth_year_search_before_founder_supported_count` are all pinned **0**, while
+`relaxed_gate_selected_count` and `seed_query_generic_blocked_count` show the recovery firing.
+Accuracy is **not** the success criterion — loop closure, target binding, and these pinned-0
+safety invariants are. For repeatable mechanism-level comparison across 5h/5i runs, use a
+**fixed 10–20 item dev/debug slice** with pinned `item_ids` (recommended; for debugging only,
+never a headline claim) and diff the detector counts, not the accuracy. Deferred this iteration
+(documented, not claimed): source-subject extraction, coreference collapse, batch judging +
+explicit-location hard filter, and the dev-slice runner script.

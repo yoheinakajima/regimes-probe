@@ -526,3 +526,27 @@ set — and the risk surface. Keep the experiment honest:
   Deferred (and explicitly not yet claimed): a generic `bind_target_answer_slot` action, a
   parser-fallback variable/constant classifier, exa/firecrawl alternate-URL read fallback, and
   projecting read-intent states as first-class graph objects.
+
+- **Level 5h — closing the read→judge loop without manufacturing support.** 5g made reads
+  execute; the danger 5h addresses is a loop that *looks* busy but never closes — reads that
+  add no evidence, judges re-reading the same truncated snippet, and a target answer slot left
+  unbound while the frontier re-verifies an already-supported subject. The honest hazards and
+  their controls: (1) a read→judge **obligation** (`PendingReadJudgment`) is closed only by
+  re-judging the *fetched page body* on targeted passages — never the snippet that created it
+  and never only the document head (`judge_reused_truncated_excerpt_after_full_read_count` =
+  `read_head_only_judgment_count` = 0); an unresolved read stays open with an explicit reason,
+  it is not laundered into a vague new candidate. (2) **Target binding does not fabricate an
+  answer**: `bind_target_answer_slot` only retrieves/reads/binds answer-shaped candidates from
+  the supported subject; the strict answer-support gate is unchanged, and a target slot is never
+  filled with the subject entity (`target_answer_slot_filled_with_subject_count` = 0). (3)
+  **Anti-pollution is precision, not cleverness**: blocking a generic single-token seed,
+  refusing to read dictionary pages for entity tasks, and staging dependent slots behind their
+  dependencies all *narrow* what the loop does — like the 5f/5g gates they can lower apparent
+  accuracy by abstaining more, which is the intended trade. The candidate-local "confirmed"
+  label is renamed `slot_candidate_supported` precisely so a reader never mistakes a local slot
+  decision for global answer readiness. Detector counts (`read_loop_open_count`,
+  `proposal_gate_starvation_count`, …) are **debug labels for mechanism comparison only** — an
+  `n=2` smoke supports **no** benchmark or generalization claim, and the recommended fixed
+  dev/debug slice is for debugging deltas, never a headline. Deferred and explicitly not
+  claimed: source-subject extraction, coreference collapse, and a batch-judge / explicit-location
+  hard filter.

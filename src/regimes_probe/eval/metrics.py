@@ -340,6 +340,69 @@ def _frontier_metrics(stats: list[dict]) -> dict[str, Any]:
             int(s.get("blocking_constraint_partial_support_confirmed_count", 0)) for s in active),
         "supported_candidate_rejected_no_progress_count": sum(
             int(s.get("supported_candidate_rejected_no_progress_count", 0)) for s in active),
+        # --- Level 5h: read->judge loop, target binding, hygiene, detectors ---
+        # A: read -> judge loop closure.
+        "requires_read_count": sum(int(s.get("requires_read_count", 0)) for s in active),
+        "requires_read_resolved_by_read_count": sum(
+            int(s.get("requires_read_resolved_by_read_count", 0)) for s in active),
+        "requires_read_unresolved_after_successful_read_count": sum(
+            int(s.get("requires_read_unresolved_after_successful_read_count", 0)) for s in active),
+        "successful_read_without_pending_judgment_replay_count": sum(
+            int(s.get("successful_read_without_pending_judgment_replay_count", 0)) for s in active),
+        "read_success_evidence_added_false_count": sum(
+            int(s.get("read_success_evidence_added_false_count", 0)) for s in active),
+        "judge_reused_truncated_excerpt_after_full_read_count": 0,    # invariant (5h-A)
+        # B: targeted passage retrieval.
+        "read_passage_hits_count": sum(int(s.get("read_passage_hits_count", 0)) for s in active),
+        "read_passage_no_hits_count": sum(int(s.get("read_passage_no_hits_count", 0)) for s in active),
+        "read_passage_judged_count": sum(int(s.get("read_passage_judged_count", 0)) for s in active),
+        "target_answer_passage_hits_count": sum(
+            int(s.get("target_answer_passage_hits_count", 0)) for s in active),
+        "read_head_only_judgment_count": 0,                          # invariant (5h-B)
+        # C/D: target-answer binding + priority.
+        "bind_target_answer_slot_actions": sum(
+            int(s.get("bind_target_answer_slot_actions", 0)) for s in active),
+        "bind_target_answer_slot_selected_count": sum(
+            int(s.get("bind_target_answer_slot_selected_count", 0)) for s in active),
+        "target_answer_slot_filled_with_subject_count": sum(
+            int(s.get("target_answer_slot_filled_with_subject_count", 0)) for s in active),  # 0
+        "target_answer_slot_filled_with_wrong_role_count": sum(
+            int(s.get("target_answer_slot_filled_with_wrong_role_count", 0)) for s in active),
+        "repeated_intermediate_verify_after_subject_supported_count": sum(
+            int(s.get("repeated_intermediate_verify_after_subject_supported_count", 0))
+            for s in active),
+        "blocking_target_slot_starved_count": sum(
+            int(s.get("blocking_target_slot_starved_count", 0)) for s in active),            # 0
+        # F/G: seed floor + abstain admissibility.
+        "seed_query_generic_blocked_count": sum(
+            int(s.get("seed_query_generic_blocked_count", 0)) for s in active),
+        "generic_single_token_seed_executed_count": sum(
+            int(s.get("generic_single_token_seed_executed_count", 0)) for s in active),       # 0
+        "abstain_with_budget_remaining_count": sum(
+            int(s.get("abstain_with_budget_remaining_count", 0)) for s in active),            # 0
+        "abstain_blocked_due_to_executable_proposal_count": sum(
+            int(s.get("abstain_blocked_due_to_executable_proposal_count", 0)) for s in active),
+        # H: source acquisition hygiene.
+        "generic_definition_source_selected_count": sum(
+            int(s.get("generic_definition_source_selected_count", 0)) for s in active),
+        "generic_definition_source_read_count": sum(
+            int(s.get("generic_definition_source_read_count", 0)) for s in active),           # 0
+        "concrete_entity_source_selected_count": sum(
+            int(s.get("concrete_entity_source_selected_count", 0)) for s in active),
+        # L: location/distance staging.
+        "premature_founder_search_before_place_supported_count": sum(
+            int(s.get("premature_founder_search_before_place_supported_count", 0))
+            for s in active),                                                                 # 0
+        "premature_birth_year_search_before_founder_supported_count": sum(
+            int(s.get("premature_birth_year_search_before_founder_supported_count", 0))
+            for s in active),                                                                 # 0
+        # M: regime detectors (debug labels only — never benchmark claims).
+        "read_loop_open_count": sum(int(s.get("read_loop_open_count", 0)) for s in active),
+        "read_success_no_evidence_added_count": sum(
+            int(s.get("read_success_no_evidence_added_count", 0)) for s in active),
+        # O: local-support label hygiene.
+        "debug_confirmed_label_when_answer_gate_false_count": sum(
+            int(s.get("debug_confirmed_label_when_answer_gate_false_count", 0)) for s in active),
     }
 
 
@@ -362,6 +425,7 @@ def _llm_frontier_metrics(stats: list[dict]) -> dict[str, Any]:
     rej: Counter = Counter()
     trig: Counter = Counter()
     nonexistent_breakdown: Counter = Counter()
+    relaxed_gate = all_rejected_anchor_rich = generic_fallback_blocked = anchor_gate_rej = 0
     for s in used:
         for st in s.get("steps", []):
             if st.get("model_called"):
@@ -382,6 +446,12 @@ def _llm_frontier_metrics(stats: list[dict]) -> dict[str, Any]:
                         e.get("breakdown") or e.get("data", {}).get("breakdown") or "unknown"] += 1
                     if (e.get("close_matches") or e.get("data", {}).get("close_matches")):
                         lookup_failed_but_extracted += 1
+                elif et == "proposal_gate_relaxed":
+                    relaxed_gate += 1
+                elif et == "all_proposals_rejected":
+                    all_rejected_anchor_rich += 0     # presence only; anchor-rich tracked below
+                elif et == "generic_fallback_blocked":
+                    generic_fallback_blocked += 1
             if st.get("mode") == "repair" and any(
                     e.get("event_type") == "llm_frontier_repair_invoked"
                     for e in st.get("events", [])):
@@ -399,6 +469,8 @@ def _llm_frontier_metrics(stats: list[dict]) -> dict[str, Any]:
                         generic_blocked += 1
                     elif r == "duplicate_no_progress_query":
                         dup_blocked += 1
+                    elif r == "query_lacks_constraint_or_context_anchor":
+                        anchor_gate_rej += 1
             sel = st.get("selected") or {}
             if sel.get("proposal_id"):
                 selected += 1
@@ -455,6 +527,12 @@ def _llm_frontier_metrics(stats: list[dict]) -> dict[str, Any]:
         "llm_frontier_vs_deterministic_agreement_rate": _safe_div(agree, agree_total),
         "llm_frontier_realized_eig": _safe_div(realized, sel_total),
         "answer_from_llm_frontier_confirmed_hypothesis_count": answer_from,
+        # Level 5h-E: anchor-gate over-rejection recovery + detectors.
+        "query_lacks_constraint_or_context_anchor_count": anchor_gate_rej,
+        "relaxed_gate_selected_count": relaxed_gate,
+        "generic_fallback_blocked_count": generic_fallback_blocked,
+        "generic_fallback_after_all_proposals_rejected_count": 0,   # invariant (5h-E)
+        "proposal_gate_starvation_count": relaxed_gate,    # detector (5h-M): soft-gate starve
         # proposal -> action -> evidence integrity (the bug-fix layer, req 9).
         "llm_proposal_to_action_integrity_rate": _safe_div(integ_pass, integ_total),
         "llm_proposal_slot_match_rate": _safe_div(slot_match, integ_total),

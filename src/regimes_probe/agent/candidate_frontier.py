@@ -32,7 +32,17 @@ FRONTIER_ACTION_TYPES = (
     "expand_candidate_to_dependent_slot", "compare_candidates_for_slot",
     "read_candidate_source", "reject_candidate", "merge_duplicate_candidate",
     "promote_candidate_to_confirmed", "answer_from_confirmed_hypothesis",
-    "abstain_no_viable_hypothesis")
+    "abstain_no_viable_hypothesis", "bind_target_answer_slot")
+#: generic answer-shape role/descriptor cues: when a target slot is answer-shaped (a year,
+#: date, number, name, surname, title, venue, role-holder…) and a subject is supported, the
+#: frontier should bind the TARGET, not keep re-verifying the supported subject (5h-C).
+_ANSWER_SHAPE_ROLES = frozenset({
+    "date", "date_or_time", "year", "number", "quantity", "name", "surname", "title",
+    "venue", "publication", "duration", "time_span", "measure", "distance"})
+_ANSWER_SHAPE_WORDS = frozenset({
+    "year", "years", "birth", "born", "date", "number", "name", "surname", "title",
+    "venue", "duration", "range", "age", "distance", "miles", "kilometers", "count",
+    "how", "many", "much", "when"})
 #: epistemic modes that DO use the heavy slate layer (others skip it).
 HEAVY_MODES = ("decomposed_search", "iterative_research", "task_frame_required")
 _REJECT_NO_PROGRESS = 2
@@ -363,6 +373,44 @@ class CandidateFrontier:
         self.read_selected_count = 0
         self.read_blocked_no_url_count = 0
         self.read_blocked_tool_count = 0
+        #: Level 5h-A/B pending read->judge loop + targeted passage retrieval.
+        from regimes_probe.agent.read_judgment import DEFAULT_READ_CONFIG
+        self.read_config = DEFAULT_READ_CONFIG
+        self.pending_read_judgments: dict[str, Any] = {}
+        self._prj = 0
+        self.requires_read_resolved_by_read_count = 0
+        self.requires_read_unresolved_after_read_count = 0
+        self.successful_read_without_pending_replay_count = 0
+        self.read_success_evidence_added_false_count = 0
+        self.read_passage_hits_count = 0
+        self.read_passage_no_hits_count = 0
+        self.read_passage_judged_count = 0
+        self.target_answer_passage_hits_count = 0
+        #: Level 5h-C/D target-answer binding + target-slot priority.
+        self.bind_target_answer_slot_actions = 0
+        self.bind_target_answer_slot_selected_count = 0
+        self.bind_target_answer_slot_success_count = 0
+        self.target_binding_eig_boost_count = 0
+        self.repeated_intermediate_verify_after_subject_supported_count = 0
+        self.fuzzy_duplicate_query_rejected_count = 0
+        self._executed_query_token_sets: list[frozenset] = []
+        self.target_binding_rejected_reason: dict[str, int] = {}
+        #: Level 5h-F/G/H seed floor, abstain admissibility, source hygiene.
+        self.seed_query_generic_blocked_count = 0
+        self.generic_single_token_seed_executed_count = 0
+        self.abstain_with_budget_remaining_count = 0
+        self.abstain_blocked_due_to_executable_proposal_count = 0
+        self.generic_definition_source_selected_count = 0
+        self.generic_definition_source_read_count = 0
+        self.source_title_only_read_count = 0
+        self.concrete_entity_source_selected_count = 0
+        self.source_acquisition_rejected_reason: dict[str, int] = {}
+        #: Level 5h-L location/distance staging guard.
+        self.premature_founder_search_before_place_supported_count = 0
+        self.premature_birth_year_search_before_founder_supported_count = 0
+        #: Level 5h-M regime detectors (debug labels only — never benchmark claims).
+        self.read_loop_open_count = 0
+        self.read_success_no_evidence_added_count = 0
         self._cc = self._ec = self._hc = self._ac = self._evc = 0
         self._known = {_norm(t) for t in frame.known_context_terms}
         # one slate per slot that NEEDS binding (every unbound variable).
@@ -425,7 +473,8 @@ class CandidateFrontier:
                         read_depth: int = 0, action_id: Optional[str] = None,
                         directed_slot_id: Optional[str] = None,
                         directed_constraint_ids: Optional[list[str]] = None,
-                        proposal_id: Optional[str] = None) -> EvidenceRecord:
+                        proposal_id: Optional[str] = None,
+                        read_candidate_id: Optional[str] = None) -> EvidenceRecord:
         """Fold a tool call's observations into the slates.
 
         When the call was driven by an LLM frontier proposal, ``directed_slot_id`` /
@@ -551,6 +600,25 @@ class CandidateFrontier:
             self._emit("read_interpreted", evidence_id=ev.evidence_id,
                        data={"slot_id": directed_slot_id, "read_depth": read_depth,
                              "new_support": sel_support_gain})
+            # 5h-A: route the fetched page BODY back into any pending requires_read judgments
+            # for this candidate/source (targeted passage re-judge), and detect a read that
+            # produced chars but added no evidence (a read-loop-open seam — 5h-M).
+            best_obs = max((o for o in observations if not getattr(o, "failed", False)),
+                           key=lambda o: len(getattr(o, "snippet", "") or ""), default=None)
+            read_text = getattr(best_obs, "snippet", "") or "" if best_obs else ""
+            read_url = getattr(best_obs, "url", "") or "" if best_obs else ""
+            had_pending = bool(self._open_pending_for(read_candidate_id, read_url))
+            resolved = 0
+            if read_text and (read_candidate_id or read_url):
+                resolved = self.route_read_into_pending_judgments(
+                    candidate_id=read_candidate_id, source_url=read_url, read_text=read_text)
+            evidence_added = bool(sel_support_gain or resolved
+                                  or ev.newly_introduced_candidates)
+            if read_text and not evidence_added:
+                self.read_success_evidence_added_false_count += 1
+                self.read_success_no_evidence_added_count += 1
+                if had_pending:
+                    self.read_loop_open_count += 1
         if directed_slot_id:
             if sel_support_gain > 0 or (read_depth and read_depth >= 1):
                 self._slot_no_support_streak[directed_slot_id] = 0
@@ -727,6 +795,11 @@ class CandidateFrontier:
                         self._emit("evidence_judgment_requires_read", candidate_id=cid,
                                    slot_id=sid, evidence_id=ev.evidence_id,
                                    data={"constraint_id": rc})
+                        # 5h-A: a requires_read is a persistent OBLIGATION on the
+                        # (candidate, slot, constraint, source_url) triple, not a vague hint.
+                        self._register_pending_read_judgment(
+                            candidate_id=cid, slot_id=sid, constraint_id=rc,
+                            source_url=getattr(ev, "url", ""))
                     for al in a.candidate_aliases:
                         if al and al not in cand.aliases:
                             cand.aliases.append(al)
@@ -847,7 +920,10 @@ class CandidateFrontier:
             # already has clean support (Level 5f-I): a supported candidate is "working".
             new, reason = "rejected", "repeated_no_progress"
         elif self._confirmable(cand, contaminated):
-            new, reason = "confirmed", "required_constraints_supported"
+            # 5h-O: a candidate-/slot-LOCAL support label — NOT a global answer-gate signal.
+            # "confirmed" here means this slot's constraints are locally supported; the strict
+            # answer-support gate (eval/eligibility) is the only thing that authorises answering.
+            new, reason = "confirmed", "slot_candidate_supported"
         if new != old:
             cand.status, cand.status_reason = new, reason
             if new == "rejected":
@@ -973,6 +1049,125 @@ class CandidateFrontier:
         return max(active, key=lambda h: (h.confidence_score, h.support_score,
                                           h.coverage_score), default=None)
 
+    # ---------- 5h-C/D: target-answer binding ----------
+    def _target_slot_ids(self) -> list[str]:
+        return [s.slot_id for s in self.frame.target_answer_slots if s.slot_id in self.slates]
+
+    def _is_answer_shaped_slot(self, slot) -> bool:
+        if slot is None:
+            return False
+        if (getattr(slot, "slot_role", "") or "").lower() in _ANSWER_SHAPE_ROLES:
+            return True
+        desc = (getattr(slot, "descriptor_text", "") or getattr(slot, "slot_name", "")).lower()
+        return any(w in _ANSWER_SHAPE_WORDS for w in re.findall(r"[a-z]+", desc))
+
+    def _target_unbound(self, slot_id: str) -> bool:
+        """A target slot is unbound when no candidate on it is confirmed or carries support."""
+        slate = self.slates.get(slot_id)
+        if not slate:
+            return True
+        return not any(c.status == "confirmed" or c.constraints_supported
+                       for c in slate.candidates.values()
+                       if c.status not in ("rejected", "merged"))
+
+    def _supported_subject_candidate(self, *, exclude_slot: str = ""):
+        """Return the best supported subject/intermediate candidate on a NON-target slot
+        (the working subject a target-binding read/search should pivot from)."""
+        targets = set(self._target_slot_ids())
+        best = None
+        for sid, slate in self.slates.items():
+            if sid in targets or sid == exclude_slot:
+                continue
+            for c in slate.candidates.values():
+                if c.status in ("rejected", "merged"):
+                    continue
+                if c.status == "confirmed" or c.constraints_supported:
+                    if best is None or c.evidence_score > best.evidence_score:
+                        best = c
+        return best
+
+    @staticmethod
+    def _qtokens(query: str) -> frozenset:
+        return frozenset(w.lower() for w in re.findall(r"[a-z0-9]+", (query or "").lower())
+                         if len(w) >= 3)
+
+    def is_near_duplicate_query(self, query: str) -> bool:
+        """Fuzzy dedupe by normalized content-token SET (word-order variants count once)."""
+        toks = self._qtokens(query)
+        if not toks:
+            return False
+        return any(toks and (toks == prev or (len(toks & prev) >= max(2, len(toks) - 1)
+                                              and len(toks ^ prev) <= 1))
+                   for prev in self._executed_query_token_sets)
+
+    def note_executed_query(self, query: str) -> None:
+        toks = self._qtokens(query)
+        if toks and toks not in self._executed_query_token_sets:
+            self._executed_query_token_sets.append(toks)
+
+    def _is_concrete_entity_task(self) -> bool:
+        """A task whose target/intermediate slots name concrete entities (person/org/place/
+        work), not a dictionary definition — generic role test (5h-H)."""
+        roles = {(getattr(s, "slot_role", "") or "").lower() for s in self.frame.all_slots}
+        entityish = {"person", "organization", "organisation", "place", "location", "work",
+                     "restaurant", "hotel", "museum", "company", "author", "founder", "film"}
+        return bool(roles & entityish) and "definition" not in roles
+
+    @staticmethod
+    def _is_generic_definition_source(obs) -> bool:
+        title = getattr(obs, "title", "") or ""
+        snippet = getattr(obs, "snippet", "") or ""
+        nk = _noise_kind(title) or _noise_kind(snippet[:40])
+        if nk == "generic_definition_noise":
+            return True
+        role = getattr(obs, "source_role", "") or ""
+        return role in ("generic_definition_page", "source_title_only")
+
+    def _slot_supported(self, slot_id: str) -> bool:
+        slate = self.slates.get(slot_id)
+        return bool(slate and any(c.status == "confirmed" or c.constraints_supported
+                                  for c in slate.candidates.values()
+                                  if c.status not in ("rejected", "merged")))
+
+    def _dependency_unsupported(self, slot) -> bool:
+        """5h-L: a slot is premature to search while any slot it DEPENDS ON is unsupported
+        (don't search the founder before the place is supported; the birth year before the
+        founder). Generic — driven by the frame's dependency edges, no entity names."""
+        for dep in getattr(slot, "depends_on", []) or []:
+            if dep in self.slates and not self._slot_supported(dep):
+                return True
+        return False
+
+    def _executable_anchor_rich_action(self) -> bool:
+        """A non-generic, anchor-rich progress action is available right now (5h-G/E)."""
+        acts = self.frontier_actions or self.generate_frontier_actions()
+        for a in acts:
+            if a.action_type not in ("generate_candidates_for_slot",
+                                     "verify_candidate_constraint", "read_candidate_source",
+                                     "bind_target_answer_slot",
+                                     "expand_candidate_to_dependent_slot"):
+                continue
+            if a.action_type == "read_candidate_source":
+                return True                       # a read of a real source is anchor-rich
+            cons = [self._con(cid) for cid in a.constraint_ids]
+            if any(c is not None and _is_discriminative_constraint(c) for c in cons):
+                return True
+        return False
+
+    def abstain_admissible(self, *, budget_remaining: int) -> tuple[bool, str]:
+        """5h-G: abstain is INADMISSIBLE while budget remains, a blocking constraint is
+        unresolved, AND an executable anchor-rich progress action exists. It is admissible
+        only when the remaining options are unsafe/generic/contaminated/exhausted."""
+        if budget_remaining <= 0:
+            return True, "budget_exhausted"
+        has_blocking = any(self._slot_blocking_constraints(s) for s in self.slates)
+        if not has_blocking:
+            return True, "no_unresolved_blocking_constraint"
+        if self._executable_anchor_rich_action():
+            self.abstain_blocked_due_to_executable_proposal_count += 1
+            return False, "executable_anchor_rich_action_available"
+        return True, "only_generic_or_exhausted_actions_remain"
+
     # ---------- frontier ----------
     def generate_frontier_actions(self) -> list[FrontierAction]:
         actions: list[FrontierAction] = []
@@ -989,12 +1184,30 @@ class CandidateFrontier:
                        data={"action_type": atype, "target_slot_id": slot, "eig": round(eig, 3)})
             return a
 
+        bind_subject = self._supported_subject_candidate()
         for slate in self.slates.values():
-            blocking = [c for c in self._constraints_for_slot(slate.slot_id)
-                        if c.status != "resolved"
-                        and (getattr(c, "blocks_answer_if_unresolved", False)
-                             or getattr(c, "priority", "") == "high"
-                             or "can_block_answer" in getattr(c, "affordances", []))]
+            slot_obj = self.frame.slot(slate.slot_id)
+            # 5h-L: defer *searching/binding* a slot whose dependency is not yet supported
+            # (stage it: bind the place before the founder, the founder before the birth
+            # year). An already-confirmed candidate still expands to its dependents below.
+            dep_blocked = self._dependency_unsupported(slot_obj)
+            if dep_blocked:
+                self._emit("dependent_slot_search_deferred", slot_id=slate.slot_id,
+                           data={"reason": "dependency_unsupported"})
+            # 5h-C: an answer-shaped TARGET slot with a supported subject is driven by the
+            # bind_target_answer_slot action below, not a generic generate/verify here.
+            defer_for_bind = (bind_subject is not None
+                              and slate.slot_id in self._target_slot_ids()
+                              and self._is_answer_shaped_slot(slot_obj)
+                              and self._target_unbound(slate.slot_id))
+            if defer_for_bind:
+                dep_blocked = True
+            blocking = ([] if dep_blocked else
+                        [c for c in self._constraints_for_slot(slate.slot_id)
+                         if c.status != "resolved"
+                         and (getattr(c, "blocks_answer_if_unresolved", False)
+                              or getattr(c, "priority", "") == "high"
+                              or "can_block_answer" in getattr(c, "affordances", []))])
             blocking.sort(key=lambda c: -_disc(c))    # most discriminative first
             active = [c for c in slate.candidates.values() if c.status == "active"]
             confirmed = [c for c in slate.candidates.values() if c.status == "confirmed"]
@@ -1015,11 +1228,13 @@ class CandidateFrontier:
                          cand=active[0].candidate_id, cons=cons_ids,
                          eig=3.0 + 0.75 * _disc(top) + disc_bonus - streak_penalty, cost=1.0,
                          reason="resolve_blocking_constraint")
-                else:
+                elif not confirmed:
+                    # only search for MORE candidates when the slot has no confirmed binding
+                    # yet (5h-D: a confirmed slot is "done"; don't keep generating for it).
                     _add("generate_candidates_for_slot", slot=slate.slot_id, cons=cons_ids,
                          eig=2.5 + 0.75 * _disc(top) + disc_bonus - streak_penalty, cost=1.0,
                          reason="bind_slot_via_discriminative_constraint")
-            elif not slate.candidates:
+            elif not slate.candidates and not dep_blocked:
                 _add("generate_candidates_for_slot", slot=slate.slot_id, eig=2.0, cost=1.0,
                      reason="slot_unbound")
             if len(active) >= 2:
@@ -1064,6 +1279,35 @@ class CandidateFrontier:
                         _add("expand_candidate_to_dependent_slot", slot=dep,
                              cand=c.candidate_id, eig=2.0, cost=1.0,
                              reason="upstream_confirmed_unlocks_dependent")
+        # 5h-C/D: when a SUBJECT/intermediate is supported but an answer-shaped TARGET slot
+        # is still unbound, prefer binding the target over re-verifying the supported subject.
+        subject = self._supported_subject_candidate()
+        bind_actions: list[FrontierAction] = []
+        if subject is not None:
+            for tid in self._target_slot_ids():
+                tslot = self.frame.slot(tid)
+                if not (self._is_answer_shaped_slot(tslot) and self._target_unbound(tid)):
+                    continue
+                tcons = [c.constraint_id for c in self._constraints_for_slot(tid)
+                         if c.status != "resolved"]
+                ba = _add("bind_target_answer_slot", slot=tid, cand=subject.candidate_id,
+                          cons=tcons, eig=4.2, cost=1.0,
+                          reason="subject_supported_target_unbound")
+                ba.plan["bind_target"] = {"subject_candidate_id": subject.candidate_id,
+                                          "subject_slot_id": subject.slot_id}
+                bind_actions.append(ba)
+                self.bind_target_answer_slot_actions += 1
+                self.target_binding_eig_boost_count += 1
+                self._emit("bind_target_answer_slot_proposed", slot_id=tid,
+                           candidate_id=subject.candidate_id,
+                           data={"subject_slot_id": subject.slot_id})
+            # demote repeated intermediate verification while the target is starved.
+            if bind_actions:
+                for a in actions:
+                    if (a.action_type == "verify_candidate_constraint"
+                            and a.target_slot_id == subject.slot_id):
+                        a.expected_information_gain -= 2.5
+                        self.repeated_intermediate_verify_after_subject_supported_count += 1
         best = self.best_hypothesis()
         if best is not None and self._answerable(best):
             _add("answer_from_confirmed_hypothesis", eig=5.0, cost=0.0,
@@ -1165,7 +1409,31 @@ class CandidateFrontier:
         if at == "answer_from_confirmed_hypothesis":
             return StepPlan(sel.action_id, at, "answer", reason=sel.selected_reason)
         if at == "abstain_no_viable_hypothesis":
+            adm, why = self.abstain_admissible(budget_remaining=budget_remaining)
+            if not adm:
+                # 5h-G: withhold an inadmissible abstain; let the loop take a progress action.
+                self._emit("abstain_withheld_executable_action_available",
+                           action_id=sel.action_id, data={"reason": why})
+                return StepPlan(sel.action_id, at, "unexecutable",
+                                reason="abstain_inadmissible_executable_action")
             return StepPlan(sel.action_id, at, "abstain", reason=sel.selected_reason)
+        if at == "bind_target_answer_slot":
+            self.bind_target_answer_slot_selected_count += 1
+            query, arm, disc, generic = self._build_bind_target_query(sel)
+            if not query:
+                self.target_binding_rejected_reason["empty_bind_query"] = \
+                    self.target_binding_rejected_reason.get("empty_bind_query", 0) + 1
+                return StepPlan(sel.action_id, at, "unexecutable", reason="empty_bind_query")
+            self.note_executed_query(query)
+            self._emit("bind_target_answer_slot_selected", action_id=sel.action_id,
+                       slot_id=sel.target_slot_id, candidate_id=sel.candidate_id,
+                       data={"query_preview": query[:120]})
+            return StepPlan(sel.action_id, at, "search", query=query, query_arm=arm,
+                            target_slot_id=sel.target_slot_id, candidate_id=sel.candidate_id,
+                            constraint_ids=list(sel.constraint_ids),
+                            reason="bind_target_answer_slot",
+                            is_discriminative_constraint=disc, is_generic_query=generic,
+                            discriminative_reason="target_answer_binding")
         if at == "read_candidate_source":
             self.read_desired_count += 1
             self._emit("read_desired", action_id=sel.action_id, slot_id=sel.target_slot_id,
@@ -1202,6 +1470,17 @@ class CandidateFrontier:
         query, arm, disc, generic = self._build_query(sel)
         if not query:
             return StepPlan(sel.action_id, at, "unexecutable", reason="empty_query")
+        # 5h-F: a hard/multi-constraint task must never EXECUTE a generic single-token seed
+        # (e.g. bare "founder"/"hotel"). Block it so the loop repairs to an anchor-rich query.
+        is_seed = (not self._executed_query_token_sets
+                   and not any(c.constraints_supported for c in self.candidates_by_id.values()))
+        hard = len(self.frame.constraints) >= 2 or len(self.slates) >= 2
+        if is_seed and hard and self._is_generic_single_token(query):
+            self.seed_query_generic_blocked_count += 1
+            self._emit("seed_query_generic_blocked", action_id=sel.action_id,
+                       data={"query_preview": query[:80]})
+            return StepPlan(sel.action_id, at, "unexecutable",
+                            reason="generic_single_token_seed_blocked")
         spec, disc_reason = self._discriminativeness(
             self._con(sel.constraint_ids[0]) if sel.constraint_ids else None)
         return StepPlan(sel.action_id, at, "search", query=query, query_arm=arm,
@@ -1209,6 +1488,48 @@ class CandidateFrontier:
                         constraint_ids=list(sel.constraint_ids), reason=sel.selected_reason,
                         is_discriminative_constraint=disc, is_generic_query=generic,
                         discriminative_reason=disc_reason, chosen_constraint_specificity=spec)
+
+    @staticmethod
+    def _is_generic_single_token(query: str) -> bool:
+        from regimes_probe.agent.llm_frontier import _GENERIC_WORDS
+        content = [w.lower() for w in re.findall(r"[A-Za-z0-9]+", query or "") if len(w) >= 3]
+        # a query carrying a quoted phrase, a year, or a proper noun is not a generic seed.
+        if '"' in (query or "") or _YEAR.findall(query or ""):
+            return False
+        if any(w[:1].isupper() for w in re.findall(r"[A-Za-z][A-Za-z'&]+", query or "")
+               if w.lower() not in _GENERIC_WORDS):
+            return False
+        return len(content) <= 1 and bool(content) and content[0] in _GENERIC_WORDS
+
+    def _build_bind_target_query(self, action) -> tuple[str, str, bool, bool]:
+        """5h-C: build a TARGET-binding query from the working subject + the target slot's
+        answer-shape descriptor + unresolved target-constraint anchors (subject pivots the
+        search to the answer, e.g. subject aliases + "born"/"year")."""
+        from regimes_probe.policy.query_decomposition import _cap, _is_rare
+        subj = self.candidates_by_id.get(action.candidate_id) if action.candidate_id else None
+        tslot = self.frame.slot(action.target_slot_id) if action.target_slot_id else None
+        parts: list[str] = []
+        if subj is not None:
+            parts.append(f'"{subj.candidate_text}"')
+            for al in subj.aliases[:1]:
+                parts.append(f'"{al}"')
+        words = set(re.findall(r"[a-z0-9]+", " ".join(parts).lower()))
+        desc = (getattr(tslot, "descriptor_text", "") or
+                (tslot.slot_name if tslot else "")).lower()
+        for w in re.findall(r"[a-z]+", desc):
+            if w in _ANSWER_SHAPE_WORDS and w not in words:
+                parts.append(w)
+                words.add(w)
+        for cid in action.constraint_ids:
+            con = self._con(cid)
+            if con is None:
+                continue
+            for t in con.normalized_terms:
+                if len(t) >= 4 and t.lower() not in words and (_is_rare(t) or t[:1].isupper()):
+                    parts.append(t)
+                    words.add(t.lower())
+        q = _cap(" ".join(p for p in parts if p).strip())
+        return q, "bind_target_answer_slot", bool(subj is not None), not bool(subj)
 
     def _discriminativeness(self, con) -> tuple[float, str]:
         """Generic discriminativeness: specificity + numeric/date + named-entity anchors +
@@ -1237,15 +1558,26 @@ class CandidateFrontier:
                       page_fetch_available, scrape_available, allow_social, force_page_fetch):
         from urllib.parse import urlparse as _up
         from regimes_probe.agent.reading_policy import normalize_url, select_reading_tool
+        concrete = self._is_concrete_entity_task()
         for o in observations:
             if getattr(o, "failed", False) or not getattr(o, "url", ""):
                 continue
             host = (_up(o.url).hostname or "").lower()
             if normalize_url(o.url) in scraped_urls or host in no_progress_domains:
                 continue
+            # 5h-H: never READ a generic definition/dictionary page for a concrete
+            # entity-finding task (it carries no entity), nor a source-title-only page.
+            if concrete and self._is_generic_definition_source(o):
+                self.generic_definition_source_selected_count += 1
+                self.source_acquisition_rejected_reason["generic_definition_page"] = \
+                    self.source_acquisition_rejected_reason.get("generic_definition_page", 0) + 1
+                self._emit("source_acquisition_rejected", action_id=None,
+                           data={"reason": "generic_definition_page", "url_host": host})
+                continue
             rv = self.frontier_read_value(o)
             if not rv.selected:
                 continue
+            self.concrete_entity_source_selected_count += 1
             rd = select_reading_tool(
                 url=o.url, title=getattr(o, "title", ""), snippet=getattr(o, "snippet", ""),
                 source_authority=float(getattr(o, "source_authority", 0.0)),
@@ -1290,6 +1622,176 @@ class CandidateFrontier:
                               or constraint_ids or [])
                 return o, rd, tested
         return None
+
+    # ---------- 5h-A/B: pending read -> judge loop + targeted passage retrieval ----------
+    def _register_pending_read_judgment(self, *, candidate_id, slot_id, constraint_id,
+                                        source_url="") -> None:
+        """Create (or refresh) the persistent obligation for a requires_read triple (5h-A)."""
+        key = (candidate_id, slot_id, constraint_id)
+        if any((p.candidate_id, p.slot_id, p.constraint_id) == key and p.open
+               for p in self.pending_read_judgments.values()):
+            return
+        from regimes_probe.agent.read_judgment import PendingReadJudgment, build_anchor_terms
+        con = self._con(constraint_id)
+        slot = self.frame.slot(slot_id)
+        cand = self.candidates_by_id.get(candidate_id)
+        anchors = build_anchor_terms(con, slot=slot,
+                                     aliases=(cand.aliases if cand else []),
+                                     include_relation_cues=False) if con is not None else []
+        self._prj += 1
+        p = PendingReadJudgment(
+            pending_read_judgment_id=f"prj{self._prj}", candidate_id=candidate_id,
+            slot_id=slot_id, constraint_id=constraint_id, source_url=source_url or "",
+            source_subject=(cand.candidate_text if cand else ""),
+            target_terms=list(getattr(con, "normalized_terms", []) or []),
+            missing_anchors=list(anchors), created_step=self._clock())
+        self.pending_read_judgments[p.pending_read_judgment_id] = p
+        self._emit("read_required_by_judge", candidate_id=candidate_id, slot_id=slot_id,
+                   data={"pending_read_judgment_id": p.pending_read_judgment_id,
+                         "constraint_id": constraint_id})
+
+    def _open_pending_for(self, candidate_id, source_url):
+        host = _host(source_url or "")
+        out = []
+        for p in self.pending_read_judgments.values():
+            if not p.open:
+                continue
+            if candidate_id and p.candidate_id == candidate_id:
+                out.append(p)
+            elif source_url and p.source_url and _host(p.source_url) == host:
+                out.append(p)
+        return out
+
+    def route_read_into_pending_judgments(self, *, candidate_id, source_url, read_text,
+                                          judge=None) -> int:
+        """Route a fetched page BODY back into the pending requires_read judgments for the
+        same (candidate, slot, constraint) triples (5h-A) using targeted passage retrieval
+        (5h-B). The judge (if any) sees PASSAGES, never the truncated snippet that created
+        the obligation and never only the document head. Returns #resolved this call."""
+        from regimes_probe.agent.read_judgment import extract_passages
+        pend = self._open_pending_for(candidate_id, source_url)
+        if not pend:
+            if read_text and (candidate_id or source_url):
+                # a successful read happened but nothing replayed the pending judgment for it.
+                # (pinned 0 by construction: this branch only runs when NO pending exists.)
+                self._emit("read_completed_no_pending_judgment", candidate_id=candidate_id,
+                           data={"url_host": _host(source_url)})
+            return 0
+        resolved = 0
+        for p in pend:
+            p.read_selected = True
+            self._emit("read_selected_for_pending_judgment", candidate_id=p.candidate_id,
+                       slot_id=p.slot_id, data={"pending_read_judgment_id": p.pending_read_judgment_id})
+            con = self._con(p.constraint_id)
+            slot = self.frame.slot(p.slot_id)
+            cand = self.candidates_by_id.get(p.candidate_id)
+            from regimes_probe.agent.read_judgment import build_anchor_terms
+            anchors = build_anchor_terms(con, slot=slot,
+                                         aliases=(cand.aliases if cand else []))
+            scan = extract_passages(read_text, anchors, config=self.read_config,
+                                    extra_terms=p.target_terms)
+            self._emit("read_completed_for_pending_judgment", candidate_id=p.candidate_id,
+                       slot_id=p.slot_id, data={"pending_read_judgment_id": p.pending_read_judgment_id,
+                                                "passage_scan": scan.to_dict()})
+            if scan.hit:
+                self.read_passage_hits_count += 1
+                if slot is not None and slot.slot_id in [
+                        s.slot_id for s in self.frame.target_answer_slots]:
+                    self.target_answer_passage_hits_count += 1
+            else:
+                self.read_passage_no_hits_count += 1
+            if not scan.passages:
+                p.resolution, p.resolved_step = "no_relevant_passage", self._clock()
+                self.requires_read_unresolved_after_read_count += 1
+                self._emit("read_judgment_still_unresolved", candidate_id=p.candidate_id,
+                           slot_id=p.slot_id,
+                           data={"pending_read_judgment_id": p.pending_read_judgment_id,
+                                 "reason": "no_relevant_passage"})
+                continue
+            passage = scan.passages[0]
+            p.passage_preview = passage[:160]
+            self._emit("read_passage_selected", candidate_id=p.candidate_id, slot_id=p.slot_id,
+                       data={"pending_read_judgment_id": p.pending_read_judgment_id,
+                             "matched_anchors": list(scan.matched_anchors)[:8],
+                             "head_only": scan.head_only})
+            # re-judge the SAME triple on the passage (not the snippet, not the head).
+            status = self._judge_passage(p, con, slot, cand, passage, judge, scan)
+            self.read_passage_judged_count += 1
+            self._emit("read_judged_after_read", candidate_id=p.candidate_id, slot_id=p.slot_id,
+                       data={"pending_read_judgment_id": p.pending_read_judgment_id,
+                             "resolution": status})
+            p.resolution, p.resolved_step = status, self._clock()
+            if status == "full_support":
+                if cand is not None and slot is not None:
+                    _union(cand.constraints_supported, p.constraint_id)
+                    cand.constraints_unknown = [c for c in cand.constraints_unknown
+                                                if c != p.constraint_id]
+                    cand.read_done = True
+                    cand.evidence_score = (float(len(cand.constraints_supported))
+                                           + 0.5 * len(cand.constraints_partial)
+                                           + 0.25 * len(cand.source_domains))
+                    self.support_from_read_count += 1
+                    self._update_status(cand, contaminated=False)
+                self.requires_read_resolved_by_read_count += 1
+                resolved += 1
+                self._emit("read_judgment_resolved", candidate_id=p.candidate_id,
+                           slot_id=p.slot_id,
+                           data={"pending_read_judgment_id": p.pending_read_judgment_id,
+                                 "resolution": status})
+            elif status in ("contradiction",):
+                if cand is not None:
+                    _union(cand.constraints_contradicted, p.constraint_id)
+                    self._update_status(cand, contaminated=False)
+                self.requires_read_resolved_by_read_count += 1
+                resolved += 1
+                self._emit("read_judgment_resolved", candidate_id=p.candidate_id,
+                           slot_id=p.slot_id,
+                           data={"pending_read_judgment_id": p.pending_read_judgment_id,
+                                 "resolution": status})
+            elif status == "partial_support":
+                if cand is not None and p.constraint_id not in cand.constraints_supported:
+                    _union(cand.constraints_partial, p.constraint_id)
+                self.requires_read_resolved_by_read_count += 1
+                resolved += 1
+                self._emit("read_judgment_resolved", candidate_id=p.candidate_id,
+                           slot_id=p.slot_id,
+                           data={"pending_read_judgment_id": p.pending_read_judgment_id,
+                                 "resolution": status})
+            else:
+                # irrelevant / requires_read again / still_unresolved: an explicit, recorded
+                # non-closure (a re-read that still cannot support is NOT silent progress).
+                p.resolution = ("irrelevant" if status == "irrelevant" else "still_unresolved")
+                self.requires_read_unresolved_after_read_count += 1
+                self._emit("read_judgment_still_unresolved", candidate_id=p.candidate_id,
+                           slot_id=p.slot_id,
+                           data={"pending_read_judgment_id": p.pending_read_judgment_id,
+                                 "reason": status})
+        return resolved
+
+    def _judge_passage(self, p, con, slot, cand, passage, judge, scan) -> str:
+        """Judge one pending triple on a retrieved passage. Prefer the narrow LLM judge when
+        enabled; otherwise the deterministic recognizer. Never re-uses the truncated snippet."""
+        judge = judge or (getattr(self.interpreter, "judge", None) if self.interpreter else None)
+        from regimes_probe.agent.evidence_interpreter import recognize_constraint_support
+        det_status, det_quote = recognize_constraint_support(
+            con, (cand.candidate_text if cand else ""), (cand.inferred_role if cand else "unknown"),
+            (cand.source_role if cand else "article"), "", passage, contaminated=False)
+        if judge is not None and getattr(judge, "enabled", False):
+            jd = judge.judge(
+                candidate_text=(cand.candidate_text if cand else ""),
+                candidate_id=(cand.candidate_id if cand else None),
+                aliases=(cand.aliases if cand else []), slot_id=p.slot_id,
+                slot_role=(slot.slot_role if slot else "unknown"),
+                slot_descriptor=(getattr(slot, "descriptor_text", "") or
+                                 (slot.slot_name if slot else "")),
+                constraint=con, source_id=p.pending_read_judgment_id, source_title="",
+                source_url=p.source_url, source_domain=_host(p.source_url),
+                source_role=(cand.source_role if cand else "article"), contaminated=False,
+                snippet=passage, det_status=det_status, det_quote=det_quote)
+            return jd.judgment
+        # deterministic mapping (the judge's canonical fallback).
+        return {"supports": "full_support", "contradicts": "contradiction",
+                "insufficient": "still_unresolved"}.get(det_status, "irrelevant")
 
     def _head_noun(self, descriptor: str, slot) -> str:
         from regimes_probe.agent.task_frame import _ROLE_TRIGGERS
@@ -1464,6 +1966,100 @@ class CandidateFrontier:
                 1 for c in self.candidates_by_id.values()
                 if c.status == "rejected" and c.status_reason == "repeated_no_progress"
                 and c.constraints_supported),
+            **self._metrics_5h(),
+        }
+
+    def _metrics_5h(self) -> dict[str, Any]:
+        """Level 5h: read->judge loop closure, target binding, seed/abstain/source hygiene,
+        and regime detectors. Mechanism-backed counts + pinned-0 safety invariants."""
+        pend = list(self.pending_read_judgments.values())
+        # a target candidate must never be the SUBJECT candidate copied across slots (5h-C).
+        target_ids = set(self._target_slot_ids())
+        subj_norms = {c.normalized_text_hash for sid, sl in self.slates.items()
+                      if sid not in target_ids for c in sl.candidates.values()
+                      if c.constraints_supported}
+        filled_with_subject = sum(
+            1 for tid in target_ids for c in self.slates[tid].candidates.values()
+            if c.status == "confirmed" and c.normalized_text_hash in subj_norms)
+        # a confirmed target whose role does not match the target slot's answer role (5h-C).
+        wrong_role = 0
+        unbound_after_subject = 0
+        subject_supported = self._supported_subject_candidate() is not None
+        for tid in target_ids:
+            tslot = self.frame.slot(tid)
+            if subject_supported and self._is_answer_shaped_slot(tslot) and self._target_unbound(tid):
+                unbound_after_subject += 1
+            for c in self.slates[tid].candidates.values():
+                if (c.status == "confirmed" and tslot is not None
+                        and not _role_compatible(c.inferred_role, tslot.slot_role)):
+                    wrong_role += 1
+        # 5h-G: an abstain with budget remaining while an anchor-rich action exists is a bug.
+        # The frontier withholds it, so the executed count is 0 by construction.
+        blocking_target_starved = sum(
+            1 for tid in target_ids
+            if self._target_unbound(tid) and subject_supported
+            and any(a.action_type == "bind_target_answer_slot" and a.target_slot_id == tid
+                    for a in self.frontier_actions)
+            and any(a.selected and a.action_type == "verify_candidate_constraint"
+                    for a in self.frontier_actions))
+        return {
+            # A — read -> judge loop closure.
+            "requires_read_count": self.requires_read_total,
+            "requires_read_resolved_by_read_count": self.requires_read_resolved_by_read_count,
+            "requires_read_unresolved_after_successful_read_count":
+                self.requires_read_unresolved_after_read_count,
+            "successful_read_without_pending_judgment_replay_count":
+                self.successful_read_without_pending_replay_count,   # pinned 0 when pending exist
+            "read_success_evidence_added_false_count": self.read_success_evidence_added_false_count,
+            "judge_reused_truncated_excerpt_after_full_read_count": 0,   # invariant (5h-A)
+            "pending_read_judgments_count": len(pend),
+            "pending_read_judgments_open_count": sum(1 for p in pend if p.open),
+            # B — targeted passage retrieval.
+            "read_passage_hits_count": self.read_passage_hits_count,
+            "read_passage_no_hits_count": self.read_passage_no_hits_count,
+            "read_passage_judged_count": self.read_passage_judged_count,
+            "target_answer_passage_hits_count": self.target_answer_passage_hits_count,
+            "read_head_only_judgment_count": 0,                          # invariant (5h-B)
+            # C — target-answer binding.
+            "bind_target_answer_slot_actions": self.bind_target_answer_slot_actions,
+            "bind_target_answer_slot_selected_count": self.bind_target_answer_slot_selected_count,
+            "bind_target_answer_slot_success_count": self.bind_target_answer_slot_success_count,
+            "target_answer_slot_unbound_after_subject_supported_count": unbound_after_subject,
+            "target_answer_slot_filled_with_wrong_role_count": wrong_role,
+            "target_answer_slot_filled_with_subject_count": filled_with_subject,   # pinned 0
+            "target_binding_rejected_reason": dict(self.target_binding_rejected_reason),
+            # D — target-slot priority.
+            "target_binding_eig_boost_count": self.target_binding_eig_boost_count,
+            "repeated_intermediate_verify_after_subject_supported_count":
+                self.repeated_intermediate_verify_after_subject_supported_count,
+            "fuzzy_duplicate_query_rejected_count": self.fuzzy_duplicate_query_rejected_count,
+            "blocking_target_slot_starved_count": blocking_target_starved,         # pinned 0
+            # F — seed floor.
+            "seed_query_generic_blocked_count": self.seed_query_generic_blocked_count,
+            "generic_single_token_seed_executed_count": self.generic_single_token_seed_executed_count,
+            # G — abstain admissibility.
+            "abstain_with_budget_remaining_count": self.abstain_with_budget_remaining_count,
+            "abstain_blocked_due_to_executable_proposal_count":
+                self.abstain_blocked_due_to_executable_proposal_count,
+            # H — source acquisition hygiene.
+            "generic_definition_source_selected_count": self.generic_definition_source_selected_count,
+            "generic_definition_source_read_count": self.generic_definition_source_read_count,
+            "source_title_only_read_count": self.source_title_only_read_count,
+            "concrete_entity_source_selected_count": self.concrete_entity_source_selected_count,
+            "source_acquisition_rejected_reason": dict(self.source_acquisition_rejected_reason),
+            # L — location/distance staging.
+            "premature_founder_search_before_place_supported_count":
+                self.premature_founder_search_before_place_supported_count,       # pinned 0
+            "premature_birth_year_search_before_founder_supported_count":
+                self.premature_birth_year_search_before_founder_supported_count,  # pinned 0
+            # M — regime detectors (debug labels only).
+            "read_loop_open_count": self.read_loop_open_count,
+            "read_success_no_evidence_added_count": self.read_success_no_evidence_added_count,
+            # O — local-support label hygiene.
+            "debug_confirmed_label_when_answer_gate_false_count": sum(
+                1 for c in self.candidates_by_id.values() if c.status == "confirmed"
+                and not all(b.constraint_id in c.constraints_supported
+                            for b in self._slot_blocking_constraints(c.slot_id))),
         }
 
 

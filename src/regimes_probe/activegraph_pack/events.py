@@ -77,6 +77,10 @@ class Events:
     CANDIDATE_PROMOTED_FROM_LLM_FRONTIER_EVIDENCE = "candidate_promoted_from_llm_frontier_evidence"
     LLM_FRONTIER_REPAIR_TRIGGERED_REASON = "llm_frontier_repair_triggered_reason"
     TOOL_FAMILY_NORMALIZED = "tool_family_normalized"
+    # Level 5h anchor-gate over-rejection recovery
+    PROPOSAL_GATE_RELAXED = "proposal_gate_relaxed"
+    ALL_PROPOSALS_REJECTED = "all_proposals_rejected"
+    GENERIC_FALLBACK_BLOCKED = "generic_fallback_blocked"
     # Level 5d evidence interpretation (retrieval -> structured assertions)
     EVIDENCE_INTERPRETED = "evidence_interpreted"
     SOURCE_CLASSIFIED = "source_classified"
@@ -103,6 +107,22 @@ class Events:
     READ_BLOCKED_NO_URL = "read_blocked_no_url"
     READ_BLOCKED_DISALLOWED_TOOL = "read_blocked_disallowed_tool"
     READ_BLOCKED_UNSAFE_OR_CONTAMINATED_URL = "read_blocked_unsafe_or_contaminated_url"
+    # Level 5h read->judge loop closure + target binding + hygiene
+    READ_REQUIRED_BY_JUDGE = "read_required_by_judge"
+    READ_SELECTED_FOR_PENDING_JUDGMENT = "read_selected_for_pending_judgment"
+    READ_COMPLETED_FOR_PENDING_JUDGMENT = "read_completed_for_pending_judgment"
+    READ_COMPLETED_NO_PENDING_JUDGMENT = "read_completed_no_pending_judgment"
+    READ_PASSAGE_SELECTED = "read_passage_selected"
+    READ_JUDGED_AFTER_READ = "read_judged_after_read"
+    READ_JUDGMENT_RESOLVED = "read_judgment_resolved"
+    READ_JUDGMENT_STILL_UNRESOLVED = "read_judgment_still_unresolved"
+    BIND_TARGET_ANSWER_SLOT_PROPOSED = "bind_target_answer_slot_proposed"
+    BIND_TARGET_ANSWER_SLOT_SELECTED = "bind_target_answer_slot_selected"
+    SEED_QUERY_GENERIC_BLOCKED = "seed_query_generic_blocked"
+    FUZZY_DUPLICATE_QUERY_REJECTED = "fuzzy_duplicate_query_rejected"
+    ABSTAIN_WITHHELD_EXECUTABLE_ACTION_AVAILABLE = "abstain_withheld_executable_action_available"
+    SOURCE_ACQUISITION_REJECTED = "source_acquisition_rejected"
+    DEPENDENT_SLOT_SEARCH_DEFERRED = "dependent_slot_search_deferred"
     # Level 5f LLM evidence judge
     LLM_EVIDENCE_JUDGMENT_CREATED = "llm_evidence_judgment.created"
     LLM_EVIDENCE_JUDGMENT_ACCEPTED = "llm_evidence_judgment.accepted"
@@ -137,6 +157,8 @@ LLM_FRONTIER_EVENTS: tuple[str, ...] = (
     Events.SELECTED_PROPOSAL_TRANSLATED_TO_ACTION, Events.EVIDENCE_LINKED_TO_LLM_PROPOSAL,
     Events.CANDIDATE_PROMOTED_FROM_LLM_FRONTIER_EVIDENCE,
     Events.LLM_FRONTIER_REPAIR_TRIGGERED_REASON, Events.TOOL_FAMILY_NORMALIZED,
+    Events.PROPOSAL_GATE_RELAXED, Events.ALL_PROPOSALS_REJECTED,
+    Events.GENERIC_FALLBACK_BLOCKED,
 )
 
 #: Evidence-interpretation event-type strings (trace + projection only).
@@ -158,6 +180,14 @@ EVIDENCE_INTERPRETATION_EVENTS: tuple[str, ...] = (
     Events.EVIDENCE_JUDGMENT_REJECTED_REASON, Events.SKIPPED_READ_AFTER_REQUIRES_READ,
     Events.READ_DESIRED, Events.READ_SELECTED, Events.READ_BLOCKED_NO_URL,
     Events.READ_BLOCKED_DISALLOWED_TOOL, Events.READ_BLOCKED_UNSAFE_OR_CONTAMINATED_URL,
+    Events.READ_REQUIRED_BY_JUDGE, Events.READ_SELECTED_FOR_PENDING_JUDGMENT,
+    Events.READ_COMPLETED_FOR_PENDING_JUDGMENT, Events.READ_COMPLETED_NO_PENDING_JUDGMENT,
+    Events.READ_PASSAGE_SELECTED, Events.READ_JUDGED_AFTER_READ,
+    Events.READ_JUDGMENT_RESOLVED, Events.READ_JUDGMENT_STILL_UNRESOLVED,
+    Events.BIND_TARGET_ANSWER_SLOT_PROPOSED, Events.BIND_TARGET_ANSWER_SLOT_SELECTED,
+    Events.SEED_QUERY_GENERIC_BLOCKED, Events.FUZZY_DUPLICATE_QUERY_REJECTED,
+    Events.ABSTAIN_WITHHELD_EXECUTABLE_ACTION_AVAILABLE, Events.SOURCE_ACQUISITION_REJECTED,
+    Events.DEPENDENT_SLOT_SEARCH_DEFERRED,
 )
 
 

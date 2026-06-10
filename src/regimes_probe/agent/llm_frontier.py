@@ -73,6 +73,39 @@ def _query_lacks_distinctive_anchor(q: str) -> bool:
     return True
 
 
+def _content_token_set(q: str) -> frozenset:
+    return frozenset(w.lower() for w in _WORD.findall(q or "")
+                     if len(w) >= 3 and w.lower() not in _ANCHOR_STOP)
+
+
+def _is_fuzzy_duplicate(q: str, failed_norms: set[str]) -> bool:
+    """A query is a fuzzy duplicate of a prior zero-progress query when their normalized
+    content-token SETS are equal or differ by at most one token (word-order variants)."""
+    toks = _content_token_set(q)
+    if not toks:
+        return False
+    for fn in failed_norms:
+        prev = _content_token_set(fn)
+        if not prev:
+            continue
+        if toks == prev or (len(toks & prev) >= max(2, min(len(toks), len(prev)) - 1)
+                            and len(toks ^ prev) <= 1):
+            return True
+    return False
+
+
+def _proposal_is_anchor_rich(p) -> bool:
+    """A rejected proposal that still carries a real retrieval anchor (a quoted phrase, a
+    year, a proper noun, or any matched constraint/context token) — eligible for the relaxed
+    gate (5h-E). A generic single-token query is NOT anchor-rich."""
+    q = p.proposed_query or ""
+    if _is_generic_query(q):
+        return False
+    if getattr(p, "matched_anchor_tokens", None):
+        return True
+    return not _query_lacks_distinctive_anchor(q)
+
+
 # --------------------------------------------------------------------------- card
 @dataclass
 class ResearchStateCard:
@@ -199,6 +232,11 @@ class FrontierProposal:
     tool_normalized: bool = False
     #: candidate text->id resolution debug (req 6), set during validation.
     candidate_lookup_debug: dict = field(default_factory=dict)
+    #: 5h-E anchor-gate diagnostics, set during validation.
+    matched_anchor_tokens: list[str] = field(default_factory=list)
+    missing_anchor_tokens: list[str] = field(default_factory=list)
+    gate_failure_reason: str = ""
+    relaxed_gate: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {"proposal_id": self.proposal_id, "action_type": self.action_type,
@@ -233,17 +271,45 @@ def _extract_proposals(raw: str) -> list[dict]:
     return []
 
 
+#: stopwords stripped when computing normalized content-token anchor overlap (5h-E).
+_ANCHOR_STOP = frozenset({
+    "the", "a", "an", "of", "in", "on", "at", "to", "and", "or", "for", "with", "by",
+    "is", "are", "was", "were", "be", "as", "that", "this", "from", "between", "into"})
+
+
 def _anchor_terms(frame) -> set[str]:
+    """Normalized CONTENT-token anchors (5h-E): a multiword normalized term like
+    "probation officer" contributes BOTH "probation" and "officer", so a compact decomposed
+    query ("years probation officer") is not wrongly rejected as anchor-less. Years collapse
+    to a ``<year>`` class so "hotel 1955" matches "hotel originally opened in 1955"."""
     terms: set[str] = set()
     for c in frame.constraints:
         for t in c.normalized_terms:
-            if len(t) >= 4:
-                terms.add(t.lower())
+            for w in _WORD.findall(str(t).lower()):
+                if len(w) >= 3 and w not in _ANCHOR_STOP:
+                    terms.add(w)
+                if re.fullmatch(r"(1[5-9]\d{2}|20\d{2})", w):
+                    terms.add("<year>")
+        for y in re.findall(r"\b(1[5-9]\d{2}|20\d{2})\b", c.text_span or ""):
+            terms.add(y)
+            terms.add("<year>")
     for t in frame.known_context_terms:
         for w in _WORD.findall(t.lower()):
-            if len(w) >= 3:
+            if len(w) >= 3 and w not in _ANCHOR_STOP:
                 terms.add(w)
     return terms
+
+
+def _query_anchor_tokens(query: str) -> set[str]:
+    """Query content tokens with years collapsed to ``<year>`` (mirrors ``_anchor_terms``)."""
+    toks: set[str] = set()
+    for w in _WORD.findall(query or ""):
+        wl = w.lower()
+        if len(wl) >= 3 and wl not in _ANCHOR_STOP:
+            toks.add(wl)
+        if re.fullmatch(r"(1[5-9]\d{2}|20\d{2})", wl):
+            toks.add("<year>")
+    return toks
 
 
 # --------------------------------------------------------------------------- tools (req 6)
@@ -418,9 +484,19 @@ def validate_proposal(p: FrontierProposal, frame, frontier, *, failed_norms: set
         return False, "generic_query"
     if _norm_q(q) in failed_norms:
         return False, "duplicate_no_progress_query"
+    # 5h-D/E: fuzzy (normalized token-SET) dedupe — a word-order/reformulation variant of a
+    # zero-progress query is the SAME query and is rejected (re-selection picks another).
+    if _is_fuzzy_duplicate(q, failed_norms):
+        return False, "fuzzy_duplicate_no_progress_query"
+    # 5h-E: anchor coverage by NORMALIZED content-token overlap (not verbatim phrase match),
+    # so a compact reformulation ("hotel 1955" for "hotel originally opened in 1955") passes.
     anchors = _anchor_terms(frame)
-    qtok = {w.lower() for w in _WORD.findall(q)}
-    if anchors and not (qtok & anchors):
+    qtok = _query_anchor_tokens(q)
+    matched = sorted(qtok & anchors)
+    p.matched_anchor_tokens = matched
+    p.missing_anchor_tokens = sorted(anchors - qtok)[:12]
+    if anchors and not matched:
+        p.gate_failure_reason = "query_lacks_constraint_or_context_anchor"
         return False, "query_lacks_constraint_or_context_anchor"
     # must be connected to an unresolved slot or constraint.
     unresolved_slots = {s.slot_id for s in frame.all_slots}
@@ -482,6 +558,10 @@ class LLMFrontierProposer:
         self.tool_normalized_count = 0
         self.rejection_counts: Counter = Counter()
         self.repair_trigger_reasons: Counter = Counter()
+        #: 5h-E anchor-gate over-rejection recovery.
+        self.relaxed_gate_selected_count = 0
+        self.all_proposals_rejected_with_anchor_rich_count = 0
+        self.generic_fallback_after_all_proposals_rejected_count = 0
 
     def stats(self) -> dict[str, Any]:
         return {"llm_frontier_model": self.model, "llm_frontier_model_calls": self.model_calls,
@@ -496,7 +576,19 @@ class LLMFrontierProposer:
                 "llm_frontier_integrity_error_count": self.integrity_error_count,
                 "llm_frontier_tool_normalized_count": self.tool_normalized_count,
                 "llm_frontier_rejection_counts": dict(self.rejection_counts),
-                "llm_frontier_repair_trigger_reason_counts": dict(self.repair_trigger_reasons)}
+                "llm_frontier_repair_trigger_reason_counts": dict(self.repair_trigger_reasons),
+                # 5h-E anchor-gate over-rejection recovery.
+                "query_lacks_constraint_or_context_anchor_count":
+                    self.rejection_counts.get("query_lacks_constraint_or_context_anchor", 0),
+                "fuzzy_duplicate_query_rejected_count":
+                    self.rejection_counts.get("fuzzy_duplicate_no_progress_query", 0),
+                "zero_progress_near_duplicate_query_count":
+                    self.rejection_counts.get("fuzzy_duplicate_no_progress_query", 0),
+                "relaxed_gate_selected_count": self.relaxed_gate_selected_count,
+                "all_proposals_rejected_with_executable_anchor_rich_candidate_count":
+                    self.all_proposals_rejected_with_anchor_rich_count,
+                "generic_fallback_after_all_proposals_rejected_count":
+                    self.generic_fallback_after_all_proposals_rejected_count}   # pinned 0
 
     def _input_hash(self, card: ResearchStateCard) -> str:
         return _sha(f"{self.prompt.fingerprint()}|{self.model}|{card.card_hash()}")
@@ -614,9 +706,31 @@ class LLMFrontierProposer:
         meta["proposal_hash"] = _sha(raw or "")
 
         accepted = [p for p in proposals if p.status == "accepted"]
+        # 5h-E: if EVERY proposal was rejected only on the soft anchor-mismatch gate but an
+        # anchor-rich reformulation exists, run the best such proposal under a RELAXED gate
+        # rather than collapsing to a generic deterministic seed (never prefer a generic seed
+        # over a reasonable anchor-rich proposal).
+        if not accepted:
+            soft = [p for p in proposals
+                    if p.rejection_reason == "query_lacks_constraint_or_context_anchor"
+                    and _proposal_is_anchor_rich(p)]
+            if soft:
+                self.all_proposals_rejected_with_anchor_rich_count += 1
+                best_soft = max(soft, key=lambda p: (len(p.matched_anchor_tokens),
+                                                     -proposals.index(p)))
+                best_soft.status, best_soft.relaxed_gate = "accepted", True
+                best_soft.rejection_reason = ""
+                score_proposal(best_soft, frame, frontier, failed_norms=failed_norms)
+                self.relaxed_gate_selected_count += 1
+                _ev("proposal_gate_relaxed", proposal_id=best_soft.proposal_id,
+                    data={"missing_anchor_tokens": list(best_soft.missing_anchor_tokens)[:8]})
+                _ev("generic_fallback_blocked", proposal_id=best_soft.proposal_id)
+                accepted = [best_soft]
         if not accepted:
             self.fallback_count += 1
+            meta["all_proposals_rejected"] = bool(proposals)
             meta["fallback_reason"] = meta.get("fallback_reason") or "no_accepted_proposal"
+            _ev("all_proposals_rejected", n=len(proposals))
             return None, meta
         best = max(accepted, key=lambda p: (p.score, -proposals.index(p)))
         meta["selected"] = best.to_dict()

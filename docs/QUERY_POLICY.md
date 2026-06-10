@@ -1012,3 +1012,60 @@ classifier hardening (req 5), `exa_search`/`firecrawl_search` alternate-URL read
 projecting every read-intent state as a graph object (the events are registered and emitted;
 object/relation projection is the follow-up). The strict answer gate, contamination safety,
 replayability, and policy-memory hygiene are unchanged.
+
+#### Level 5h: close the read→judge loop, bind the target, stop generic pollution
+
+5g made reads *execute*; the next smoke showed the loop still didn't *close*: reads produced
+new candidates but `evidence_added=False`, judges kept re-reading truncated snippets, the
+target answer slot stayed unbound while the frontier re-verified already-supported subjects,
+and a generic `"founder"` seed polluted the episode. 5h closes those seams generically.
+
+- **Read→judge loop closure + targeted passage retrieval (A/B).** A judge `requires_read` is
+  now a **persistent obligation** — a `PendingReadJudgment` on the exact
+  `(candidate, slot, constraint, source_url)` triple. When a read for that source executes, its
+  page **body** is routed back into a *targeted re-judgment of the same triple*, not just
+  generic candidate extraction: `extract_passages()` finds compact windows around the
+  constraint/target/alias/relation/year anchors (deterministic, lexical-overlap fallback,
+  bounded by `read_max_chars_total`/`read_passage_window_chars`/`read_max_passages_per_pending_judgment`),
+  and the judge sees those **passages**, never the truncated snippet or only the document head.
+  Each obligation closes (`full_support`/`partial_support`/`contradiction`) or stays open with
+  an explicit reason (`still_unresolved`/`irrelevant`/`no_relevant_passage`/`read_failed`).
+  Pinned-0: `judge_reused_truncated_excerpt_after_full_read_count`, `read_head_only_judgment_count`.
+- **Target-answer binding + target-slot priority (C/D).** A first-class
+  `bind_target_answer_slot` action fires when a subject/intermediate is supported but an
+  **answer-shaped** target slot (year/date/number/name/title/venue/duration…) is still unbound;
+  it pivots search/read from the working subject's aliases + the target descriptor's answer-shape
+  anchors. It **outranks** re-verifying an already-supported subject (which is demoted), a
+  confirmed slot stops generating new candidates, and near-duplicate word-order query variants
+  are rejected as one (`fuzzy_duplicate_no_progress_query`). Pinned-0:
+  `target_answer_slot_filled_with_subject_count`, `blocking_target_slot_starved_count`.
+- **Anchor-gate fix + seed floor + abstain admissibility (E/F/G).** The proposal anchor gate
+  now matches **normalized content tokens** (a multiword term like "probation officer"
+  contributes both tokens; years collapse to a `<year>` class), so compact reformulations
+  ("hotel 1955" for "hotel originally opened in 1955") pass. When *every* proposal is rejected
+  only on the soft anchor gate but an anchor-rich one exists, the best is run under a
+  **relaxed gate** rather than collapsing to a generic deterministic seed
+  (`generic_fallback_after_all_proposals_rejected_count` pinned 0). A hard/multi-constraint task
+  never executes a generic single-token seed (`generic_single_token_seed_executed_count` pinned
+  0), and an abstain is **inadmissible** while budget remains, a blocking constraint is
+  unresolved, and an executable anchor-rich action exists (`abstain_with_budget_remaining_count`
+  pinned 0).
+- **Source-acquisition hygiene + staging (H/L).** For a concrete entity-finding task the loop
+  never *reads* a generic dictionary/definition page (`generic_definition_source_read_count`
+  pinned 0), and it stages dependent slots behind their dependencies — the founder is not
+  searched before the place is supported, the birth year not before the founder
+  (`premature_founder_search_before_place_supported_count`,
+  `premature_birth_year_search_before_founder_supported_count` pinned 0), while an
+  already-confirmed candidate still expands to its dependents.
+- **Regime detectors + label hygiene (M/O).** Generic detector counts (`read_loop_open_count`,
+  `read_success_no_evidence_added_count`, `proposal_gate_starvation_count`, …) are added to the
+  report as **debug labels only** (never benchmark claims), and the candidate-local
+  "confirmed" reason is renamed `slot_candidate_supported` so it never implies global answer
+  readiness (`debug_confirmed_label_when_answer_gate_false_count` pinned 0).
+
+Deferred (documented, not silently dropped): full **source-subject extraction** (I),
+**coreference collapse** of duplicated latent slots (J — the *safety* invariant, never merging
+distinct entities, holds today), **batch judging + explicit-location hard filter** (K), and a
+fixed 10–20 item dev/debug slice script (N — recommended, not yet added). The strict answer
+gate, contamination safety, replay, and policy-memory hygiene are unchanged; accuracy is **not**
+the acceptance criterion for this iteration.

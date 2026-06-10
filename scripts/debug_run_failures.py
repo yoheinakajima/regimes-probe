@@ -148,6 +148,18 @@ def main() -> int:
                   f"| fallback_attempted={fm.get('read_fallback_attempted_count')} "
                   f"fallback_success={fm.get('read_fallback_success_count')} "
                   f"failed_zero_chars={fm.get('read_failed_zero_chars_count')}")
+            print(f"  READ->JUDGE LOOP (5h): requires_read={fm.get('requires_read_count')} "
+                  f"resolved_by_read={fm.get('requires_read_resolved_by_read_count')} "
+                  f"unresolved_after_read={fm.get('requires_read_unresolved_after_successful_read_count')} "
+                  f"passage_judged={fm.get('read_passage_judged_count')} "
+                  f"read_loop_open={fm.get('read_loop_open_count')} "
+                  f"reused_truncated={fm.get('judge_reused_truncated_excerpt_after_full_read_count')}")
+            print(f"  TARGET BIND (5h): bind_actions={fm.get('bind_target_answer_slot_actions')} "
+                  f"bind_selected={fm.get('bind_target_answer_slot_selected_count')} "
+                  f"filled_with_subject={fm.get('target_answer_slot_filled_with_subject_count')} "
+                  f"seed_blocked={fm.get('seed_query_generic_blocked_count')} "
+                  f"generic_seed_executed={fm.get('generic_single_token_seed_executed_count')} "
+                  f"def_src_read={fm.get('generic_definition_source_read_count')}")
             sfa = cf.get("selected_frontier_action", {}) or {}
             if sfa.get("plan", {}).get("read_value"):
                 print(f"    read_value: {sfa['plan']['read_value']}")

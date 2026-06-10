@@ -38,15 +38,15 @@ def test_legacy_loader_reconstructs_and_scans_passages_offline():
     o = res.obligations[0]
     assert o.reconstructed_from_legacy_trace is True
     assert o.reconstruction_method == "structured_interpretations"   # the 5l fix path
-    assert o.pipeline_status == "passages_scanned"
+    assert o.pipeline_status == "rejudgment_pending"
     assert o.stage_reason == "rejudgment_prompt_not_in_cache"   # NOT a generic cache-miss
-    assert res.overall_status == "reconstructed_passages_scanned_rejudgment_pending"
+    assert res.overall_status == "reconstructed_actual_body_rejudgment_pending"
 
 
 def test_legacy_loader_uses_raw_payload_beyond_4000_cap():
     o = load_legacy_run(_LEGACY).obligations[0]
     # the fuller raw provider payload is used, and the resolving fact sits past char 4000.
-    assert o.body_source == "cache_raw_payload"
+    assert o.body_source == "cache_read_body" and o.body_is_actual_read_body
     assert o.cached_payload_chars > o.stored_body_chars
     assert o.store_raw_was_enabled is True
     assert o.passages_found_beyond_4000 is True and o.first_hit_offset > 4000
@@ -61,7 +61,7 @@ def test_legacy_loader_reports_no_requires_read_events_per_item():
         p = Path(d)
         (p / "debug_questions.jsonl").write_text(json.dumps(rec) + "\n")
         res = load_legacy_run(p)
-        assert res.overall_status == "unvalidated_cache_miss"
+        assert res.overall_status == "no_reconstructed_obligations"
         assert any(e["event_type"] == "no_pending_read_judgment_events"
                    for e in res.replay_events)
 
@@ -83,14 +83,15 @@ def test_live_judge_tier_closes_and_records_then_replays_offline(tmp_path):
     run = _copy_legacy(tmp_path)
     r1 = load_legacy_run(run, allow_live_judge=True, max_judge_calls=20)
     o = r1.obligations[0]
-    assert o.pipeline_status == "judged" and o.stage_reason == "closed_by_live_rejudgment"
-    assert o.live_rejudgment_source in ("cache_stored_text", "cache_raw_payload",
-                                        "call_embedded_body")   # never debug_snippet_only
+    assert o.pipeline_status in ("closed", "judged_unclosed")
+    assert o.stage_reason == "closed_by_live_rejudgment"
+    assert o.live_rejudgment_source in ("cache_read_body", "call_embedded_read_body",
+                                        "replay_export_body")   # never a snippet
     assert 1 <= r1.metrics["live_model_calls"] <= len(r1.obligations)
     # the verdicts were recorded into the run's judge cache -> a re-run is fully offline.
     r2 = load_legacy_run(run)
     assert r2.metrics["live_model_calls"] == 0
-    assert r2.obligations[0].pipeline_status in ("judged", "closed")
+    assert r2.obligations[0].pipeline_status in ("judged_unclosed", "closed")
 
 
 def test_live_judge_tier_fail_closed_at_zero_budget(tmp_path):

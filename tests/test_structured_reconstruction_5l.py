@@ -63,7 +63,8 @@ def test_norm_and_match_url_helpers():
 # ----------------------------------------------------------------- 4: body + honest truncation
 def test_body_located_from_raw_payload_with_store_raw_header():
     o = load_legacy_run(_LEGACY).obligations[0]
-    assert o.body_source == "cache_raw_payload"
+    assert o.body_source == "cache_read_body"
+    assert o.used_full_body_not_snippet is True       # the fuller raw payload was scanned
     assert o.store_raw_was_enabled is True and o.raw_unavailable is False
     assert o.cached_payload_chars > o.stored_body_chars
     assert o.passages_found_beyond_4000 is True and o.first_hit_offset > 4000

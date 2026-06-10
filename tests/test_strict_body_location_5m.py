@@ -41,8 +41,8 @@ def _write_record(run: Path, rec: dict) -> None:
 def test_cached_body_advances_to_body_located_and_passages_scanned():
     res = load_legacy_run(_LEGACY)
     o = res.obligations[0]
-    assert o.body_source in ("cache_stored_text", "cache_raw_payload")
-    assert o.pipeline_status == "passages_scanned"
+    assert o.body_source == "cache_read_body" and o.body_is_actual_read_body
+    assert o.pipeline_status in ("passages_scanned", "rejudgment_pending")
     assert res.metrics["body_located_count"] >= 1
     assert res.metrics["passages_scanned_count"] >= 1
     assert res.metrics["live_provider_calls"] == 0 and res.metrics["live_model_calls"] == 0
@@ -59,8 +59,10 @@ def test_call_embedded_body_is_recognised(tmp_path):
     _write_record(run, rec)
     res = load_legacy_run(run)
     o = res.obligations[0]
-    assert o.body_source == "call_embedded_body"
-    assert o.pipeline_status == "passages_scanned" and o.passage_anchor_hits >= 1
+    assert o.body_source == "call_embedded_read_body"
+    assert o.body_match_source == "read_call"
+    assert o.pipeline_status in ("passages_scanned", "rejudgment_pending")
+    assert o.passage_anchor_hits >= 1
     assert o.matched_body_url and o.matched_read_url
 
 
@@ -92,8 +94,10 @@ def test_matched_read_always_has_url_match_method():
 
 def test_read_on_unrelated_host_is_not_matched(tmp_path):
     run = _copy(tmp_path)
+    _strip_provider_cache(run)                      # no read-provider cache match either
     rec = _record(run)
-    # point the only read call at a DIFFERENT host -> no URL relation -> matched_read=False.
+    # point the only read call at a DIFFERENT host -> no URL relation -> matched_read=False
+    # (5n-2: neither a read-class call nor a read-provider cache entry matches by URL).
     rec["calls"][0]["evidence_record"]["url"] = "https://other.example/unrelated/page"
     rec["calls"][0]["task_action"]["query_text_preview"] = "https://other.example/unrelated/page"
     _write_record(run, rec)
@@ -129,7 +133,7 @@ def test_truncation_claim_for_actual_capped_body_without_raw(tmp_path):
     (run / "cache" / "provider_cache.json").write_text(json.dumps(cache))
     res = load_legacy_run(run)
     o = res.obligations[0]
-    assert o.body_source == "cache_stored_text" and o.raw_unavailable
+    assert o.body_source == "cache_read_body" and o.raw_unavailable
     assert o.body_truncated_before_relevant_passage is True
     assert o.stage_reason == "body_truncated_before_relevant_passage(raw_unavailable)"
 
@@ -141,7 +145,7 @@ def test_live_judge_skips_when_only_debug_snippets(tmp_path):
     res = load_legacy_run(run, allow_live_judge=True, max_judge_calls=20)
     tier = res.metrics["live_judge_tier"]
     assert tier["enabled"] is True
-    assert tier["live_judge_skipped_reason"] == "no_body_passages_to_judge"
+    assert tier["live_judge_skipped_reason"] == "no_actual_body_predicate_relevant_passages_to_judge"
     assert res.metrics["live_model_calls"] == 0
     assert all(not o.live_rejudgment_source or o.live_rejudgment_source != "debug_snippet_only"
                for o in res.obligations)
@@ -150,10 +154,11 @@ def test_live_judge_skips_when_only_debug_snippets(tmp_path):
 def test_live_judge_records_source_for_actual_body(tmp_path):
     run = _copy(tmp_path)
     res = load_legacy_run(run, allow_live_judge=True, max_judge_calls=20)
-    judged = [o for o in res.obligations if o.pipeline_status == "judged"]
+    judged = [o for o in res.obligations
+              if o.pipeline_status in ("judged_unclosed", "closed")]
     assert judged
-    assert all(o.live_rejudgment_source in ("cache_stored_text", "cache_raw_payload",
-                                            "call_embedded_body") for o in judged)
+    assert all(o.live_rejudgment_source in ("cache_read_body", "call_embedded_read_body",
+                                            "replay_export_body") for o in judged)
     assert res.metrics["live_model_calls"] >= 1
 
 

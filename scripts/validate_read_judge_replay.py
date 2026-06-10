@@ -114,19 +114,25 @@ def main() -> int:
     if av.obligations:
         pm = av.metrics
         print(f"   reconstructed={pm.get('reconstructed_count')} "
-              f"body_located={pm.get('body_located_count')} "
+              f"actual_read_bodies={pm.get('body_located_count')} "
               f"passages_scanned={pm.get('passages_scanned_count')} "
-              f"judged={pm.get('judged_count')} closed={pm.get('closed_count')}; "
-              f"debug_snippet_scanned={pm.get('debug_snippet_scanned_count')} "
-              f"(diagnostic only, never counts as a located body); "
-              f"beyond_4000={pm.get('passages_found_beyond_4000_count')}")
+              f"(predicate_relevant={pm.get('predicate_relevant_passage_count')} "
+              f"subject_only={pm.get('subject_only_passage_count')}) "
+              f"judged={pm.get('judged_count')} closed={pm.get('closed_count')}")
+        print(f"   diagnostic-only (never counted as bodies): "
+              f"search_snippets={pm.get('search_snippet_only_count')} "
+              f"debug_snippets={pm.get('debug_snippet_scanned_count')}; "
+              f"beyond_4000={pm.get('passages_found_beyond_4000_count')} "
+              f"rejudge_version_mismatch="
+              f"{pm.get('recorded_rejudgment_cache_version_mismatch_count')}")
         print(f"   body_sources: {json.dumps(pm.get('body_source_counts', {}))} "
               f"url_match: {json.dumps(pm.get('url_match_method_counts', {}))}")
         print(f"   stage_reasons: {json.dumps(pm.get('stage_reason_counts', {}))}")
         cr = pm.get("cache_report", {})
         if cr:
             print(f"   cache: files={cr.get('n_files')} entries={cr.get('n_entries')} "
-                  f"by_provider={json.dumps(cr.get('entries_by_provider', {}))} "
+                  f"read_body={json.dumps(cr.get('read_body_entries_by_provider', {}))} "
+                  f"search={json.dumps(cr.get('search_snippet_entries_by_provider', {}))} "
                   f"raw_entries={cr.get('raw_payload_entries')} "
                   f"unrecognized={cr.get('unrecognized_schema_count')}")
     for nnote in av.notes:

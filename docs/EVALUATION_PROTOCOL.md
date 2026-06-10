@@ -600,3 +600,25 @@ bodies for read-class tools, cap 40000 chars, sanitized by the recording cache) 
 read-judgment-backed runs — judge input stays bounded by passage windows, so a larger
 retrieval body does not grow judge prompts). Zero live calls in default mode; no
 benchmark/accuracy/memory/generalization claim follows.
+
+**Level 5n — provider-class strictness, passage relevance, closure-gated status.** The 5m
+local run still over-credited: search-provider snippets (serper/exa/firecrawl_search) counted
+as located bodies, candidate-name/title hits counted as judgeable passages, and a pre-strict
+recorded rejudgment made `overall_status=validated` with `closed_count=0`. 5n closes all three:
+(1) only READ-BODY providers (firecrawl_scrape/page_fetch), call-embedded read bodies, or
+`read_judge_replay_v1` persisted bodies are actual bodies — search snippets are
+`cache_search_snippet_only` diagnostics that never increment body_located/passages_scanned/
+truncation/judged/closed and never feed the judge (pinned 0:
+`search_snippet_counted_as_body_count`, `actual_body_located_without_read_body_provenance_count`);
+(2) passages are scanned with CATEGORIZED anchors and only `predicate_relevant` passages
+(≥1 non-subject category: constraint label/facet, target descriptor, specific relation verbs,
+numeric/year, quoted phrase — all from the question/frame, never gold) advance to judging;
+subject/title-only hits report `subject_only_passage_no_predicate_anchor`; (3)
+`overall_status=validated_closed` is reserved for actual closure — `judged_unclosed`
+(`requires_read_still_open`) is not validated — and the targeted-rejudgment cache is VERSIONED
+(`read_judge_replay_strict_body_v2` with body provenance + hash): pre-strict entries are
+ignored with `recorded_rejudgment_cache_version_mismatch_count`. The live tier judges only
+actual-body predicate-relevant passages (else `no_actual_body_predicate_relevant_passages_to_judge`,
+zero calls). `--inspect-schema` splits cache entries by provider class so it is obvious
+whether a legacy run holds page bodies or only snippets. Zero live calls in default mode; no
+benchmark/accuracy/memory/generalization claim follows.

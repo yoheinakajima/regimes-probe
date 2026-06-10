@@ -323,6 +323,23 @@ def main() -> int:
                       run_id=run_id, results_root=args.results_root, dataset_label=label,
                       dataset_version=version, dataset_path=ds_path, is_real=is_real,
                       search_tools=search_tools, live_settings=settings.to_dict())
+    # 5n-8: capture the read-persistence config in the plan/manifest so a replay validator
+    # can see whether the run stored raw read bodies and which read caps were active.
+    read_persistence = {
+        "read_cache_store_raw": bool(args.read_cache_store_raw),
+        "read_cache_raw_chars": (_DEFAULT_READ_RAW_CHARS
+                                 if args.read_cache_store_raw else 0),
+        "read_max_chars": int(args.read_max_chars or 0),
+    }
+    plan.manifest["read_persistence"] = read_persistence
+    _plan_file = Path(plan.run_dir) / "plan.json"
+    if _plan_file.exists():
+        try:
+            _pj = json.loads(_plan_file.read_text(encoding="utf-8"))
+            _pj["read_persistence"] = read_persistence
+            _plan_file.write_text(json.dumps(_pj, indent=2), encoding="utf-8")
+        except Exception:
+            pass
 
     miss = missing_keys(tools)
     print(f"=== run_live ({'EXECUTE' if executing else 'DRY-RUN'}) — dataset={label}, "

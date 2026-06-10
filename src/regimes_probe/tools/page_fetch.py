@@ -81,6 +81,7 @@ class PageFetch(SearchProvider):
             req = urllib.request.Request(query, headers={"User-Agent": "regimes-probe/0.1"})
             with urllib.request.urlopen(req, timeout=30) as resp:  # noqa: S310
                 raw = resp.read().decode("utf-8", errors="replace")
+                final_url = resp.geturl()
             parser = _TextExtractor()
             parser.feed(raw)
             full = parser.text
@@ -102,6 +103,8 @@ class PageFetch(SearchProvider):
             }
             if self.raw_chars > 0:
                 fetch_meta["raw_text"] = full[: self.raw_chars]
+            if final_url and final_url != query:
+                fetch_meta["final_url"] = final_url      # 5r-5: redirect provenance
         except Exception as exc:  # network failure surfaces as an error response
             results = ()
             err = str(exc)

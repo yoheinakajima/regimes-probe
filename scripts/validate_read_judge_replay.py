@@ -140,9 +140,16 @@ def main() -> int:
             print(f"   unmatched read-body urls: {pm['unmatched_read_body_urls_sample']}")
         print(f"   targeting: success_rate={pm.get('pending_read_targeting_success_rate')} "
               f"body_link_rate={pm.get('pending_read_body_link_rate')} "
-              f"suppressed_contaminated="
-              f"{json.dumps(pm.get('stage_reason_counts', {}).get('pending_read_not_targeted', 0))}"
-              f" (pending_read_not_targeted in stage_reasons)")
+              f"not_targeted={pm.get('pending_read_not_targeted_count')} "
+              f"(event-derived; events={pm.get('not_targeted_read_events_total')})")
+        print(f"   unlinked read bodies: total={pm.get('unlinked_read_body_count')} "
+              f"while_pending={pm.get('unlinked_read_body_while_pending_count')} "
+              f"after_pending={pm.get('unlinked_read_body_after_pending_count')}"
+              + (f"; note: {pm.get('body_match_explanation')}"
+                 if pm.get('body_match_explanation') else ""))
+        from regimes_probe.eval.replay_validation import consistency_violations
+        viol = consistency_violations(pm)
+        print(f"   internal consistency: {'OK' if not viol else 'VIOLATIONS: ' + '; '.join(viol)}")
         print(f"   diagnostic-only (never counted as bodies): "
               f"search_snippets={pm.get('search_snippet_only_count')} "
               f"debug_snippets={pm.get('debug_snippet_scanned_count')}; "

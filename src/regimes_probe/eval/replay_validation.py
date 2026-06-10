@@ -1068,6 +1068,7 @@ def load_legacy_run(run_dir: str | Path, *, allow_live_judge: bool = False,
     recon_sources: list[str] = []
     cache_urls = list(bodies.keys())
     has_read_bodies = any(r.get("read_body") for r in bodies.values())
+    not_targeted_events_total = 0
     for line in dqf.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line:
@@ -1079,6 +1080,13 @@ def load_legacy_run(run_dir: str | Path, *, allow_live_judge: bool = False,
             continue
         n_items += 1
         item_id = record.get("item_id", "")
+        # 5r-2: a TRUE not-targeted event = the run EXECUTED a read for a different URL while
+        # a pending obligation was open (event-derived; a blocked read is not "not targeted").
+        item_not_targeted = any(
+            e.get("event_type") == "read_scheduled_for_different_url_than_pending_obligation"
+            for e in ((record.get("candidate_frontier") or {}).get("events") or []))
+        if item_not_targeted:
+            not_targeted_events_total += 1
         obs, coverage = _reconstruct_obligations(record)
         recon_sources.append(coverage.get("reconstruction_source", "none"))
         if coverage.get("reconstruction_coverage_bounded"):
@@ -1201,13 +1209,14 @@ def load_legacy_run(run_dir: str | Path, *, allow_live_judge: bool = False,
                             o.debug_snippet_chars = len(body_rec["search_snippet"])
                             o.pipeline_status = ("read_matched_search_snippet_only"
                                                  if o.matched_read_call else "reconstructed")
-                            # 5q-6: when actual read bodies EXIST in the cache but none match
-                            # this obligation, that is a TARGETING failure — not "only search
-                            # snippets are available".
+                            # 5r-2: precise reasons — pending_read_not_targeted ONLY when the
+                            # run demonstrably EXECUTED a different read while this item's
+                            # pendings were open (event-derived); otherwise the obligation's
+                            # URL simply has only a search snippet.
                             o.stage_reason = (
                                 "read_body_not_persisted_legacy_run" if o.matched_read_call
-                                else ("pending_read_not_targeted" if has_read_bodies
-                                      else "search_snippet_only_no_read_body"))
+                                else ("pending_read_not_targeted" if item_not_targeted
+                                      else "pending_source_has_search_snippet_only"))
                             res.obligations.append(o)
                             continue
             o.stored_body_chars = (len(body_rec.get("read_body", ""))
@@ -1236,12 +1245,14 @@ def load_legacy_run(run_dir: str | Path, *, allow_live_judge: bool = False,
                                       else "debug_snippet_only_no_body")
                 else:
                     o.body_source = "not_found"
-                    if has_read_bodies and not o.matched_read_body:
+                    if o.matched_read_call:
+                        o.stage_reason = "read_event_found_but_body_missing"
+                    elif item_not_targeted:
                         o.stage_reason = "pending_read_not_targeted"
                     else:
-                        o.stage_reason = ("source_url_mismatch" if o.url_match_method == "none"
-                                          and not o.matched_read
-                                          else "read_event_found_but_body_missing")
+                        # 5r-2: the pending obligation's body was simply never acquired (no
+                        # read attempt, no snippet) — distinct from a true targeting event.
+                        o.stage_reason = "pending_obligation_body_not_acquired"
                 res.obligations.append(o)
                 continue
             # an ACTUAL read body (call-embedded / replay-export / read-provider cache).
@@ -1342,7 +1353,8 @@ def load_legacy_run(run_dir: str | Path, *, allow_live_judge: bool = False,
     _summarize_legacy(res, n_items, live_calls, coverage_bounded=coverage_bounded,
                       allow_live_judge=allow_live_judge, cache_report=cache_report,
                       rejudge_version_mismatches=rejudge_version_mismatches,
-                      bodies=bodies, recon_sources=recon_sources)
+                      bodies=bodies, recon_sources=recon_sources,
+                      not_targeted_events_total=not_targeted_events_total)
     return res
 
 
@@ -1454,7 +1466,8 @@ def _summarize_legacy(res: ReplayValidationResult, n_items: int, live_calls: int
                       cache_report: Optional[dict] = None,
                       rejudge_version_mismatches: int = 0,
                       bodies: Optional[dict] = None,
-                      recon_sources: Optional[list] = None) -> None:
+                      recon_sources: Optional[list] = None,
+                      not_targeted_events_total: int = 0) -> None:
     obs = res.obligations
     stage = Counter(o.pipeline_status for o in obs)
     reasons = Counter(o.stage_reason for o in obs if o.stage_reason)
@@ -1569,17 +1582,38 @@ def _summarize_legacy(res: ReplayValidationResult, n_items: int, live_calls: int
         "unmatched_obligation_source_urls_sample": [_trunc(u) for u in unmatched_ob[:5]],
         "unmatched_read_body_urls_sample": [_trunc(u) for u in unmatched_body[:5]],
     })
-    # 5p-5: detector — read bodies exist but NONE were linked to a requires_read obligation.
-    # This is a read-TARGETING failure, not a route_miss and not a benchmark failure.
+    # 5r-1: internally CONSISTENT unlinked/not-targeted metrics.
+    # pending_read_not_targeted_count is DERIVED from the stage reasons (event-backed), so a
+    # stage reason and its count can never contradict each other.
+    res.metrics["pending_read_not_targeted_count"] = reasons.get("pending_read_not_targeted", 0)
+    res.metrics["not_targeted_read_events_total"] = not_targeted_events_total
+    # explicit unlinked counts: every actual read body that links to no obligation, split by
+    # whether clean executable pendings were still UNSERVED when the run ended (heuristic on
+    # persisted obligation state; exact attribution needs per-read ordering, documented).
+    res.metrics["unlinked_read_body_count"] = len(unmatched_body)
+    executable_unserved = any(
+        o.source_url and not o.body_is_actual_read_body
+        and not o.read_targeted_pending_obligation for o in obs)
+    res.metrics["unlinked_read_body_while_pending_count"] = (
+        len(unmatched_body) if executable_unserved else 0)
+    res.metrics["unlinked_read_body_after_pending_count"] = (
+        0 if executable_unserved else len(unmatched_body))
+    # back-compat ALIAS (documented): True only when read bodies exist and NONE linked to any
+    # obligation — i.e. "unlinked while obligations had no located body at all".
     if obs and body_urls and not matched_body:
         res.metrics["read_body_unlinked_to_requires_read_obligation"] = True
-        res.metrics["pending_read_not_targeted_count"] = len(unmatched_ob)
         res.replay_events.append({"event_type": "read_body_unlinked_to_requires_read_obligation",
                                   "read_body_url_count": len(body_urls),
                                   "obligation_source_url_count": len(ob_urls)})
     else:
         res.metrics["read_body_unlinked_to_requires_read_obligation"] = False
-        res.metrics["pending_read_not_targeted_count"] = 0
+    # 5r-3: explain a body located WITHOUT a persisted read-event backlink (legacy runs).
+    if res.metrics["body_located_count"] > 0 and res.metrics["matched_read_call_count"] == 0:
+        res.metrics["body_match_explanation"] = (
+            "matched by read-provider cache URL; no persisted read event backlink "
+            "(legacy/incomplete call metadata)")
+    else:
+        res.metrics["body_match_explanation"] = ""
     # 5q-6: targeting rates + extra bounded samples (sanitized; no gold).
     with_url = [o for o in obs if o.source_url]
     res.metrics["pending_read_targeting_success_rate"] = round(
@@ -1682,6 +1716,31 @@ def inspect_run_schema(run_dir: str | Path) -> dict[str, Any]:
     # (read_body_entries_by_provider / search_snippet_entries_by_provider /
     # model_entries_by_provider / urls_with_actual_read_bodies / urls_with_search_snippets_only).
     return out
+
+
+def consistency_violations(metrics: dict) -> list[str]:
+    """5r-1: machine-checkable internal-consistency rules for a validation report. Returns a
+    list of violated rules (empty = consistent). Tests pin this to [] so contradictory
+    count/stage-reason pairs can never ship again."""
+    v: list[str] = []
+    reasons = metrics.get("stage_reason_counts", {}) or {}
+    if reasons.get("pending_read_not_targeted", 0) !=             metrics.get("pending_read_not_targeted_count", 0):
+        v.append("pending_read_not_targeted stage reason and count disagree")
+    if metrics.get("read_urls_unlinked_to_obligation_sample")             and not metrics.get("unlinked_read_body_count", 0):
+        v.append("unlinked sample non-empty but unlinked_read_body_count == 0")
+    if metrics.get("unlinked_read_body_count", 0) != (
+            metrics.get("unlinked_read_body_while_pending_count", 0)
+            + metrics.get("unlinked_read_body_after_pending_count", 0)):
+        v.append("unlinked while/after split does not sum to unlinked_read_body_count")
+    if metrics.get("body_located_count", 0) > metrics.get("matched_read_body_count", 0):
+        v.append("body_located_count exceeds matched_read_body_count")
+    if metrics.get("body_located_count", 0) > 0             and metrics.get("matched_read_call_count", 0) == 0             and not metrics.get("body_match_explanation"):
+        v.append("body located without read-event backlink but no explanation")
+    if metrics.get("search_snippet_counted_as_body_count", 0):
+        v.append("search snippet counted as body")
+    if metrics.get("actual_body_located_without_matched_read_body_count", 0):
+        v.append("actual body without matched_read_body provenance")
+    return v
 
 
 # --------------------------------------------------------------------------- artifacts

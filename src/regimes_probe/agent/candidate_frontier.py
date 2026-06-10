@@ -382,6 +382,8 @@ class CandidateFrontier:
         #: requires_read judgments suppressed for contaminated/noise sources.
         self.read_blocked_unrelated_to_pending_obligation_count = 0
         self.pending_read_suppressed_contaminated_or_noise_count = 0
+        #: 5r-4: generic/reference-source reads blocked when no pending obligations exist.
+        self.read_blocked_generic_source_count = 0
         #: Level 5h-A/B pending read->judge loop + targeted passage retrieval.
         from regimes_probe.agent.read_judgment import DEFAULT_READ_CONFIG
         self.read_config = DEFAULT_READ_CONFIG
@@ -1541,6 +1543,19 @@ class CandidateFrontier:
                                           for p in open_clean][:6]})
                     return StepPlan(sel.action_id, at, "unexecutable",
                                     reason="read_blocked_unrelated_to_pending_obligation")
+                # 5r-4: with NO pending obligations, read-class tools still require a source
+                # that passes the same source-subject triage used before judging — never a
+                # generic definition/reference/app/docs/topic page for a concrete entity task
+                # (generic role test; no domain special-cases).
+                if not open_clean and self._is_concrete_entity_task() \
+                        and self._is_generic_definition_source(chosen[0]):
+                    self.read_blocked_generic_source_count += 1
+                    self._emit("read_blocked_generic_source", action_id=sel.action_id,
+                               candidate_id=sel.candidate_id,
+                               data={"url_host": _host(url_chosen),
+                                     "reason": "generic_definition_or_reference_source"})
+                    return StepPlan(sel.action_id, at, "unexecutable",
+                                    reason="read_blocked_generic_source")
             if chosen is None:
                 self.read_blocked_no_url_count += 1
                 self._emit("read_blocked_no_url", action_id=sel.action_id,
@@ -2261,6 +2276,10 @@ class CandidateFrontier:
             "read_candidate_source_without_concrete_url_count": 0,
             "read_class_tool_called_on_generic_query_count": 0,
             "read_candidate_source_unrelated_to_pending_obligation_executed_count": 0,
+            # 5r-4: unrelated reads are BLOCKED while pendings are open (executed = 0 by
+            # construction); generic-source reads are blocked even with no pendings.
+            "unrelated_read_executed_while_pending_count": 0,
+            "read_blocked_generic_source_count": self.read_blocked_generic_source_count,
             # B — targeted passage retrieval.
             "read_passage_hits_count": self.read_passage_hits_count,
             "read_passage_no_hits_count": self.read_passage_no_hits_count,

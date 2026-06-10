@@ -90,7 +90,10 @@ def test_obligation_url_a_body_url_b_stays_unmatched_with_diagnostics(tmp_path):
     assert res.metrics["obligations_without_read_body_count"] == 1
     # the 5o-smoke failure mode is named precisely: a TARGETING failure, not route_miss.
     assert res.metrics["read_body_unlinked_to_requires_read_obligation"] is True
-    assert res.metrics["pending_read_not_targeted_count"] == 1
+    # 5r-1: pending_read_not_targeted is EVENT-derived (an executed mismatch); this fixture
+    # has no such event, so the count is 0 and the unlinked body is counted explicitly.
+    assert res.metrics["pending_read_not_targeted_count"] == 0
+    assert res.metrics["unlinked_read_body_count"] == 1
     assert any(e["event_type"] == "read_body_unlinked_to_requires_read_obligation"
                for e in res.replay_events)
     assert res.metrics["unmatched_obligation_source_urls_sample"]

@@ -182,7 +182,12 @@ def test_native_unmatched_body_reports_pending_reads_not_targeted(tmp_path):
     assert res.metrics["reconstruction_source"] == "native_persisted"
     assert res.overall_status == "native_pending_reads_not_targeted"   # not snippet_only
     assert res.metrics["read_body_unlinked_to_requires_read_obligation"] is True
-    assert "pending_read_not_targeted" in res.metrics["stage_reason_counts"]
+    # 5r-2: with no executed-mismatch EVENT, the precise reason is body_not_acquired and
+    # pending_read_not_targeted_count stays 0 (consistent by derivation).
+    assert "pending_obligation_body_not_acquired" in res.metrics["stage_reason_counts"]
+    assert res.metrics["pending_read_not_targeted_count"] == \
+        res.metrics["stage_reason_counts"].get("pending_read_not_targeted", 0)
+    assert res.metrics["unlinked_read_body_count"] == 1
     assert res.metrics["pending_read_targeting_success_rate"] == 0.0
     assert res.metrics["pending_read_body_link_rate"] == 0.0
     assert res.metrics["obligation_urls_with_no_read_attempt_sample"]

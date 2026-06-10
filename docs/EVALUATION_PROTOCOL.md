@@ -683,3 +683,19 @@ default validation. Run BEFORE any new smoke: `pytest`, `make check`,
 `python scripts/docs_check.py`, and the offline validation of the existing 5p artifacts (which
 should now report the precise `native_pending_reads_not_targeted` status, not
 `reconstructed_search_snippet_only`).
+
+**Level 5r — validator internal consistency.** The 5q smoke showed real mechanism progress
+(one obligation reached an actual body and a predicate-relevant passage) but contradictory
+diagnostics. 5r makes contradictions structurally impossible: `pending_read_not_targeted_count`
+is derived from the stage reasons, which in turn are event-derived
+(`pending_read_not_targeted` only when the run EXECUTED a different read while pendings were
+open; otherwise `pending_source_has_search_snippet_only` / `pending_obligation_body_not_acquired`);
+unlinked read bodies get an explicit `unlinked_read_body_count` with a while-pending /
+after-pending split; a body located without a persisted read-event backlink carries
+`body_match_explanation`; and `consistency_violations(metrics)` is printed by the validator and
+pinned to empty in tests. Read-class hygiene extends to the no-pending case: a generic
+definition/reference source is blocked for concrete entity tasks
+(`read_blocked_generic_source`), unrelated reads while pendings are open remain hard-blocked
+(executed count pinned 0), and blocked reads are never silently converted to searches.
+`page_fetch` now records `fetch_meta.final_url` on redirects. Zero live calls in default
+validation; no live smoke in this increment; no benchmark/accuracy/memory/generalization claim.

@@ -557,3 +557,24 @@ offline; all tool/provider data stays from cache and is never re-fetched, and `l
 is reported accurately. This is the standard way to validate a future judge/prompt change
 against historical traces without re-spending search budget. No benchmark/accuracy/memory claim
 follows from any of it.
+
+**Level 5l — reconstruct real 5g obligations from the structured trace.** 5k only scanned
+5h-era frontier events, which a pre-5h 5g `debug_questions.jsonl` cannot contain (so it found
+0 obligations). The fix reads the requires_read verdicts where they actually live —
+`candidate_frontier.interpretations[].candidate_assertions[].judgments[]` — and reconstructs
+each as an obligation (`reconstruction_method=structured_interpretations`), recovering the
+candidate from the assertion's `canonical_candidate_ids`, the constraint/slot from the judgment,
+and the source URL from the parent interpretation. Truncated persisted URLs (`source_url[:160]`)
+are matched against full cache URLs by host-exact + path-prefix (`url_match_method`); bodies are
+located from the `cache/` RecordingCache with honest reporting (`cache_stored_text` vs
+`cache_raw_payload`, `store_raw_was_enabled`, `raw_unavailable`); truncation is asserted only as
+`body_truncated_before_relevant_passage(raw_unavailable)` when the raw payload is also missing
+(it states the *cached portion* lacks the passage, not the page). A light schema probe is
+available for drift safety:
+
+    python scripts/validate_read_judge_replay.py --artifacts results/live/<run-id> --inspect-schema
+
+The live-judge tier state is unambiguous: with `--allow-live-judge` the output always shows
+`live_judge_tier.enabled=true` plus a `live_judge_skipped_reason` when there is nothing to judge.
+Default mode still makes zero live calls; no benchmark/accuracy/memory/generalization claim
+follows.

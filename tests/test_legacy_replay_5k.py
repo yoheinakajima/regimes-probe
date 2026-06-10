@@ -34,9 +34,10 @@ def _copy_legacy(tmp_path) -> Path:
 def test_legacy_loader_reconstructs_and_scans_passages_offline():
     res = load_legacy_run(_LEGACY)                          # default: no live judge
     assert res.metrics["live_model_calls"] == 0 and res.metrics["live_provider_calls"] == 0
-    assert len(res.obligations) == 1
+    assert len(res.obligations) >= 1
     o = res.obligations[0]
     assert o.reconstructed_from_legacy_trace is True
+    assert o.reconstruction_method == "structured_interpretations"   # the 5l fix path
     assert o.pipeline_status == "passages_scanned"
     assert o.stage_reason == "rejudgment_prompt_not_in_cache"   # NOT a generic cache-miss
     assert res.overall_status == "reconstructed_passages_scanned_rejudgment_pending"
@@ -45,8 +46,9 @@ def test_legacy_loader_reconstructs_and_scans_passages_offline():
 def test_legacy_loader_uses_raw_payload_beyond_4000_cap():
     o = load_legacy_run(_LEGACY).obligations[0]
     # the fuller raw provider payload is used, and the resolving fact sits past char 4000.
-    assert o.body_source == "raw_cache_payload"
+    assert o.body_source == "cache_raw_payload"
     assert o.cached_payload_chars > o.stored_body_chars
+    assert o.store_raw_was_enabled is True
     assert o.passages_found_beyond_4000 is True and o.first_hit_offset > 4000
 
 

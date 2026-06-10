@@ -69,11 +69,27 @@ class ObligationOutcome:
     pipeline_status: str = "reconstructed"     # reconstructed|body_located|passages_scanned|judged|closed
     stage_reason: str = ""
     item_id: str = ""
-    body_source: str = ""                      # stored_body|raw_cache_payload|debug_preview|none
+    body_source: str = ""                      # cache_stored_text|cache_raw_payload|debug_snippet_only|not_found
     stored_body_chars: int = 0
     cached_payload_chars: int = 0
     passages_found_beyond_4000: bool = False
     body_truncated_before_relevant_passage: bool = False
+    # Level 5l structured-interpretations reconstruction + read/url matching provenance.
+    candidate_text: str = ""
+    source_role: str = ""
+    source_domain: str = ""
+    requires_read_reason: str = ""
+    judgment_id: str = ""
+    prompt_hash: str = ""
+    reconstruction_method: str = ""            # structured_interpretations|legacy_events|native_5h
+    reconstruction_missing_fields: list = field(default_factory=list)
+    matched_read: bool = False
+    read_tool: str = ""
+    read_success: Optional[bool] = None
+    read_chars: int = 0
+    url_match_method: str = "none"             # exact|prefix|host_only|none
+    store_raw_was_enabled: Optional[bool] = None
+    raw_unavailable: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {k: getattr(self, k) for k in (
@@ -82,7 +98,11 @@ class ObligationOutcome:
             "passage_count", "used_full_body_not_snippet", "first_hit_offset",
             "reconstructed_from_legacy_trace", "pipeline_status", "stage_reason", "item_id",
             "body_source", "stored_body_chars", "cached_payload_chars",
-            "passages_found_beyond_4000", "body_truncated_before_relevant_passage")}
+            "passages_found_beyond_4000", "body_truncated_before_relevant_passage",
+            "candidate_text", "source_role", "source_domain", "requires_read_reason",
+            "judgment_id", "prompt_hash", "reconstruction_method",
+            "reconstruction_missing_fields", "matched_read", "read_tool", "read_success",
+            "read_chars", "url_match_method", "store_raw_was_enabled", "raw_unavailable")}
 
 
 @dataclass
@@ -404,29 +424,35 @@ def _load_provider_bodies(run_dir: Path) -> dict[str, dict[str, Any]]:
         entries = data.get("entries") if isinstance(data, dict) else None
         if not isinstance(entries, list):
             continue
+        store_raw = bool(data.get("store_raw"))     # cache file header (live/cache.py)
         for e in entries:
             resp = (e or {}).get("response") or {}
             results = resp.get("results") or []
             raw = e.get("raw")
+            # the read url for a fetch/scrape is the response query (a URL); search results
+            # carry their own urls. Cover both schemas (page_fetch/firecrawl/serper/exa).
             for r in results:
                 url = (r or {}).get("url") or resp.get("query") or ""
                 if not url:
                     continue
                 rec = out.setdefault(url, {})
+                rec["store_raw"] = store_raw or rec.get("store_raw", False)
                 body = (r or {}).get("snippet") or ""
                 if len(body) > len(rec.get("stored_body", "")):
                     rec["stored_body"] = body
                 fm = resp.get("fetch_meta") or {}
                 if fm.get("fetched_chars"):
                     rec["fetch_meta"] = fm
-                if isinstance(raw, str) and len(raw) > len(rec.get("raw_payload", "")):
-                    rec["raw_payload"] = raw
+                rawtext = raw if isinstance(raw, str) else (json.dumps(raw) if raw else "")
+                if rawtext and len(rawtext) > len(rec.get("raw_payload", "")):
+                    rec["raw_payload"] = rawtext
     return out
 
 
-def _anchor_terms_for_constraint(record: dict, constraint_id: str, slot_id: str) -> list[str]:
+def _anchor_terms_for_constraint(record: dict, constraint_id: str, slot_id: str,
+                                 *, candidate_text: str = "") -> list[str]:
     """Anchors for passage scan are derived from QUESTION + frame constraint terms + target
-    descriptor + recorded subject aliases — NEVER gold answers (5k requirement)."""
+    descriptor + assertion candidate_text/aliases — NEVER gold answers (5k/5l requirement)."""
     anchors: list[str] = []
     seen: set[str] = set()
 
@@ -436,6 +462,10 @@ def _anchor_terms_for_constraint(record: dict, constraint_id: str, slot_id: str)
             anchors.append(s)
             seen.add(s.lower())
 
+    # the assertion's candidate text + its content tokens (answer-free; from the trace).
+    _add(candidate_text)
+    for w in re.findall(r"[A-Za-z]{4,}", candidate_text or ""):
+        _add(w)
     frame = record.get("task_frame") or {}
     for c in frame.get("constraints", []) or []:
         if c.get("constraint_id") == constraint_id:
@@ -458,19 +488,104 @@ def _anchor_terms_for_constraint(record: dict, constraint_id: str, slot_id: str)
     return anchors[:24]
 
 
-def _reconstruct_obligations(record: dict) -> list[dict]:
-    """Heuristically reconstruct requires_read obligations from a pre-5h debug record:
-    a judge ``requires_read`` verdict + its candidate/slot/constraint + a later read of the
-    same source url. Marked ``reconstructed_from_legacy_trace`` and diagnostic-only."""
+def _constraint_slots(record: dict, constraint_id: str) -> list[str]:
+    """Slots a constraint applies to, from the persisted task frame (best-effort)."""
+    for c in ((record.get("task_frame") or {}).get("constraints") or []):
+        if c.get("constraint_id") == constraint_id:
+            return [str(s) for s in (c.get("applies_to") or [])]
+    return []
+
+
+def _reconstruct_obligations(record: dict) -> tuple[list[dict], dict]:
+    """Reconstruct ``requires_read`` obligations from a debug record (5l fix). Returns
+    ``(obligations, coverage)``. Three paths, in order of fidelity:
+
+    1. native 5h ``pending_read_judgments`` (if the run already persisted them);
+    2. **structured interpretations** — ``candidate_frontier.interpretations[].
+       candidate_assertions[].judgments[]`` with ``judgment == "requires_read"`` (the path a
+       pre-5h 5g run actually records; the 5h-era *events* do not exist there);
+    3. legacy 5h *events* (``evidence_judgment_requires_read``).
+
+    Obligations are never silently dropped for missing slot/candidate/constraint ids — they are
+    kept with ``reconstruction_missing_fields`` and a ``legacy_missing_candidate_slot_or_constraint``
+    reason. ``coverage`` reports persistence-cap truncation so a low count is attributable."""
     cf = record.get("candidate_frontier") or {}
+    interps = cf.get("interpretations") or []
     events = cf.get("events") or []
+    coverage = {
+        "events_truncated": int(cf.get("events_truncated", 0)),
+        "n_interpretations": len(interps),
+        # CandidateFrontier.to_debug caps interpretations at [:20]; an exact 20 is suspect.
+        "interpretations_possibly_bounded": len(interps) >= 20,
+        "reconstruction_coverage_bounded": bool(cf.get("events_truncated")) or len(interps) >= 20,
+    }
     obligations: list[dict] = []
-    # 1) native 5h pending objects, if the run already persisted them.
+    # 1) native 5h pending objects.
     for p in (cf.get("pending_read_judgments") or []):
-        obligations.append({**p, "reconstructed_from_legacy_trace": False, "native": True})
+        obligations.append({**p, "reconstructed_from_legacy_trace": False, "native": True,
+                            "reconstruction_method": "native_5h"})
     if obligations:
-        return obligations
-    # 2) legacy reconstruction from requires_read judge events.
+        return obligations, coverage
+
+    # 2) STRUCTURED INTERPRETATIONS (the real 5g path).
+    seen: set[tuple] = set()
+    for interp in interps:
+        src_url = interp.get("source_url", "") or ""
+        src_role = interp.get("source_role", "") or ""
+        src_dom = interp.get("source_domain", "") or ""
+        for a in (interp.get("candidate_assertions") or []):
+            canon = a.get("canonical_candidate_ids") or {}     # slot_id -> candidate_id
+            proposed = a.get("proposed_slot_ids") or []
+            cand_text = a.get("candidate_text", "") or ""
+            judged_cons: set[str] = set()
+            for j in (a.get("judgments") or []):
+                if j.get("judgment") != "requires_read":
+                    continue
+                cid = j.get("constraint_id", "") or ""
+                judged_cons.add(cid)
+                slot = j.get("slot_id") or _best_slot(cid, canon, proposed, record)
+                cand = canon.get(slot) or (next(iter(canon.values()), "") if canon else "")
+                missing = []
+                if not cand:
+                    missing.append("candidate_id")
+                if not slot:
+                    missing.append("slot_id")
+                if not cid:
+                    missing.append("constraint_id")
+                key = (cand, slot, cid, src_url)
+                if key in seen:
+                    continue
+                seen.add(key)
+                obligations.append({
+                    "candidate_id": cand, "slot_id": slot, "constraint_id": cid,
+                    "candidate_text": cand_text, "source_url": src_url,
+                    "source_role": src_role, "source_domain": src_dom,
+                    "requires_read_reason": j.get("requires_read_reason") or "",
+                    "judgment_id": j.get("judgment_id") or "", "prompt_hash": j.get("prompt_hash") or "",
+                    "reconstructed_from_legacy_trace": True, "native": False,
+                    "reconstruction_method": "structured_interpretations",
+                    "reconstruction_missing_fields": missing})
+            # cross-check: requires_read_constraint_ids without a judgment detail (5l item 1).
+            for cid in (a.get("requires_read_constraint_ids") or []):
+                if cid in judged_cons:
+                    continue
+                slot = _best_slot(cid, canon, proposed, record)
+                cand = canon.get(slot) or (next(iter(canon.values()), "") if canon else "")
+                key = (cand, slot, cid, src_url)
+                if key in seen:
+                    continue
+                seen.add(key)
+                obligations.append({
+                    "candidate_id": cand, "slot_id": slot, "constraint_id": cid,
+                    "candidate_text": cand_text, "source_url": src_url,
+                    "source_role": src_role, "source_domain": src_dom,
+                    "reconstructed_from_legacy_trace": True, "native": False,
+                    "reconstruction_method": "structured_interpretations",
+                    "reconstruction_missing_fields": ["judgment_detail"]})
+    if obligations:
+        return obligations, coverage
+
+    # 3) legacy 5h events (forward-compatible).
     for e in events:
         if e.get("event_type") not in ("evidence_judgment_requires_read", "read_required_by_judge"):
             continue
@@ -479,8 +594,83 @@ def _reconstruct_obligations(record: dict) -> list[dict]:
             "candidate_id": e.get("candidate_id") or data.get("candidate_id") or "",
             "slot_id": e.get("slot_id") or data.get("slot_id") or "",
             "constraint_id": data.get("constraint_id") or "",
-            "reconstructed_from_legacy_trace": True, "native": False})
-    return obligations
+            "reconstructed_from_legacy_trace": True, "native": False,
+            "reconstruction_method": "legacy_events"})
+    return obligations, coverage
+
+
+def _best_slot(constraint_id: str, canon: dict, proposed: list, record: dict) -> str:
+    """Best-match slot for a constraint: a slot the constraint applies to that the assertion
+    actually proposed/canonicalized; else the assertion's first proposed/canonical slot."""
+    applies = set(_constraint_slots(record, constraint_id))
+    for s in (list(canon.keys()) + list(proposed)):
+        if s in applies:
+            return s
+    return (next(iter(canon.keys()), "") or (proposed[0] if proposed else ""))
+
+
+def _norm_url(u: str) -> tuple[str, str]:
+    """Normalize a (possibly truncated) URL to ``(host, path)`` for matching: lowercase, strip
+    scheme + trailing slash. Persisted URLs are truncated (source_url[:160] / url[:300]) so
+    matching must treat the stored value as a PREFIX of the full cache URL (5l item 3)."""
+    s = (u or "").strip().lower()
+    s = re.sub(r"^https?://", "", s)
+    s = s.split("#", 1)[0].rstrip("/")
+    host, _, path = s.partition("/")
+    return host, path
+
+
+def _match_url(stored: str, candidates: list[str]) -> tuple[str, str]:
+    """Match a stored (truncated) url against full cache urls. Returns ``(matched_url, method)``
+    where method is exact|prefix|host_only|none. Host must match exactly; path by longest
+    prefix (the stored path is a prefix of the full path when truncated)."""
+    sh, sp = _norm_url(stored)
+    if not sh:
+        return "", "none"
+    best, best_method, best_len = "", "none", -1
+    for c in candidates:
+        ch, cp = _norm_url(c)
+        if ch != sh:
+            continue
+        if cp == sp:
+            return c, "exact"
+        if sp and cp.startswith(sp):
+            if len(sp) > best_len:
+                best, best_method, best_len = c, "prefix", len(sp)
+        elif not sp:
+            if best_method == "none":
+                best, best_method = c, "host_only"
+    if best:
+        return best, best_method
+    # host-only fallback: any cache url on the same host.
+    for c in candidates:
+        if _norm_url(c)[0] == sh:
+            return c, "host_only"
+    return "", "none"
+
+
+def _match_read_call(record: dict, candidate_id: str, source_url: str) -> dict:
+    """Find the read CALL for an obligation (5l item 2): a call whose tool is a read-class tool
+    or whose task_action is a read, recovering tool / success / chars + the read url."""
+    sh = _norm_url(source_url)[0]
+    for c in record.get("calls", []) or []:
+        tool = c.get("tool", "") or ""
+        ta = c.get("task_action") or {}
+        is_read = (tool in ("firecrawl_scrape", "page_fetch", "firecrawl_search")
+                   or "read" in (ta.get("kind", "") + ta.get("frontier_action_type", "")))
+        if not is_read:
+            continue
+        er = c.get("evidence_record") or {}
+        url = er.get("url") or (ta.get("query_text_preview", "")
+                                if _looks_url(ta.get("query_text_preview", "")) else "")
+        if ta.get("candidate_id") == candidate_id or (url and _norm_url(url)[0] == sh):
+            scrape = c.get("scrape") or {}
+            return {"matched_read": True, "read_tool": tool,
+                    "read_success": (not c.get("failed", False)) if "failed" in c else None,
+                    "read_chars": int(scrape.get("scrape_chars", 0) or 0),
+                    "read_url": url}
+    return {"matched_read": False, "read_tool": "", "read_success": None, "read_chars": 0,
+            "read_url": ""}
 
 
 def _read_url_for(record: dict, candidate_id: str) -> str:
@@ -539,6 +729,8 @@ def load_legacy_run(run_dir: str | Path, *, allow_live_judge: bool = False,
         live_judge = (judge_factory or deterministic_replay_judge)()
 
     n_items = 0
+    coverage_bounded = False
+    cache_urls = list(bodies.keys())
     for line in dqf.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line:
@@ -550,56 +742,89 @@ def load_legacy_run(run_dir: str | Path, *, allow_live_judge: bool = False,
             continue
         n_items += 1
         item_id = record.get("item_id", "")
-        obs = _reconstruct_obligations(record)
+        obs, coverage = _reconstruct_obligations(record)
+        if coverage.get("reconstruction_coverage_bounded"):
+            coverage_bounded = True
+            res.replay_events.append({"event_type": "reconstruction_coverage_bounded",
+                                      "item_id": item_id, **coverage})
         if not obs:
             res.replay_events.append({"event_type": "no_pending_read_judgment_events",
-                                      "item_id": item_id})
+                                      "item_id": item_id, **coverage})
             continue
         for i, ob in enumerate(obs):
             o = ObligationOutcome(
                 pending_read_judgment_id=ob.get("pending_read_judgment_id", f"recon_{item_id}_{i}"),
                 candidate_id=ob.get("candidate_id", ""), slot_id=ob.get("slot_id", ""),
-                constraint_id=ob.get("constraint_id", ""), source_url="",
+                constraint_id=ob.get("constraint_id", ""), source_url=ob.get("source_url", ""),
                 closure_code="unvalidated_cache_miss",
                 reconstructed_from_legacy_trace=bool(ob.get("reconstructed_from_legacy_trace")),
-                item_id=item_id, pipeline_status="reconstructed")
-            url = ob.get("source_url") or _read_url_for(record, o.candidate_id)
-            o.source_url = url
-            if not url:
+                item_id=item_id, pipeline_status="reconstructed",
+                candidate_text=ob.get("candidate_text", ""),
+                source_role=ob.get("source_role", ""), source_domain=ob.get("source_domain", ""),
+                requires_read_reason=ob.get("requires_read_reason", ""),
+                judgment_id=ob.get("judgment_id", ""), prompt_hash=ob.get("prompt_hash", ""),
+                reconstruction_method=ob.get("reconstruction_method", ""),
+                reconstruction_missing_fields=list(ob.get("reconstruction_missing_fields", [])))
+            # never DROP an obligation for missing ids — keep it with a precise reason.
+            if not o.constraint_id or (not o.candidate_id and not o.candidate_text):
+                o.stage_reason = "legacy_missing_candidate_slot_or_constraint"
+                res.obligations.append(o)
+                continue
+            # 5l-2: match the read CALL (tool/success/chars) for provenance.
+            rc = _match_read_call(record, o.candidate_id, o.source_url)
+            o.matched_read, o.read_tool = rc["matched_read"], rc["read_tool"]
+            o.read_success, o.read_chars = rc["read_success"], rc["read_chars"]
+            stored_url = o.source_url or rc.get("read_url", "") or _read_url_for(record, o.candidate_id)
+            o.source_url = stored_url
+            if not stored_url:
                 o.stage_reason = "read_event_found_but_body_missing"
                 res.obligations.append(o)
                 continue
-            body_rec = bodies.get(url)
+            # 5l-3: normalized (prefix) URL match against full cache urls.
+            matched_url, method = _match_url(stored_url, cache_urls)
+            o.url_match_method = method
+            body_rec = bodies.get(matched_url) if matched_url else None
+            from_preview = False
             if not body_rec:
-                # fall back to the bounded debug snippet preview (clearly marked).
-                prev = next((ev.get("snippet_preview", "") for ev in (record.get("evidence") or [])
-                             if ev.get("url") == url), "")
+                prev = ""
+                for ev in (record.get("evidence") or []):
+                    if _match_url(ev.get("url", ""), [stored_url])[1] != "none" \
+                            or _norm_url(ev.get("url", ""))[0] == _norm_url(stored_url)[0]:
+                        prev = ev.get("snippet_preview", "") or prev
                 if prev:
-                    body_rec = {"stored_body": prev, "from_preview": True}
+                    body_rec, from_preview = {"stored_body": prev}, True
+                    o.body_source = "debug_snippet_only"
                 else:
-                    o.stage_reason = "read_event_found_but_body_missing"
+                    o.stage_reason = ("source_url_mismatch" if method == "none"
+                                      else "read_event_found_but_body_missing")
                     res.obligations.append(o)
                     continue
             stored = body_rec.get("stored_body", "")
             raw = body_rec.get("raw_payload", "")
             o.stored_body_chars = len(stored)
-            o.cached_payload_chars = max(len(stored), len(raw))
+            o.cached_payload_chars = len(raw)
+            o.store_raw_was_enabled = body_rec.get("store_raw")
+            o.raw_unavailable = not bool(raw)
             # use the FULLER raw payload when present (validates beyond-cap retrieval, no spend).
             body = raw if len(raw) > len(stored) else stored
-            o.body_source = ("raw_cache_payload" if len(raw) > len(stored)
-                             else ("debug_preview" if body_rec.get("from_preview") else "stored_body"))
+            if not from_preview:
+                o.body_source = ("cache_raw_payload" if len(raw) > len(stored)
+                                 else "cache_stored_text")
             o.pipeline_status = "body_located"
-            anchors = _anchor_terms_for_constraint(record, o.constraint_id, o.slot_id)
+            anchors = _anchor_terms_for_constraint(
+                record, o.constraint_id, o.slot_id, candidate_text=o.candidate_text)
             scan = extract_passages(body, anchors)
             o.passage_anchor_hits = scan.passage_anchor_hits
             o.passage_count = scan.passage_count
             o.first_hit_offset = scan.first_hit_offset
             o.passages_found_beyond_4000 = scan.first_hit_offset > _ADAPTER_CAP_DEFAULT
+            o.used_full_body_not_snippet = o.body_source == "cache_raw_payload"
             o.pipeline_status = "passages_scanned"
-            # truncation: only assertable when the FULLER payload is also exhausted.
-            if not scan.hit and o.cached_payload_chars <= _ADAPTER_CAP_DEFAULT:
+            # truncation: only assertable when the FULLER raw payload is ALSO unavailable —
+            # we only know the CACHED portion lacks the passage, not the page (raw_unavailable).
+            if not scan.hit and o.raw_unavailable and len(stored) <= _ADAPTER_CAP_DEFAULT + 1:
                 o.body_truncated_before_relevant_passage = True
-                o.stage_reason = "body_truncated_before_relevant_passage"
+                o.stage_reason = "body_truncated_before_relevant_passage(raw_unavailable)"
             # judged/closed: new computation -> needs the live-judge tier (opt-in, capped).
             recorded = _recorded_rejudgment(judge_cache_path)
             if recorded:
@@ -609,7 +834,8 @@ def load_legacy_run(run_dir: str | Path, *, allow_live_judge: bool = False,
                 if live_calls >= max_judge_calls:          # hard cap, fail-closed (0 = none)
                     o.stage_reason = "rejudgment_call_budget_exhausted"
                 else:
-                    cand_text = _candidate_text(record, o.candidate_id, url)
+                    cand_text = o.candidate_text or _candidate_text(
+                        record, o.candidate_id, o.source_url)
                     verdict, was_live = _live_rejudge(live_judge, o, record, cand_text,
                                                       scan.passages[0], judge_cache_path)
                     live_calls += int(was_live)
@@ -622,7 +848,8 @@ def load_legacy_run(run_dir: str | Path, *, allow_live_judge: bool = False,
                 o.stage_reason = o.stage_reason or "rejudgment_prompt_not_in_cache"
             res.obligations.append(o)
 
-    _summarize_legacy(res, n_items, live_calls)
+    _summarize_legacy(res, n_items, live_calls, coverage_bounded=coverage_bounded,
+                      allow_live_judge=allow_live_judge)
     return res
 
 
@@ -686,19 +913,22 @@ def _live_rejudge(judge, o: ObligationOutcome, record: dict, candidate_text: str
     return jd.judgment, was_live
 
 
-def _summarize_legacy(res: ReplayValidationResult, n_items: int, live_calls: int) -> None:
+def _summarize_legacy(res: ReplayValidationResult, n_items: int, live_calls: int, *,
+                      coverage_bounded: bool = False, allow_live_judge: bool = False) -> None:
     obs = res.obligations
     stage = Counter(o.pipeline_status for o in obs)
     reasons = Counter(o.stage_reason for o in obs if o.stage_reason)
+    methods = Counter(o.reconstruction_method for o in obs if o.reconstruction_method)
+    n_scanned = sum(1 for o in obs if o.pipeline_status in ("passages_scanned", "judged", "closed"))
     res.metrics = {
         "n_items_inspected": n_items,
         "replay_pending_read_judgment_count": len(obs),
         "reconstructed_count": sum(1 for o in obs if o.reconstructed_from_legacy_trace),
+        "reconstruction_method_counts": dict(methods),
         "body_located_count": sum(1 for o in obs
                                   if o.pipeline_status in ("body_located", "passages_scanned",
                                                            "judged", "closed")),
-        "passages_scanned_count": sum(1 for o in obs
-                                      if o.pipeline_status in ("passages_scanned", "judged", "closed")),
+        "passages_scanned_count": n_scanned,
         "passages_found_beyond_4000_count": sum(1 for o in obs if o.passages_found_beyond_4000),
         "body_truncated_before_relevant_passage_count":
             sum(1 for o in obs if o.body_truncated_before_relevant_passage),
@@ -706,14 +936,81 @@ def _summarize_legacy(res: ReplayValidationResult, n_items: int, live_calls: int
         "closed_count": sum(1 for o in obs if o.closure_code in _CLOSED),
         "pipeline_status_counts": dict(stage),
         "stage_reason_counts": dict(reasons),
+        "url_match_method_counts": dict(Counter(o.url_match_method for o in obs)),
+        "reconstruction_coverage_bounded": coverage_bounded,
         "live_provider_calls": 0, "live_model_calls": live_calls,
     }
+    # 5l-6: unambiguous live-judge tier state.
+    if allow_live_judge:
+        skip = None
+        if not obs:
+            skip = "no_reconstructed_obligations"
+        elif n_scanned == 0:
+            skip = "no_passages_to_judge"
+        res.metrics["live_judge_tier"] = {"enabled": True, "live_judge_skipped_reason": skip,
+                                          "live_model_calls": live_calls}
+    else:
+        res.metrics["live_judge_tier"] = {"enabled": False, "live_judge_skipped_reason": None,
+                                          "live_model_calls": 0}
     if not obs:
         res.overall_status = "unvalidated_cache_miss"
     elif any(o.pipeline_status in ("judged", "closed") for o in obs):
         res.overall_status = "validated"
     else:
         res.overall_status = "reconstructed_passages_scanned_rejudgment_pending"
+
+
+def inspect_run_schema(run_dir: str | Path) -> dict[str, Any]:
+    """5l-7: a LIGHT zero-call schema probe — a safety net against future schema drift. Per
+    debug record: top-level keys, interpretation/assertion/judgment-by-verdict counts, events
+    count + events_truncated, calls-by-tool, and cache files + whether entries carry raw."""
+    run_dir = Path(run_dir)
+    out: dict[str, Any] = {"path": str(run_dir), "exists": run_dir.exists(), "records": [],
+                           "cache_files": [], "live_provider_calls": 0, "live_model_calls": 0}
+    dqf = run_dir / "debug_questions.jsonl"
+    if dqf.exists():
+        for line in dqf.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+            except Exception:
+                out["records"].append({"error": "line_not_json"})
+                continue
+            cf = rec.get("candidate_frontier") or {}
+            verdicts: Counter = Counter()
+            n_assert = 0
+            for interp in (cf.get("interpretations") or []):
+                for a in (interp.get("candidate_assertions") or []):
+                    n_assert += 1
+                    for j in (a.get("judgments") or []):
+                        verdicts[j.get("judgment", "?")] += 1
+            out["records"].append({
+                "item_id": rec.get("item_id", ""),
+                "top_level_keys": sorted(rec.keys()),
+                "n_interpretations": len(cf.get("interpretations") or []),
+                "n_candidate_assertions": n_assert,
+                "judgment_verdict_counts": dict(verdicts),
+                "n_events": len(cf.get("events") or []),
+                "events_truncated": cf.get("events_truncated", 0),
+                "calls_by_tool": dict(Counter(c.get("tool", "?") for c in (rec.get("calls") or []))),
+            })
+    cdir = run_dir / "cache"
+    cfiles = (sorted(cdir.glob("*.json")) if cdir.is_dir() else []) \
+        + sorted(run_dir.glob("*_cache.json"))
+    for cfp in cfiles:
+        info = {"file": cfp.name, "entries": 0, "any_raw": False, "store_raw_header": None}
+        try:
+            data = json.loads(cfp.read_text(encoding="utf-8"))
+            if isinstance(data, dict) and isinstance(data.get("entries"), list):
+                info["entries"] = len(data["entries"])
+                info["any_raw"] = any(e.get("raw") for e in data["entries"])
+                info["store_raw_header"] = bool(data.get("store_raw"))
+        except Exception:
+            info["error"] = "not_json_or_unknown_schema"
+        out["cache_files"].append(info)
+    return out
 
 
 # --------------------------------------------------------------------------- artifacts

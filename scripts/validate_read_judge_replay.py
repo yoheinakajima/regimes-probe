@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from regimes_probe.eval.replay_validation import (   # noqa: E402
-    run_replay, run_triage_promotion_fixture, validate_artifacts_dir)
+    inspect_run_schema, run_replay, run_triage_promotion_fixture, validate_artifacts_dir)
 
 _READ_FIXTURE = ROOT / "fixtures" / "replay" / "read_judge_loop_fixture.json"
 _TRIAGE_FIXTURE = ROOT / "fixtures" / "replay" / "triage_promotion_fixture.json"
@@ -40,7 +40,15 @@ def main() -> int:
                          "(all tool/provider data stays from cache); off by default")
     ap.add_argument("--max-judge-calls", type=int, default=20,
                     help="hard cap on live re-judgment calls (fail-closed when reached)")
+    ap.add_argument("--inspect-schema", action="store_true",
+                    help="light zero-call schema probe of the artifacts dir (drift safety net)")
     args = ap.parse_args()
+
+    # --inspect-schema: a light, zero-call diagnostic (not the primary mechanism).
+    if args.inspect_schema:
+        info = inspect_run_schema(args.artifacts)
+        print(json.dumps(info, indent=2))
+        return 0
 
     out: dict = {}
 
@@ -73,9 +81,12 @@ def main() -> int:
     out["artifacts_replay"] = {"path": args.artifacts, **av.to_dict()}
     out["live_calls"] = {"provider": int(av.metrics.get("live_provider_calls", 0)),
                          "model": int(av.metrics.get("live_model_calls", 0))}
-    out["live_judge_tier"] = {"enabled": bool(args.allow_live_judge),
-                              "max_judge_calls": args.max_judge_calls,
-                              "default_is_offline": True}
+    # 5l-6: the live-judge tier state is taken from the loader (unambiguous: enabled reflects
+    # the flag, with a skip reason when there is nothing to judge).
+    tier = dict(av.metrics.get("live_judge_tier")
+                or {"enabled": bool(args.allow_live_judge), "live_judge_skipped_reason": None})
+    tier.update({"max_judge_calls": args.max_judge_calls, "default_is_offline": True})
+    out["live_judge_tier"] = tier
 
     if args.json:
         print(json.dumps(out, indent=2))

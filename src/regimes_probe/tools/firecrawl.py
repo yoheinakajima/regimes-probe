@@ -61,23 +61,34 @@ class FirecrawlScrape(_FirecrawlBase):
     is_fetch = True
     cost_per_call = Decimal("0.003")
 
+    def __init__(self, *, enabled: bool = False, max_chars: int = 4000) -> None:
+        # 5l-8: the stored-snippet cap is now CONFIGURABLE (was a hardcoded [:4000]). A run can
+        # set a larger cap for read-judgment-backed reads (judge input stays bounded by passage
+        # windows regardless). Default stays conservative for ordinary reads.
+        self.max_chars = max_chars
+
     def search(self, query: str, *, limit: int = 1, **opts: Any) -> SearchResponse:
         # ``query`` is the URL to scrape.
         if not self.available():
             raise ProviderUnavailable("firecrawl_scrape requires FIRECRAWL_API_KEY")
         t0 = time.monotonic()
         formats = list(opts.get("formats", ["markdown"]))
+        cap = int(opts.get("max_chars", self.max_chars))
         data = _post("scrape", {"url": query, "formats": formats})
         doc = data.get("data") or data
-        md = doc.get("markdown") or doc.get("html") or doc.get("content") or ""
+        md = str(doc.get("markdown") or doc.get("html") or doc.get("content") or "")
         meta = doc.get("metadata") or {}
         result = SearchResult(
-            title=meta.get("title", query), url=query, snippet=str(md)[:4000],
+            title=meta.get("title", query), url=query, snippet=md[:cap],
             published_at=meta.get("publishedTime") or meta.get("date"),
             source_authority=0.6, rank=0,
             extra={"provider": "firecrawl", "tool_family": "scrape", "metadata": meta})
+        fetch_meta = {"fetched_chars": len(md), "stored_body_chars": len(md[:cap]),
+                      "adapter_max_chars": cap, "body_truncated_for_storage": len(md) > cap,
+                      "truncation_origin": "firecrawl_scrape_adapter_max_chars"}
         return SearchResponse(provider=self.name, query=query, results=(result,),
-                              cost=self.cost_per_call, latency_s=time.monotonic() - t0)
+                              cost=self.cost_per_call, latency_s=time.monotonic() - t0,
+                              fetch_meta=fetch_meta)
 
 
 class FirecrawlInteract(_FirecrawlBase):

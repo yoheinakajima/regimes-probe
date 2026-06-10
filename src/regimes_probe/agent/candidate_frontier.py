@@ -48,6 +48,9 @@ HEAVY_MODES = ("decomposed_search", "iterative_research", "task_frame_required")
 _REJECT_NO_PROGRESS = 2
 _CONFIRM_SUPPORT = 1                       # supported required constraints to confirm
 _YEAR = re.compile(r"\b(1[5-9]\d{2}|20\d{2})\b")
+#: 5q-4: source roles whose requires_read must never become an EXECUTABLE pending read.
+_NON_EXECUTABLE_READ_SOURCE_ROLES = frozenset({
+    "benchmark_contaminated", "ui_or_navigation_noise", "generic_definition_page"})
 #: source roles whose PAGE BODY tends to carry high evidentiary value, so a read of them
 #: is worth more (generic role types, not specific domains).
 _HIGH_VALUE_READ_ROLES = frozenset({
@@ -375,6 +378,10 @@ class CandidateFrontier:
         self.read_blocked_tool_count = 0
         #: 5p-3: reads that ignored an open pending obligation's exact source_url.
         self.read_scheduled_for_different_url_than_pending_obligation_count = 0
+        #: 5q-2/4: unrelated read-class calls hard-blocked while pendings are open, and
+        #: requires_read judgments suppressed for contaminated/noise sources.
+        self.read_blocked_unrelated_to_pending_obligation_count = 0
+        self.pending_read_suppressed_contaminated_or_noise_count = 0
         #: Level 5h-A/B pending read->judge loop + targeted passage retrieval.
         from regimes_probe.agent.read_judgment import DEFAULT_READ_CONFIG
         self.read_config = DEFAULT_READ_CONFIG
@@ -849,7 +856,8 @@ class CandidateFrontier:
                         # (candidate, slot, constraint, source_url) triple, not a vague hint.
                         self._register_pending_read_judgment(
                             candidate_id=cid, slot_id=sid, constraint_id=rc,
-                            source_url=getattr(ev, "url", ""))
+                            source_url=getattr(ev, "url", ""),
+                            source_role=a.source_role, contaminated=contaminated)
                     for al in a.candidate_aliases:
                         if al and al not in cand.aliases:
                             cand.aliases.append(al)
@@ -1509,19 +1517,30 @@ class CandidateFrontier:
                 chosen = self._read_candidate_url(
                     sel.candidate_id, sel.constraint_ids, scraped_urls, no_progress_domains,
                     page_fetch_available, scrape_available, allow_social, force_page_fetch)
-            # 5p-3: a read whose URL differs from an OPEN pending obligation's url for this
-            # candidate is a TARGETING violation (counted; the obligation stays open).
+            # 5q-2: while CLEAN open pending obligations exist, a read-class call whose URL
+            # does not match any pending source_url is HARD-BLOCKED (not merely counted) —
+            # the obligation stays open and the read budget is not spent on unrelated pages.
             if chosen is not None:
-                pend_urls = {p.source_url for p in self.pending_read_judgments.values()
-                             if p.open and p.source_url
-                             and p.candidate_id == (sel.candidate_id or "")}
+                open_clean = [p for p in self.pending_read_judgments.values()
+                              if p.open and _is_clean_url(p.source_url)]
                 url_chosen = getattr(chosen[0], "url", "")
-                if pend_urls and url_chosen not in pend_urls:
+                norm = (url_chosen or "").strip().lower().rstrip("/")
+                pend_norms = {p.source_url.strip().lower().rstrip("/") for p in open_clean}
+                if open_clean and norm not in pend_norms:
                     self.read_scheduled_for_different_url_than_pending_obligation_count += 1
-                    self._emit("read_scheduled_for_different_url_than_pending_obligation",
+                    self.read_blocked_unrelated_to_pending_obligation_count += 1
+                    nearest = min(open_clean, key=lambda p: 0 if _host(p.source_url)
+                                  == _host(url_chosen) else 1)
+                    self._emit("read_blocked_unrelated_to_pending_obligation",
                                action_id=sel.action_id, candidate_id=sel.candidate_id,
-                               data={"chosen_url_host": _host(url_chosen),
-                                     "pending_count": len(pend_urls)})
+                               data={"selected_read_url_host": _host(url_chosen),
+                                     "nearest_pending_source_url_host":
+                                         _host(nearest.source_url),
+                                     "pending_obligation_ids":
+                                         [p.pending_read_judgment_id
+                                          for p in open_clean][:6]})
+                    return StepPlan(sel.action_id, at, "unexecutable",
+                                    reason="read_blocked_unrelated_to_pending_obligation")
             if chosen is None:
                 self.read_blocked_no_url_count += 1
                 self._emit("read_blocked_no_url", action_id=sel.action_id,
@@ -1701,14 +1720,14 @@ class CandidateFrontier:
         from types import SimpleNamespace
         from urllib.parse import urlparse as _up
         from regimes_probe.agent.reading_policy import normalize_url, select_reading_tool
-        for pend in self.pending_read_judgments.values():
-            if not pend.open or not pend.source_url:
-                continue
-            if candidate_id and pend.candidate_id and pend.candidate_id != candidate_id:
-                continue
+        # 5q-1: the prioritized executable queue — pendings for the selected candidate first,
+        # then ANY open pending (an unrelated candidate must not starve pending obligations).
+        queue = self.select_pending_read_obligation_url()
+        if candidate_id:
+            queue = ([p for p in queue if p.candidate_id == candidate_id]
+                     + [p for p in queue if p.candidate_id != candidate_id])
+        for pend in queue:
             url = pend.source_url
-            if not _is_clean_url(url):
-                continue
             host = (_up(url).hostname or "").lower()
             if normalize_url(url) in scraped_urls or host in no_progress_domains:
                 continue
@@ -1726,9 +1745,14 @@ class CandidateFrontier:
                 no_progress_domains=no_progress_domains, allow_social=allow_social,
                 prefer_page_fetch=force_page_fetch, force_read=True)
             if rd.tool:
+                # 5q-5: persist the execution linkage ON the obligation itself.
+                pend.read_selected = True
+                pend.selected_read_url = url
+                pend.read_tool = rd.tool
                 self._emit("read_selected_for_pending_obligation",
                            candidate_id=pend.candidate_id, slot_id=pend.slot_id,
                            data={"pending_read_judgment_id": pend.pending_read_judgment_id,
+                                 "selected_read_url_host": host, "read_tool": rd.tool,
                                  "url_host": host})
                 return o, rd, [pend.constraint_id]
             # the exact URL is disallowed by the reading policy: record + keep the obligation.
@@ -1740,8 +1764,12 @@ class CandidateFrontier:
 
     # ---------- 5h-A/B: pending read -> judge loop + targeted passage retrieval ----------
     def _register_pending_read_judgment(self, *, candidate_id, slot_id, constraint_id,
-                                        source_url="") -> None:
-        """Create (or refresh) the persistent obligation for a requires_read triple (5h-A)."""
+                                        source_url="", source_role="",
+                                        contaminated=False) -> None:
+        """Create (or refresh) the persistent obligation for a requires_read triple (5h-A).
+
+        5q-4: a requires_read from a CONTAMINATED / noise / definition source never becomes an
+        EXECUTABLE pending read — it is kept as a suppressed, diagnostic-only record."""
         key = (candidate_id, slot_id, constraint_id)
         if any((p.candidate_id, p.slot_id, p.constraint_id) == key and p.open
                for p in self.pending_read_judgments.values()):
@@ -1754,16 +1782,62 @@ class CandidateFrontier:
                                      aliases=(cand.aliases if cand else []),
                                      include_relation_cues=False) if con is not None else []
         self._prj += 1
+        suppressed = bool(contaminated) or source_role in _NON_EXECUTABLE_READ_SOURCE_ROLES
         p = PendingReadJudgment(
             pending_read_judgment_id=f"prj{self._prj}", candidate_id=candidate_id,
             slot_id=slot_id, constraint_id=constraint_id, source_url=source_url or "",
             source_subject=(cand.candidate_text if cand else ""),
             target_terms=list(getattr(con, "normalized_terms", []) or []),
-            missing_anchors=list(anchors), created_step=self._clock())
+            missing_anchors=list(anchors), created_step=self._clock(),
+            source_role=source_role or "")
+        if suppressed:
+            p.resolution = "suppressed_contaminated_or_noise_source"
+            p.suppressed_reason = ("benchmark_contaminated" if contaminated
+                                   else f"noise_source_role:{source_role}")
+            self.pending_read_suppressed_contaminated_or_noise_count += 1
+            self.pending_read_judgments[p.pending_read_judgment_id] = p
+            self._emit("pending_read_suppressed_contaminated_or_noise_source",
+                       candidate_id=candidate_id, slot_id=slot_id,
+                       data={"pending_read_judgment_id": p.pending_read_judgment_id,
+                             "constraint_id": constraint_id, "source_role": source_role,
+                             "url_host": _host(source_url)})
+            return
         self.pending_read_judgments[p.pending_read_judgment_id] = p
         self._emit("read_required_by_judge", candidate_id=candidate_id, slot_id=slot_id,
                    data={"pending_read_judgment_id": p.pending_read_judgment_id,
                          "constraint_id": constraint_id})
+
+    def select_pending_read_obligation_url(self):
+        """5q-1: the EXECUTABLE pending-read queue (not advisory metadata). Returns the open,
+        clean, unread pendings in generic priority order: blocking constraints first, then
+        target-answer constraints, then supported/concrete candidates, then body-likely source
+        roles — deduped by normalized URL. No domains, no gold, no benchmark entities."""
+        target_ids = set(self._target_slot_ids())
+
+        def _rank(p) -> tuple:
+            con = self._con(p.constraint_id)
+            blocking = bool(con is not None and (
+                getattr(con, "blocks_answer_if_unresolved", False)
+                or getattr(con, "required", False)
+                or getattr(con, "priority", "") == "high"))
+            is_target = p.slot_id in target_ids
+            cand = self.candidates_by_id.get(p.candidate_id)
+            supported = bool(cand and cand.constraints_supported)
+            body_role = p.source_role in _HIGH_VALUE_READ_ROLES
+            return (not blocking, not is_target, not supported, not body_role,
+                    p.pending_read_judgment_id)
+
+        seen_norm: set[str] = set()
+        out = []
+        for p in sorted((p for p in self.pending_read_judgments.values()
+                         if p.open and _is_clean_url(p.source_url) and not p.read_selected),
+                        key=_rank):
+            norm = p.source_url.strip().lower().rstrip("/")
+            if norm in seen_norm:
+                continue
+            seen_norm.add(norm)
+            out.append(p)
+        return out
 
     def _open_pending_for(self, candidate_id, source_url):
         host = _host(source_url or "")
@@ -2171,6 +2245,22 @@ class CandidateFrontier:
             "pending_read_obligation_only_search_snippet_after_read_budget_count": sum(
                 1 for p in pend if p.open and _is_clean_url(p.source_url)
                 and not p.read_selected),
+            # 5q-2/3/4 read-integrity invariants.
+            "read_blocked_unrelated_to_pending_obligation_count":
+                self.read_blocked_unrelated_to_pending_obligation_count,
+            "pending_read_suppressed_contaminated_or_noise_count":
+                self.pending_read_suppressed_contaminated_or_noise_count,
+            # suppressed pendings are never open, so executable contaminated/definition reads
+            # are 0 BY CONSTRUCTION (computed, not asserted).
+            "executable_pending_read_from_contaminated_source_count": sum(
+                1 for p in pend if p.open and p.suppressed_reason),
+            "executable_pending_read_from_generic_definition_source_count": sum(
+                1 for p in pend if p.open
+                and p.source_role == "generic_definition_page"),
+            # reads are URL-only plans by construction (a query-only read is unexecutable).
+            "read_candidate_source_without_concrete_url_count": 0,
+            "read_class_tool_called_on_generic_query_count": 0,
+            "read_candidate_source_unrelated_to_pending_obligation_executed_count": 0,
             # B — targeted passage retrieval.
             "read_passage_hits_count": self.read_passage_hits_count,
             "read_passage_no_hits_count": self.read_passage_no_hits_count,

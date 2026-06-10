@@ -200,6 +200,11 @@ class PendingReadJudgment:
     resolution: str = "open"
     read_selected: bool = False
     passage_preview: str = ""
+    # 5q: source-safety + execution linkage (persisted for replay validation).
+    source_role: str = ""
+    suppressed_reason: str = ""
+    selected_read_url: str = ""
+    read_tool: str = ""
 
     @property
     def open(self) -> bool:
@@ -218,7 +223,11 @@ class PendingReadJudgment:
                 "target_terms": list(self.target_terms)[:8],
                 "created_step": self.created_step, "resolved_step": self.resolved_step,
                 "resolution": self.resolution, "read_selected": self.read_selected,
-                "passage_preview": self.passage_preview[:160]}
+                "passage_preview": self.passage_preview[:160],
+                "source_role": self.source_role,
+                "suppressed_reason": self.suppressed_reason,
+                "selected_read_url": (self.selected_read_url or "")[:300],
+                "read_tool": self.read_tool}
 
 
 def _host(url: str) -> str:

@@ -133,6 +133,14 @@ class Events:
     ABSTAIN_WITHHELD_EXECUTABLE_ACTION_AVAILABLE = "abstain_withheld_executable_action_available"
     SOURCE_ACQUISITION_REJECTED = "source_acquisition_rejected"
     DEPENDENT_SLOT_SEARCH_DEFERRED = "dependent_slot_search_deferred"
+    # Level 5p/5q pending-read targeting + read integrity
+    READ_SELECTED_FOR_PENDING_OBLIGATION = "read_selected_for_pending_obligation"
+    READ_SCHEDULED_FOR_DIFFERENT_URL_THAN_PENDING_OBLIGATION = \
+        "read_scheduled_for_different_url_than_pending_obligation"
+    READ_BLOCKED_UNRELATED_TO_PENDING_OBLIGATION = \
+        "read_blocked_unrelated_to_pending_obligation"
+    PENDING_READ_SUPPRESSED_CONTAMINATED_OR_NOISE_SOURCE = \
+        "pending_read_suppressed_contaminated_or_noise_source"
     # Level 5k adaptive bounded re-read for truncation (live runs only)
     READ_REREAD_DUE_TO_TRUNCATION = "read_reread_due_to_truncation"
     # Level 5f LLM evidence judge
@@ -200,6 +208,10 @@ EVIDENCE_INTERPRETATION_EVENTS: tuple[str, ...] = (
     Events.SEED_QUERY_GENERIC_BLOCKED, Events.FUZZY_DUPLICATE_QUERY_REJECTED,
     Events.ABSTAIN_WITHHELD_EXECUTABLE_ACTION_AVAILABLE, Events.SOURCE_ACQUISITION_REJECTED,
     Events.DEPENDENT_SLOT_SEARCH_DEFERRED, Events.READ_REREAD_DUE_TO_TRUNCATION,
+    Events.READ_SELECTED_FOR_PENDING_OBLIGATION,
+    Events.READ_SCHEDULED_FOR_DIFFERENT_URL_THAN_PENDING_OBLIGATION,
+    Events.READ_BLOCKED_UNRELATED_TO_PENDING_OBLIGATION,
+    Events.PENDING_READ_SUPPRESSED_CONTAMINATED_OR_NOISE_SOURCE,
     Events.SOURCE_SUBJECT_EXTRACTED, Events.SOURCE_SUBJECT_PROMOTED,
     Events.SOURCE_SUBJECT_REJECTED, Events.SOURCE_SUBJECT_USED_FOR_CANDIDATE,
     Events.SOURCE_SUBJECT_USED_FOR_RELATION_SUPPORT,

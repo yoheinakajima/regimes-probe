@@ -660,3 +660,26 @@ route_miss, never a benchmark label. Next raw-read smoke success criterion (mech
 `read_body_urls_without_obligations_count` bounded/explainable,
 `search_snippet_counted_as_body_count = 0`, zero live calls in default validation, and no
 benchmark/accuracy/memory/generalization claim.
+
+**Level 5q — pending-read URL targeting + read integrity.** The fresh 5p smoke proved native
+persistence (31 native obligations, 4 raw read bodies) but exposed the executor seam: read
+calls went to unrelated URLs while pending obligation URLs stayed unread. 5q makes pendings an
+EXECUTABLE queue (generic priority: blocking → target-answer → supported candidate →
+body-likely source role; URL-deduped), HARD-BLOCKS unrelated read-class calls while clean
+pendings are open (`read_blocked_unrelated_to_pending_obligation`; obligation preserved),
+suppresses requires_read from contaminated/noise/definition sources into diagnostic-only
+records (never executable; pinned-0 executable contaminated/definition pendings), and persists
+execution linkage on the obligation (`selected_read_url`/`read_tool` → validator links bodies
+by pending id even across redirects). The validator now names the failure in one line:
+`overall_status=native_pending_reads_not_targeted` with `stage_reason=pending_read_not_targeted`
+(search_snippet_only is reserved for runs with NO read bodies), plus
+`pending_read_targeting_success_rate` / `pending_read_body_link_rate` and bounded samples.
+**Next-smoke mechanism criterion** (no benchmark/accuracy/memory/generalization claim):
+`native_pending_read_judgment_count > 0`, `pending_read_targeting_success_rate > 0`,
+`body_located_count > 0` for obligations, `body_source_counts` includes `cache_read_body`,
+`pending_read_not_targeted_count = 0` for clean executable obligations with read budget,
+`passages_scanned_count > 0`, `search_snippet_counted_as_body_count = 0`, zero live calls in
+default validation. Run BEFORE any new smoke: `pytest`, `make check`,
+`python scripts/docs_check.py`, and the offline validation of the existing 5p artifacts (which
+should now report the precise `native_pending_reads_not_targeted` status, not
+`reconstructed_search_snippet_only`).

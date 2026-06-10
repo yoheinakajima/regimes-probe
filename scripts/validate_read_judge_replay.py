@@ -138,6 +138,11 @@ def main() -> int:
                   f"{pm['unmatched_obligation_source_urls_sample']}")
         if pm.get("unmatched_read_body_urls_sample"):
             print(f"   unmatched read-body urls: {pm['unmatched_read_body_urls_sample']}")
+        print(f"   targeting: success_rate={pm.get('pending_read_targeting_success_rate')} "
+              f"body_link_rate={pm.get('pending_read_body_link_rate')} "
+              f"suppressed_contaminated="
+              f"{json.dumps(pm.get('stage_reason_counts', {}).get('pending_read_not_targeted', 0))}"
+              f" (pending_read_not_targeted in stage_reasons)")
         print(f"   diagnostic-only (never counted as bodies): "
               f"search_snippets={pm.get('search_snippet_only_count')} "
               f"debug_snippets={pm.get('debug_snippet_scanned_count')}; "

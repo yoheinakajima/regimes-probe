@@ -118,6 +118,12 @@ class ObligationOutcome:
     read_body_chars: int = 0
     read_body_provider: str = ""
     is_target_constraint: bool = False
+    # Level 5q execution-linkage provenance.
+    read_targeted_pending_obligation: bool = False
+    pending_read_judgment_id_on_read_event: str = ""
+    matched_pending_read_judgment_id_from_body: str = ""
+    #: pending_id | exact_url | prefix_url | host_only | none
+    read_body_link_source: str = "none"
 
     def to_dict(self) -> dict[str, Any]:
         return {k: getattr(self, k) for k in (
@@ -135,7 +141,9 @@ class ObligationOutcome:
             "live_rejudgment_source", "body_provider", "body_is_actual_read_body",
             "body_is_search_snippet", "body_match_source", "anchor_category_counts",
             "passage_relevance", "matched_read_call", "matched_read_body",
-            "read_body_chars", "read_body_provider", "is_target_constraint")}
+            "read_body_chars", "read_body_provider", "is_target_constraint",
+            "read_targeted_pending_obligation", "pending_read_judgment_id_on_read_event",
+            "matched_pending_read_judgment_id_from_body", "read_body_link_source")}
 
 
 @dataclass
@@ -1059,6 +1067,7 @@ def load_legacy_run(run_dir: str | Path, *, allow_live_judge: bool = False,
     coverage_bounded = False
     recon_sources: list[str] = []
     cache_urls = list(bodies.keys())
+    has_read_bodies = any(r.get("read_body") for r in bodies.values())
     for line in dqf.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line:
@@ -1113,6 +1122,11 @@ def load_legacy_run(run_dir: str | Path, *, allow_live_judge: bool = False,
                 o.pipeline_status = "read_matched"
             stored_url = o.source_url or rc.get("read_url", "") or _read_url_for(record, o.candidate_id)
             o.source_url = stored_url
+            # 5q-5: native obligations persist their execution linkage.
+            o.read_targeted_pending_obligation = bool(ob.get("read_selected"))
+            if o.read_targeted_pending_obligation:
+                o.pending_read_judgment_id_on_read_event = o.pending_read_judgment_id
+            selected_read_url = ob.get("selected_read_url", "") or ""
             if not stored_url:
                 o.stage_reason = "read_event_found_but_body_missing"
                 res.obligations.append(o)
@@ -1144,7 +1158,22 @@ def load_legacy_run(run_dir: str | Path, *, allow_live_judge: bool = False,
                     if not o.matched_read_call:
                         o.url_match_method = exp_method
                 else:
-                    matched_url, method = _match_url(stored_url, cache_urls)
+                    # 5q-5: an explicit pending-id link (the obligation's own selected read
+                    # URL, surviving redirects) beats fuzzy source_url matching.
+                    matched_url, method = "", "none"
+                    if selected_read_url:
+                        matched_url, method = _match_url(selected_read_url, cache_urls)
+                        if matched_url:
+                            o.matched_pending_read_judgment_id_from_body = \
+                                o.pending_read_judgment_id
+                            o.read_body_link_source = "pending_id"
+                    if not matched_url:
+                        matched_url, method = _match_url(stored_url, cache_urls)
+                        if matched_url and o.read_body_link_source == "none":
+                            o.read_body_link_source = {"exact": "exact_url",
+                                                       "prefix": "prefix_url",
+                                                       "host_only": "host_only"}.get(
+                                                           method, "none")
                     if not o.matched_read_call:
                         o.url_match_method = method
                     if matched_url:
@@ -1172,9 +1201,13 @@ def load_legacy_run(run_dir: str | Path, *, allow_live_judge: bool = False,
                             o.debug_snippet_chars = len(body_rec["search_snippet"])
                             o.pipeline_status = ("read_matched_search_snippet_only"
                                                  if o.matched_read_call else "reconstructed")
-                            o.stage_reason = ("read_body_not_persisted_legacy_run"
-                                              if o.matched_read_call
-                                              else "search_snippet_only_no_read_body")
+                            # 5q-6: when actual read bodies EXIST in the cache but none match
+                            # this obligation, that is a TARGETING failure — not "only search
+                            # snippets are available".
+                            o.stage_reason = (
+                                "read_body_not_persisted_legacy_run" if o.matched_read_call
+                                else ("pending_read_not_targeted" if has_read_bodies
+                                      else "search_snippet_only_no_read_body"))
                             res.obligations.append(o)
                             continue
             o.stored_body_chars = (len(body_rec.get("read_body", ""))
@@ -1203,9 +1236,12 @@ def load_legacy_run(run_dir: str | Path, *, allow_live_judge: bool = False,
                                       else "debug_snippet_only_no_body")
                 else:
                     o.body_source = "not_found"
-                    o.stage_reason = ("source_url_mismatch" if o.url_match_method == "none"
-                                      and not o.matched_read
-                                      else "read_event_found_but_body_missing")
+                    if has_read_bodies and not o.matched_read_body:
+                        o.stage_reason = "pending_read_not_targeted"
+                    else:
+                        o.stage_reason = ("source_url_mismatch" if o.url_match_method == "none"
+                                          and not o.matched_read
+                                          else "read_event_found_but_body_missing")
                 res.obligations.append(o)
                 continue
             # an ACTUAL read body (call-embedded / replay-export / read-provider cache).
@@ -1544,6 +1580,24 @@ def _summarize_legacy(res: ReplayValidationResult, n_items: int, live_calls: int
     else:
         res.metrics["read_body_unlinked_to_requires_read_obligation"] = False
         res.metrics["pending_read_not_targeted_count"] = 0
+    # 5q-6: targeting rates + extra bounded samples (sanitized; no gold).
+    with_url = [o for o in obs if o.source_url]
+    res.metrics["pending_read_targeting_success_rate"] = round(
+        len(matched_ob) / len(ob_urls), 3) if ob_urls else 0.0
+    res.metrics["pending_read_body_link_rate"] = round(
+        sum(1 for o in with_url if o.body_is_actual_read_body) / len(with_url), 3) \
+        if with_url else 0.0
+    no_attempt = sorted({o.source_url for o in obs
+                         if o.source_url and not o.read_targeted_pending_obligation
+                         and not o.body_is_actual_read_body})
+    res.metrics["obligation_urls_with_no_read_attempt_sample"] = [
+        _trunc(u) for u in no_attempt[:5]]
+    res.metrics["read_urls_unlinked_to_obligation_sample"] = [
+        _trunc(u) for u in unmatched_body[:5]]
+    res.metrics["blocked_unrelated_read_urls_sample"] = [
+        e.get("data", {}).get("selected_read_url_host", "")
+        for e in res.replay_events
+        if e.get("event_type") == "read_blocked_unrelated_to_pending_obligation"][:5]
     # 5n-6: unambiguous live-judge tier; only actual-body PREDICATE-RELEVANT passages qualify.
     if allow_live_judge:
         skip = None
@@ -1567,6 +1621,12 @@ def _summarize_legacy(res: ReplayValidationResult, n_items: int, live_calls: int
         res.overall_status = "judged_unclosed"
     elif n_scanned > 0 or any(o.pipeline_status == "actual_body_located" for o in obs):
         res.overall_status = "reconstructed_actual_body_rejudgment_pending"
+    elif res.metrics.get("read_body_unlinked_to_requires_read_obligation"):
+        # 5q-6: read bodies EXIST but none belong to an obligation — a read-targeting
+        # failure, named precisely (never "search snippets only", never route_miss).
+        native = res.metrics.get("reconstruction_source") == "native_persisted"
+        res.overall_status = ("native_pending_reads_not_targeted" if native
+                              else "reconstructed_pending_reads_not_targeted")
     elif any(o.body_is_search_snippet for o in obs):
         res.overall_status = "reconstructed_search_snippet_only"
     elif any(o.pipeline_status == "debug_snippet_scanned" for o in obs):

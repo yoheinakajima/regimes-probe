@@ -70,6 +70,22 @@ def main() -> int:
                 a, b = ma.get(m, 0.0), mb.get(m, 0.0)
                 print(f"    {m:<32} A={a:>8.3f}  B={b:>8.3f}  Δ={b - a:+.3f}")
 
+    # 5i-N: mechanism-detector deltas (DEBUG labels only — never a benchmark claim). These
+    # surface loop-closure / pollution / target-binding mechanism movement on the same items.
+    from regimes_probe.eval.debug_slice import (
+        DEBUG_SLICE_DETECTOR_KEYS, detector_deltas, is_debug_slice_report)
+    if is_debug_slice_report(rep_a) or is_debug_slice_report(rep_b):
+        print("\n[DEBUG/DEV slice — mechanism deltas only, NOT a benchmark claim]")
+    print("\nmechanism-detector deltas (B - A) — debug labels only:")
+    for cond, budget in keys:
+        d = detector_deltas(cells_a[(cond, budget)], cells_b[(cond, budget)])
+        if not d:
+            continue
+        print(f"\n  [{cond} @ budget {budget}]")
+        for k in DEBUG_SLICE_DETECTOR_KEYS:
+            if k in d:
+                print(f"    {k:<52} A={d[k]['a']!s:>6}  B={d[k]['b']!s:>6}  Δ={d[k]['delta']:+}")
+
     # Budget curve for policy_memory (the headline condition), if present.
     print("\nbudget curve — correct_per_tool_call (condition=policy_memory):")
     budgets = sorted({bud for (c, bud) in set(cells_a) | set(cells_b) if c == "policy_memory"})

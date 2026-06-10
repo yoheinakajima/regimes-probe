@@ -183,13 +183,22 @@ class EvidenceJudge:
     def __init__(self, model_fn: Optional[Callable[[str], str]] = None, *,
                  cache=None, model: str = "deterministic", replay_only: bool = False,
                  enabled: bool = False, prompt_name: str = "evidence_judge",
-                 max_calls_per_candidate: int = 6) -> None:
+                 max_calls_per_candidate: int = 6, batch_enabled: bool = False) -> None:
         self.model_fn = model_fn
         self.cache = cache
         self.model = model
         self.replay_only = replay_only
         self.enabled = enabled
         self.max_calls_per_candidate = max_calls_per_candidate
+        #: Level 5i-K3: optional batch judging (one cached call per (source, candidate) over a
+        #: bounded constraint set) — falls back to the per-constraint path.
+        self.batch_enabled = batch_enabled
+        self.batch_judge_calls = 0
+        self.batch_judge_constraints_evaluated = 0
+        self.per_constraint_judge_calls_avoided = 0
+        self.batch_judge_fallback = 0
+        self.batch_judge_cache_hit = 0
+        self.batch_judge_post_rule_downgrade = 0
         from regimes_probe.agent import prompts
         self._prompt = prompts.get(prompt_name) if prompt_name in prompts.registry_dict() else None
         self._jc = 0
@@ -236,6 +245,14 @@ class EvidenceJudge:
             "judge_calls_saved_by_contradiction_stop": self.calls_saved_by_contradiction_stop,
             "contradiction_early_stop_count": self.contradiction_early_stop,
             "judge_max_calls_cap_hit_count": self.max_calls_cap_hit,
+            # Level 5i-K3 batch judging.
+            "batch_judge_enabled": self.batch_enabled,
+            "batch_judge_calls_count": self.batch_judge_calls,
+            "batch_judge_constraints_evaluated_count": self.batch_judge_constraints_evaluated,
+            "per_constraint_judge_calls_avoided_count": self.per_constraint_judge_calls_avoided,
+            "batch_judge_fallback_count": self.batch_judge_fallback,
+            "batch_judge_cache_hit_count": self.batch_judge_cache_hit,
+            "batch_judge_post_rule_downgrade_count": self.batch_judge_post_rule_downgrade,
         }
 
     def _triple_hash(self, *, candidate_text, slot_id, slot_role, constraint, source_role,
@@ -284,6 +301,110 @@ class EvidenceJudge:
         j.prompt_hash = (self._prompt.content_hash if self._prompt is not None else "")
         self.judgment_counts[j.judgment] += 1
         return j
+
+    def judge_batch(self, *, candidate_text, candidate_id, aliases, slot_id, slot_role,
+                    slot_descriptor, constraints, source_id, source_title, source_url,
+                    source_domain, source_role, contaminated, snippet,
+                    det_by_cid, relational_by_cid=None, object_anchored_by_cid=None) -> dict:
+        """Judge ONE (source, candidate) over a bounded set of constraints (5i-K3).
+
+        Returns ``{constraint_id: EvidenceJudgment}``. With a model + cache this is a single
+        cached call; the deterministic baseline (``det_by_cid[cid] = (status, quote)``) is
+        always computed and is the canonical fallback. The 5f/5g/5h post-model hard rules are
+        applied **per constraint**, so batching never weakens support contracts. On any
+        malformed batch reply it falls back to the per-constraint ``judge`` path."""
+        relational_by_cid = relational_by_cid or {}
+        object_anchored_by_cid = object_anchored_by_cid or {}
+        cons = list(constraints)
+        out: dict[str, EvidenceJudgment] = {}
+        self.batch_judge_calls += 1
+        self.batch_judge_constraints_evaluated += len(cons)
+        if len(cons) > 1:
+            self.per_constraint_judge_calls_avoided += len(cons) - 1
+        # one cached model call (when enabled + not replay) returning per-cid verdicts.
+        model_map: dict[str, dict] = {}
+        if self.enabled and self.model_fn is not None and not self.replay_only and self.cache is not None:
+            key = _sha("|".join(["batch", self.model, candidate_text, slot_id,
+                                 source_url, snippet[:300],
+                                 ",".join(getattr(c, "constraint_id", "") for c in cons)]))
+            raw = self.cache.get(key)
+            if raw is not None:
+                self.batch_judge_cache_hit += 1
+            else:
+                prompt = self._batch_prompt(candidate_text, slot_descriptor, slot_role,
+                                            cons, source_title, source_url, source_role,
+                                            contaminated, snippet)
+                try:
+                    self.calls += 1
+                    raw = self.model_fn(prompt)
+                    self.cache.put(key, raw or "")
+                except Exception:
+                    raw = None
+            parsed = _extract_json(raw) if raw else None
+            if isinstance(parsed, dict):
+                vmap = parsed.get("verdicts") if isinstance(parsed.get("verdicts"), dict) else parsed
+                if isinstance(vmap, dict):
+                    model_map = {str(k): v for k, v in vmap.items() if isinstance(v, dict)}
+            if self.enabled and not model_map:
+                self.batch_judge_fallback += 1
+        for c in cons:
+            cid = getattr(c, "constraint_id", "")
+            det_status, det_quote = det_by_cid.get(cid, ("irrelevant", ""))
+            has_url = bool((source_url or "").strip())
+            mv = model_map.get(cid)
+            if mv and str(mv.get("judgment", "")) in JUDGMENTS:
+                j = EvidenceJudgment(
+                    judgment=str(mv["judgment"]), quote=str(mv.get("quote", "") or det_quote),
+                    rationale="batch_model", confidence=float(mv.get("confidence", 0.5) or 0.5),
+                    candidate_aliases=[str(x) for x in (mv.get("candidate_aliases") or [])],
+                    requires_read_reason=(str(mv["requires_read_reason"])
+                                          if mv.get("requires_read_reason") else None),
+                    mode="batch_model")
+            else:
+                j = EvidenceJudgment(
+                    judgment=_det_to_judgment(det_status, has_url=has_url, source_role=source_role),
+                    quote=det_quote, rationale=f"batch_deterministic:{det_status}",
+                    confidence=0.6 if det_status in ("supports", "contradicts") else 0.3,
+                    requires_read_reason=("snippet_insufficient_body_may_support"
+                                          if det_status == "insufficient" and has_url else None),
+                    mode="batch_deterministic")
+            before = j.judgment
+            j = enforce_hard_rules(
+                j, contaminated=contaminated, source_role=source_role,
+                has_quote=bool((j.quote or "").strip()), candidate_text=candidate_text,
+                aliases=list(aliases or []), slot_role=slot_role,
+                relational=bool(relational_by_cid.get(cid, False)),
+                object_anchored=bool(object_anchored_by_cid.get(cid, True)),
+                counters=self.guard_counts)
+            if contaminated and j.judgment in _SUPPORT_JUDGMENTS:
+                self.contaminated_support_blocked += 1
+                j.judgment = "irrelevant"
+            if j.judgment != before:
+                self.batch_judge_post_rule_downgrade += 1
+            self._jc += 1
+            j.judgment_id = f"ejb{self._jc}"
+            j.candidate_id, j.slot_id, j.constraint_id = candidate_id, slot_id, cid
+            j.source_id, j.model = source_id, self.model
+            j.prompt_hash = (self._prompt.content_hash if self._prompt is not None else "")
+            self.judgment_counts[j.judgment] += 1
+            out[cid] = j
+        return out
+
+    @staticmethod
+    def _batch_prompt(candidate_text, slot_descriptor, slot_role, cons, source_title,
+                      source_url, source_role, contaminated, snippet) -> str:
+        clist = "\n".join(
+            f'- {getattr(c, "constraint_id", "")}: {getattr(c, "text_span", "")}' for c in cons)
+        return (
+            "You are an EVIDENCE JUDGE. For ONE candidate and ONE source excerpt, decide per "
+            "constraint whether the excerpt full_support|partial_support|contradiction|"
+            "irrelevant|requires_read. Do NOT answer the user's question. Output JSON: "
+            '{"verdicts": {"<constraint_id>": {"judgment": "...", "quote": "...", '
+            '"confidence": 0.0}}}.\n'
+            f"SLOT: {slot_descriptor} (role={slot_role})\nCANDIDATE: {candidate_text}\n"
+            f"CONSTRAINTS:\n{clist}\n"
+            f"SOURCE role={source_role} contaminated={contaminated} title={source_title[:160]}\n"
+            f"EXCERPT: {snippet[:600]}\n")
 
     def _judge_inner(self, *, ih, candidate_text, aliases, slot_role, slot_descriptor,
                      constraint, source_title, source_url, source_role, contaminated,

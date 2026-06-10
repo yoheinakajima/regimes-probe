@@ -118,6 +118,16 @@ class Events:
     READ_JUDGMENT_STILL_UNRESOLVED = "read_judgment_still_unresolved"
     BIND_TARGET_ANSWER_SLOT_PROPOSED = "bind_target_answer_slot_proposed"
     BIND_TARGET_ANSWER_SLOT_SELECTED = "bind_target_answer_slot_selected"
+    # Level 5i source-subject extraction + explicit-location filtering
+    SOURCE_SUBJECT_EXTRACTED = "source_subject_extracted"
+    SOURCE_SUBJECT_PROMOTED = "source_subject_promoted"
+    SOURCE_SUBJECT_REJECTED = "source_subject_rejected"
+    SOURCE_SUBJECT_USED_FOR_CANDIDATE = "source_subject_used_for_candidate"
+    SOURCE_SUBJECT_USED_FOR_RELATION_SUPPORT = "source_subject_used_for_relation_support"
+    EXPLICIT_LOCATION_FILTER_APPLIED = "explicit_location_filter_applied"
+    EXPLICIT_LOCATION_MISMATCH_REJECTED = "explicit_location_mismatch_rejected"
+    EXPLICIT_LOCATION_AMBIGUOUS_KEPT = "explicit_location_ambiguous_kept"
+    EXPLICIT_LOCATION_SUPPORTED = "explicit_location_supported"
     SEED_QUERY_GENERIC_BLOCKED = "seed_query_generic_blocked"
     FUZZY_DUPLICATE_QUERY_REJECTED = "fuzzy_duplicate_query_rejected"
     ABSTAIN_WITHHELD_EXECUTABLE_ACTION_AVAILABLE = "abstain_withheld_executable_action_available"
@@ -188,6 +198,11 @@ EVIDENCE_INTERPRETATION_EVENTS: tuple[str, ...] = (
     Events.SEED_QUERY_GENERIC_BLOCKED, Events.FUZZY_DUPLICATE_QUERY_REJECTED,
     Events.ABSTAIN_WITHHELD_EXECUTABLE_ACTION_AVAILABLE, Events.SOURCE_ACQUISITION_REJECTED,
     Events.DEPENDENT_SLOT_SEARCH_DEFERRED,
+    Events.SOURCE_SUBJECT_EXTRACTED, Events.SOURCE_SUBJECT_PROMOTED,
+    Events.SOURCE_SUBJECT_REJECTED, Events.SOURCE_SUBJECT_USED_FOR_CANDIDATE,
+    Events.SOURCE_SUBJECT_USED_FOR_RELATION_SUPPORT,
+    Events.EXPLICIT_LOCATION_FILTER_APPLIED, Events.EXPLICIT_LOCATION_MISMATCH_REJECTED,
+    Events.EXPLICIT_LOCATION_AMBIGUOUS_KEPT, Events.EXPLICIT_LOCATION_SUPPORTED,
 )
 
 

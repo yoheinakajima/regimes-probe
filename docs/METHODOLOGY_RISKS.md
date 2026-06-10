@@ -550,3 +550,23 @@ set — and the risk surface. Keep the experiment honest:
   dev/debug slice is for debugging deltas, never a headline. Deferred and explicitly not
   claimed: source-subject extraction, coreference collapse, and a batch-judge / explicit-location
   hard filter.
+
+- **Level 5i — source-subject, triage, batch judging, and a debug slice that cannot become a
+  claim.** Subtle precision traps. (1) *Promoting a page's title or chrome as the answer* — a
+  "Founder Definition" headword or a listing title is not the founder; source-subject extraction
+  promotes only a source's predicate-grounded subject (`candidate_promoted_from_source_title_only_count`
+  = `candidate_promoted_from_chrome_count` = 0). (2) *Spending judge budget — and risking a
+  hallucinated support — on obvious non-entities*: pre-judge triage rejects chrome/topic/title-only
+  before the judge runs (`judge_invoked_on_obvious_chrome_count` = 0) and counts the saved calls,
+  so the saving is auditable, not assumed. (3) *A location filter that silently over-rejects*: it
+  is gazetteer-bounded and preposition-gated (a person named after a state is not a location),
+  persons are never location-filtered, ambiguity is kept-and-flagged rather than dropped, and
+  `explicit_location_mismatch_promoted_count` = 0. (4) *Batching to save cost must not weaken
+  support*: the post-model hard rules run per constraint inside the batch, contaminated sources
+  support nothing, and batched support materializes identically to the per-constraint path
+  (tested). (5) *Coreference is the easiest place to corrupt a frame*: it is proposal-only, never
+  auto-merges, blocks distinct-entity and target↔subject merges, and claims no judge-call
+  reduction (`invalid_coreference_collapse_count` = 0). (6) *A small debug slice is the easiest
+  place to fool yourself*: the slice is `headline_eligible=false`, deterministic, and
+  dataset-immutable, and `generate_claims` refuses any performance/memory claim for it — its only
+  output is mechanism-detector deltas, which are debug labels, not results.

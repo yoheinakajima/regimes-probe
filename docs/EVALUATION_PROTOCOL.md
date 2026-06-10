@@ -489,3 +489,27 @@ safety invariants are. For repeatable mechanism-level comparison across 5h/5i ru
 never a headline claim) and diff the detector counts, not the accuracy. Deferred this iteration
 (documented, not claimed): source-subject extraction, coreference collapse, batch judging +
 explicit-location hard filter, and the dev-slice runner script.
+
+**Level 5h live-smoke expectations (mechanism, not accuracy).** A live 5h smoke is validated
+on *loop mechanics*, never on accuracy (which may stay 0 on a tiny pair): (a) successful reads
+tied to a pending judgment must produce `read_judged_after_read` events and either close or
+explicitly keep open the obligation; (b) `bind_target_answer_slot` must appear when a supported
+subject exists and an answer-shaped target is unresolved; (c) `answer_support_gate=True` is
+required before any answer — no answer is emitted otherwise. These are checked from the
+projection/debug output; the offline tests assert the same invariants with stubs (no live
+calls required).
+
+**Level 5i — source-subject, triage, batch judging, debug slice.** Audit, from interpreter and
+judge stats: source-subject hygiene (`candidate_promoted_from_source_title_only_count` =
+`candidate_promoted_from_chrome_count` = 0; `source_subject_extracted_count` /
+`source_subject_promoted_count` for yield); pre-judge triage
+(`judge_invoked_on_obvious_chrome_count` = 0; `judge_calls_saved_by_prejudge_triage` for the
+savings); explicit-location filter (`explicit_location_mismatch_promoted_count` = 0;
+`explicit_location_mismatch_rejected_count` / `_ambiguous_kept_count` / `_supported_count`);
+and batch judging when enabled (`batch_judge_calls_count`,
+`per_constraint_judge_calls_avoided_count`, `batch_judge_post_rule_downgrade_count` — batched
+support must materialize identically to the per-constraint path). For repeatable mechanism
+comparison, run on a **stable debug slice** (`scripts/make_debug_slice.py`, pinned `item_ids`,
+`headline_eligible=false`) and diff the detector deltas via `compare_runs`; `generate_claims`
+refuses any headline/memory claim for a debug-slice report. Coreference (5i-J) is
+proposal-only: `invalid_coreference_collapse_count` = 0 and no judge-call reduction is claimed.

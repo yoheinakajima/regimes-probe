@@ -429,3 +429,18 @@ are all event-backed too (`bind_target_answer_slot_*`, `seed_query_generic_block
 `dependent_slot_search_deferred`, `proposal_gate_relaxed`/`generic_fallback_blocked`), and the
 candidate-local support label is `slot_candidate_supported` (never confused, in the projection,
 with the global answer-support gate).
+
+Level 5i adds a `SourceSubject` to each interpretation (what the page is *about*) and projects
+its lifecycle (`source_subject_extracted` / `source_subject_promoted` / `source_subject_rejected`
+/ `source_subject_used_for_candidate`) plus the explicit-location filter outcomes
+(`explicit_location_filter_applied`, `explicit_location_mismatch_rejected`,
+`explicit_location_ambiguous_kept`, `explicit_location_supported`), so candidate promotion is
+auditable: a reviewer can see *why* a title/chrome/topic was not promoted and *why* an org was
+location-rejected. Batch judging (5i-K3) emits the **same per-constraint** judgment events as
+the per-constraint path, so a batched judgment re-projects identically and per-constraint
+relations remain replayable. Coreference (5i-J) is projected as `CoreferenceProposal` objects
+with `merge_status` — proposals and *blocked* merges are in the log, but nothing is auto-merged,
+so the graph never depends on an unsafe collapse. The debug-slice manifest
+(`debug_slice_manifest.json`) records the pinned `item_ids` + selection method deterministically
+and carries `headline_eligible=false`, so a slice run replays identically and can never be read
+as a benchmark claim.

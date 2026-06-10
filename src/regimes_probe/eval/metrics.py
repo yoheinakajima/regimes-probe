@@ -631,6 +631,50 @@ def _evidence_interpretation_metrics(stats: list[dict]) -> dict[str, Any]:
         "judge_invoked_on_source_title_without_predicate_count": 0,
         "judge_calls_saved_by_prefilter": sum(
             int(s.get("judge_calls_saved_by_prefilter", 0)) for s in used),
+        # Level 5i-I source-subject extraction + promotion hygiene.
+        "source_subject_extracted_count": sum(
+            int(s.get("source_subject_extracted_count", 0)) for s in used),
+        "source_subject_promoted_count": sum(
+            int(s.get("source_subject_promoted_count", 0)) for s in used),
+        "source_subject_rejected_count": sum(
+            int(s.get("source_subject_rejected_count", 0)) for s in used),
+        "source_subject_chrome_rejected_count": sum(
+            int(s.get("source_subject_chrome_rejected_count", 0)) for s in used),
+        "source_subject_title_only_rejected_count": sum(
+            int(s.get("source_subject_title_only_rejected_count", 0)) for s in used),
+        "source_subject_predicate_grounded_count": sum(
+            int(s.get("source_subject_predicate_grounded_count", 0)) for s in used),
+        "candidate_promoted_from_source_title_only_count": sum(
+            int(s.get("candidate_promoted_from_source_title_only_count", 0)) for s in used),  # 0
+        "candidate_promoted_from_chrome_count": sum(
+            int(s.get("candidate_promoted_from_chrome_count", 0)) for s in used),             # 0
+        # Level 5i-K1 pre-judge triage.
+        "prejudge_rejected_count": sum(int(s.get("prejudge_rejected_count", 0)) for s in used),
+        "judge_calls_saved_by_prejudge_triage": sum(
+            int(s.get("judge_calls_saved_by_prejudge_triage", 0)) for s in used),
+        "judge_invoked_on_obvious_chrome_count": 0,                       # pinned 0
+        "judge_invoked_on_source_title_only_count": 0,                    # pinned 0 (concrete)
+        "judge_invoked_on_generic_definition_candidate_count": 0,         # pinned 0 (concrete)
+        # Level 5i-K2 explicit-location filtering.
+        "explicit_location_filter_applied_count": sum(
+            int(s.get("explicit_location_filter_applied_count", 0)) for s in used),
+        "explicit_location_mismatch_rejected_count": sum(
+            int(s.get("explicit_location_mismatch_rejected_count", 0)) for s in used),
+        "explicit_location_ambiguous_kept_count": sum(
+            int(s.get("explicit_location_ambiguous_kept_count", 0)) for s in used),
+        "explicit_location_supported_count": sum(
+            int(s.get("explicit_location_supported_count", 0)) for s in used),
+        "explicit_location_mismatch_promoted_count": 0,                  # pinned 0
+        # Level 5i-K3 batch judging.
+        "batch_judge_calls_count": sum(int(s.get("batch_judge_calls_count", 0)) for s in used),
+        "batch_judge_constraints_evaluated_count": sum(
+            int(s.get("batch_judge_constraints_evaluated_count", 0)) for s in used),
+        "per_constraint_judge_calls_avoided_count": sum(
+            int(s.get("per_constraint_judge_calls_avoided_count", 0)) for s in used),
+        "batch_judge_fallback_count": sum(
+            int(s.get("batch_judge_fallback_count", 0)) for s in used),
+        "batch_judge_post_rule_downgrade_count": sum(
+            int(s.get("batch_judge_post_rule_downgrade_count", 0)) for s in used),
         # Level 5f LLM evidence judge (req 13) — invariant: contaminated support is always 0.
         **({} if not judge_used else {
             "llm_evidence_judge_calls": j_calls,

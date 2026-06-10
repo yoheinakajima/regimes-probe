@@ -1069,3 +1069,43 @@ distinct entities, holds today), **batch judging + explicit-location hard filter
 fixed 10–20 item dev/debug slice script (N — recommended, not yet added). The strict answer
 gate, contamination safety, replay, and policy-memory hygiene are unchanged; accuracy is **not**
 the acceptance criterion for this iteration.
+
+#### Level 5i: source-subject extraction, pre-judge triage, batch judging, stable debug slice
+
+5h's deferrals (I/K/N) plus J safety scaffolding land here. All generic, deterministic-by-
+default, replayable, answer-free; the strict answer gate is untouched.
+
+- **Source-subject extraction (I).** Every result/read now yields a `SourceSubject` — *what
+  real-world entity the page is about* — separate from its chrome/title: `subject_name`,
+  `subject_type`, `subject_role` (article/profile/page-owner/mentioned/generic-topic/chrome),
+  `is_predicate_grounded`, `is_chrome_or_source_title_only`, aliases, quote. Candidate
+  promotion uses it: a source **title-only / chrome / generic-topic** subject is not a
+  candidate unless body predicate text grounds it; a profile/official/database page is
+  structurally about its title subject; a `Title (YYYY)` work page is a `title_or_work`
+  subject (so a film named "The Founder" never binds a real-world person slot). Pinned 0:
+  `candidate_promoted_from_source_title_only_count`, `candidate_promoted_from_chrome_count`.
+- **Pre-judge triage (K1).** Chrome/UI, generic-topic/definition headwords, and
+  source-title-only ungrounded subjects are rejected **before** any judge call, and the saved
+  calls are counted (`judge_calls_saved_by_prejudge_triage`). Pinned 0:
+  `judge_invoked_on_obvious_chrome_count`, and (for concrete entity tasks)
+  `judge_invoked_on_source_title_only_count` / `judge_invoked_on_generic_definition_candidate_count`.
+- **Explicit-location filter (K2).** When the frame carries an explicit location facet
+  (gazetteer-bounded: US states + DC), an org/place candidate whose source clearly names a
+  *different* location — read only after a location preposition, so "Georgia O'Keeffe" is not a
+  state — with no branch evidence is rejected before judging; an ambiguous one is kept but
+  flagged `needs_location_support`; a compatible one is allowed. Pinned 0:
+  `explicit_location_mismatch_promoted_count`. (Persons are not location-filtered.)
+- **Batch judging (K3, optional).** `EvidenceJudge.judge_batch` judges one `(source, candidate)`
+  over a bounded constraint set in a single cached call, emitting per-constraint verdicts; the
+  5f/5g/5h **post-model hard rules are applied per constraint**, a blocking contradiction
+  early-stops support, and any malformed batch reply falls back to the per-constraint path.
+  Off by default (`batch_enabled`); support materializes identically to the per-constraint path.
+- **Coreference SAFETY scaffolding (J).** A conservative `propose_coreference` only *proposes*
+  merging obvious same-referent person descriptors ("this author … the author") and never
+  auto-merges by default; it *blocks* unsafe merges — distinct roles, distinct anchor entities
+  (hotel/museum/restaurant/founder/birth-year), and a target value vs its subject. Pinned 0:
+  `invalid_coreference_collapse_count`; no judge-call reduction is claimed from it yet.
+- **Stable debug slice (N).** `scripts/make_debug_slice.py` + `eval/debug_slice.py` produce a
+  deterministic, dataset-immutable 10–20 item slice manifest with pinned `item_ids`,
+  `headline_eligible=False`; `compare_runs` surfaces mechanism-detector deltas (debug labels
+  only), and `generate_claims` refuses any headline/memory claim for a debug-slice report.

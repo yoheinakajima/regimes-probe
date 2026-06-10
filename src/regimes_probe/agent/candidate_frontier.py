@@ -522,6 +522,34 @@ class CandidateFrontier:
                              "noise_reasons": list(interp.noise_reasons)})
             self._emit("source_classified", evidence_id=ev.evidence_id,
                        data={"source_role": interp.source_role})
+            # 5i-I: project the source-subject extraction (what the page is about).
+            ss = getattr(interp, "source_subject", None)
+            if ss is not None:
+                self._emit("source_subject_extracted", evidence_id=ev.evidence_id,
+                           data={"source_subject_id": ss.source_subject_id,
+                                 "subject_name": _prev(ss.subject_name, 60),
+                                 "subject_type": ss.subject_type, "subject_role": ss.subject_role,
+                                 "is_predicate_grounded": ss.is_predicate_grounded,
+                                 "is_chrome_or_source_title_only":
+                                     ss.is_chrome_or_source_title_only})
+                if ss.is_chrome_or_source_title_only:
+                    self._emit("source_subject_rejected", evidence_id=ev.evidence_id,
+                               data={"subject_role": ss.subject_role})
+                elif ss.is_predicate_grounded and any(
+                        a.accepted and _norm(a.candidate_text) == _norm(ss.subject_name)
+                        for a in interp.candidate_assertions):
+                    self._emit("source_subject_promoted", evidence_id=ev.evidence_id,
+                               data={"subject_name": _prev(ss.subject_name, 60)})
+                    self._emit("source_subject_used_for_candidate", evidence_id=ev.evidence_id,
+                               data={"subject_name": _prev(ss.subject_name, 60)})
+            # 5i-K2: project explicit-location filter outcomes per candidate assertion.
+            for a in interp.candidate_assertions:
+                if a.rejection_reason == "explicit_location_mismatch":
+                    self._emit("explicit_location_mismatch_rejected", evidence_id=ev.evidence_id,
+                               data={"text": _prev(a.candidate_text, 60)})
+                elif getattr(a, "needs_location_support", False):
+                    self._emit("explicit_location_ambiguous_kept", evidence_id=ev.evidence_id,
+                               data={"text": _prev(a.candidate_text, 60)})
             for a in interp.candidate_assertions:
                 if a.accepted:
                     continue

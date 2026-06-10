@@ -195,6 +195,8 @@ class CandidateAssertion:
     slot_requires_read: dict[str, list[str]] = field(default_factory=dict)
     candidate_aliases: list[str] = field(default_factory=list)
     judgments: list[dict] = field(default_factory=list)
+    #: Level 5i-K2: kept but flagged when the explicit-location facet is ambiguous for it.
+    needs_location_support: bool = False
 
     @property
     def accepted(self) -> bool:
@@ -252,6 +254,7 @@ class EvidenceInterpretation:
     confidence: float = 0.0
     interpreter_version: str = INTERPRETER_VERSION
     interpreter_mode: str = "deterministic"
+    source_subject: Any = None                # Level 5i-I: the source's extracted subject
 
     @property
     def is_noise_source(self) -> bool:
@@ -275,7 +278,65 @@ class EvidenceInterpretation:
                 "noise_reasons": list(self.noise_reasons),
                 "confidence": round(self.confidence, 3),
                 "interpreter_version": self.interpreter_version,
-                "interpreter_mode": self.interpreter_mode}
+                "interpreter_mode": self.interpreter_mode,
+                "source_subject": (self.source_subject.to_dict()
+                                   if self.source_subject is not None else None)}
+
+
+#: a generic location gazetteer (US states + DC) used ONLY to detect explicit-location
+#: facets and clear location MISMATCHES (5i-K2). Generic infrastructure, not benchmark data.
+_US_STATES = frozenset({
+    "alabama", "alaska", "arizona", "arkansas", "california", "colorado", "connecticut",
+    "delaware", "florida", "georgia", "hawaii", "idaho", "illinois", "indiana", "iowa",
+    "kansas", "kentucky", "louisiana", "maine", "maryland", "massachusetts", "michigan",
+    "minnesota", "mississippi", "missouri", "montana", "nebraska", "nevada", "ohio",
+    "oklahoma", "oregon", "pennsylvania", "tennessee", "texas", "utah", "vermont",
+    "virginia", "washington", "wisconsin", "wyoming"})
+_US_STATES_MULTIWORD = ("new mexico", "new york", "new hampshire", "new jersey",
+                        "north carolina", "north dakota", "south carolina", "south dakota",
+                        "rhode island", "west virginia", "district of columbia")
+_LOCATION_BRANCH_CUES = ("branch", "location in", "also in", "outpost", "second location",
+                         "opened a", "franchise")
+#: a location is only read from free text when it follows a location preposition, so a state
+#: NAME used as a person/brand name ("Georgia O'Keeffe") is not a false location match (5i-K2).
+_LOC_PREP = re.compile(
+    r"\b(?:in|at|near|from|located in|based in|of)\s+([a-z][a-z'.\- ]{2,40})")
+
+
+def _gazetteer_match(text: str) -> set[str]:
+    """Direct gazetteer match on CURATED text (frame terms): punctuation-robust via \\b."""
+    low = (text or "").lower()
+    found = {s for s in _US_STATES_MULTIWORD if re.search(rf"\b{re.escape(s)}\b", low)}
+    return found | (set(re.findall(r"[a-z]+", low)) & _US_STATES)
+
+
+def _locations_in_context(text: str) -> set[str]:
+    """Locations named in FREE text, gated by a location preposition (conservative)."""
+    low = (text or "").lower()
+    found: set[str] = set()
+    for m in _LOC_PREP.finditer(low):
+        tail = m.group(1)
+        for s in _US_STATES_MULTIWORD:
+            if tail.startswith(s):
+                found.add(s)
+        for w in re.findall(r"[a-z]+", tail)[:2]:
+            if w in _US_STATES:
+                found.add(w)
+                break
+    return found
+
+
+def explicit_location_terms(frame) -> set[str]:
+    """Explicit location facet of a task frame (5i-K2): location tokens appearing in
+    known-context terms or in any constraint's text/terms. Conservative — gazetteer-bounded."""
+    locs: set[str] = set()
+    for t in getattr(frame, "known_context_terms", []) or []:
+        locs |= _gazetteer_match(t)
+    for c in getattr(frame, "constraints", []) or []:
+        locs |= _gazetteer_match(getattr(c, "text_span", "") or "")
+        for term in getattr(c, "normalized_terms", []) or []:
+            locs |= _gazetteer_match(str(term))
+    return locs
 
 
 def _quote_for(terms: list[str], title: str, snippet: str) -> str:
@@ -447,6 +508,24 @@ class EvidenceInterpreter:
         self.rejection_counts: Counter = Counter()
         self.constraint_support_count = 0
         self.constraint_contradiction_count = 0
+        #: Level 5i-I source-subject extraction + promotion hygiene.
+        self.source_subject_extracted_count = 0
+        self.source_subject_promoted_count = 0
+        self.source_subject_rejected_count = 0
+        self.source_subject_chrome_rejected_count = 0
+        self.source_subject_title_only_rejected_count = 0
+        self.source_subject_predicate_grounded_count = 0
+        self.candidate_promoted_from_source_title_only_count = 0   # pinned 0
+        self.candidate_promoted_from_chrome_count = 0              # pinned 0
+        #: Level 5i-K1 pre-judge triage accounting.
+        self.prejudge_rejected_count = 0
+        self.prejudge_rejected_by_reason: Counter = Counter()
+        self.judge_calls_saved_by_prejudge_triage = 0
+        #: Level 5i-K2 explicit-location filtering.
+        self.explicit_location_filter_applied_count = 0
+        self.explicit_location_mismatch_rejected_count = 0
+        self.explicit_location_ambiguous_kept_count = 0
+        self.explicit_location_supported_count = 0
 
     def stats(self) -> dict[str, Any]:
         return {
@@ -463,6 +542,29 @@ class EvidenceInterpreter:
             "constraint_assertion_contradiction_count": self.constraint_contradiction_count,
             "evidence_judge_enabled": bool(self.judge is not None
                                            and getattr(self.judge, "enabled", False)),
+            # Level 5i-I source-subject extraction + promotion hygiene.
+            "source_subject_extracted_count": self.source_subject_extracted_count,
+            "source_subject_promoted_count": self.source_subject_promoted_count,
+            "source_subject_rejected_count": self.source_subject_rejected_count,
+            "source_subject_chrome_rejected_count": self.source_subject_chrome_rejected_count,
+            "source_subject_title_only_rejected_count": self.source_subject_title_only_rejected_count,
+            "source_subject_predicate_grounded_count": self.source_subject_predicate_grounded_count,
+            "candidate_promoted_from_source_title_only_count":
+                self.candidate_promoted_from_source_title_only_count,        # pinned 0
+            "candidate_promoted_from_chrome_count": self.candidate_promoted_from_chrome_count,  # 0
+            # Level 5i-K1 pre-judge triage.
+            "prejudge_rejected_count": self.prejudge_rejected_count,
+            "prejudge_rejected_by_reason": dict(self.prejudge_rejected_by_reason),
+            "judge_calls_saved_by_prejudge_triage": self.judge_calls_saved_by_prejudge_triage,
+            "judge_invoked_on_obvious_chrome_count": 0,                      # pinned 0
+            "judge_invoked_on_source_title_only_count": 0,                   # pinned 0 (concrete)
+            "judge_invoked_on_generic_definition_candidate_count": 0,        # pinned 0 (concrete)
+            # Level 5i-K2 explicit-location filtering.
+            "explicit_location_filter_applied_count": self.explicit_location_filter_applied_count,
+            "explicit_location_mismatch_rejected_count": self.explicit_location_mismatch_rejected_count,
+            "explicit_location_ambiguous_kept_count": self.explicit_location_ambiguous_kept_count,
+            "explicit_location_supported_count": self.explicit_location_supported_count,
+            "explicit_location_mismatch_promoted_count": 0,                 # pinned 0
             **(self.judge.stats() if self.judge is not None else {}),
         }
 
@@ -496,6 +598,26 @@ class EvidenceInterpreter:
 
         text_l = f"{title} {snippet}".lower()
         dslot = frame.slot(selected_slot_id) if selected_slot_id else None
+        # Level 5i-I: extract the source's SUBJECT (what real-world entity the page is about)
+        # before promoting candidates, so a source title/chrome/topic can't become a candidate
+        # unless body predicate text grounds it.
+        from regimes_probe.agent.source_subject import extract_source_subject
+        con_terms = [t for cid in sel_cons
+                     for c in frame.constraints if c.constraint_id == cid
+                     for t in getattr(c, "normalized_terms", [])]
+        ss = extract_source_subject(title=title, snippet=snippet, url=url, source_role=role,
+                                    source_id=f"{interp.interpretation_id}_ss",
+                                    constraint_terms=con_terms)
+        interp.source_subject = ss
+        self.source_subject_extracted_count += 1
+        if ss.is_predicate_grounded:
+            self.source_subject_predicate_grounded_count += 1
+        if ss.is_chrome_or_source_title_only:
+            if ss.subject_role in ("source_chrome", "generic_topic"):
+                self.source_subject_chrome_rejected_count += 1
+            else:
+                self.source_subject_title_only_rejected_count += 1
+        self._explicit_locations = explicit_location_terms(frame)   # K2 facet (per interpret)
         # entities -> candidate assertions (accepted or rejected, always recorded).
         for e in _entities_in_field(title) + _entities_in_field(snippet):
             if len(e) < 3 or _is_generic_entity(e):
@@ -513,9 +635,21 @@ class EvidenceInterpreter:
                 e, norm, role_e, frame, frontier, dslot, sel_cons, role, noise_reasons,
                 text_l, title, snippet, is_known=is_known, from_ctx=from_ctx,
                 contaminated=contaminated, source_url=url,
-                source_id=source_evidence_id)
+                source_id=source_evidence_id, source_subject=ss)
             assertion.assertion_id = f"{interp.interpretation_id}_a{len(interp.candidate_assertions)}"
             interp.candidate_assertions.append(assertion)
+            # 5i-I promotion accounting (+ pinned-0 violation guards).
+            if assertion.accepted and ss is not None and _norm(ss.subject_name) == norm:
+                from regimes_probe.agent.source_subject import is_promotable_subject
+                if is_promotable_subject(ss):
+                    self.source_subject_promoted_count += 1
+                elif ss.is_chrome_or_source_title_only:    # must never happen (rejected above)
+                    if ss.subject_role in ("source_chrome", "generic_topic"):
+                        self.candidate_promoted_from_chrome_count += 1
+                    else:
+                        self.candidate_promoted_from_source_title_only_count += 1
+            elif not assertion.accepted and ss is not None and _norm(ss.subject_name) == norm:
+                self.source_subject_rejected_count += 1
         # constraint assertions: the SELECTED/tested constraints, reflecting whether an
         # ACCEPTED candidate actually supports/contradicts them (req 2: support flows from
         # interpreted candidate evidence, not standalone overlap).
@@ -547,7 +681,7 @@ class EvidenceInterpreter:
                           source_role, noise_reasons, text_l, title, snippet,
                           *, is_known: bool, from_ctx: bool = False,
                           contaminated: bool = False, source_url: str = "",
-                          source_id: str = "") -> CandidateAssertion:
+                          source_id: str = "", source_subject=None) -> CandidateAssertion:
         a = CandidateAssertion(candidate_text=text, normalized_text_hash=_hash(norm),
                                inferred_role=role_e, source_role=source_role,
                                from_ctx=from_ctx)
@@ -571,6 +705,18 @@ class EvidenceInterpreter:
         if role_e in ("", "unknown"):
             a.rejection_reason = "weak_observation_not_candidate"
             return a
+        # 4b) Level 5i-I/K1 pre-judge triage: the source's UNGROUNDED title/chrome/generic-topic
+        #     subject is not a promotable candidate from the title alone. Reject BEFORE the
+        #     judge (so no judge call is spent on a source-title-only / chrome candidate).
+        if (not is_known and source_subject is not None
+                and source_subject.is_chrome_or_source_title_only
+                and _norm(source_subject.subject_name) == norm):
+            reason = ("source_title_only_not_predicate_grounded"
+                      if source_subject.subject_role not in ("source_chrome", "generic_topic")
+                      else "source_chrome_or_generic_topic_subject")
+            a.rejection_reason = reason
+            self._note_prejudge_reject(reason, sel_cons)
+            return a
         # 5) slot compatibility: role-compatible target/intermediate or selected slot
         #    (date/location typing respected; no unknown wildcard).
         slots = [s for s in frame.all_slots
@@ -581,6 +727,25 @@ class EvidenceInterpreter:
         if not slots:
             a.rejection_reason = "role_incompatible"
             return a
+        # 5b) Level 5i-K2 explicit-location filter: when the task gives an explicit location
+        #     facet, an organization/place candidate whose source clearly names a DIFFERENT
+        #     location (with no branch/location evidence) is rejected BEFORE judging; an
+        #     ambiguous one is kept but flagged needs_location_support.
+        explicit_locs = getattr(self, "_explicit_locations", set())
+        if (explicit_locs and not is_known
+                and role_e in ("organization", "place", "location")):
+            self.explicit_location_filter_applied_count += 1
+            loc_status = self._location_compat(explicit_locs, text, title, snippet)
+            if loc_status == "mismatch":
+                a.rejection_reason = "explicit_location_mismatch"
+                self.explicit_location_mismatch_rejected_count += 1
+                self._note_prejudge_reject("explicit_location_mismatch", sel_cons)
+                return a
+            if loc_status == "supported":
+                self.explicit_location_supported_count += 1
+            elif loc_status == "ambiguous":
+                self.explicit_location_ambiguous_kept_count += 1
+                a.needs_location_support = True
         # 6) per-slot constraint support via the generic recognizers (NOT raw overlap).
         proposed, supports, contradicts = [], set(), set()
         for slot in slots:
@@ -593,6 +758,58 @@ class EvidenceInterpreter:
             judge_cap = getattr(self.judge, "max_calls_per_candidate", 6) if judge_on else 0
             judged_here = 0
             stop_candidate = False                      # contradiction early-stop (5f-H)
+            # Level 5i-K3: batch judge one (source, candidate) over all constraints in a single
+            # cached call. Per-constraint verdicts + post-model hard rules are preserved, so
+            # support materializes identically to the per-constraint path.
+            if judge_on and getattr(self.judge, "batch_enabled", False) and cons:
+                det_by, rel_by, obj_by = {}, {}, {}
+                for c in cons:
+                    st, q = recognize_constraint_support(
+                        c, text, role_e, source_role, title, snippet, contaminated=contaminated)
+                    det_by[c.constraint_id] = (st, q)
+                    rel = len(getattr(c, "applies_to", []) or []) > 1
+                    rel_by[c.constraint_id] = rel
+                    obj_by[c.constraint_id] = ((not rel)
+                                               or _object_anchored(c, slot, frame, frontier, text_l))
+                results = self.judge.judge_batch(
+                    candidate_text=text, candidate_id=None, aliases=list(a.candidate_aliases),
+                    slot_id=slot.slot_id, slot_role=slot.slot_role,
+                    slot_descriptor=(getattr(slot, "descriptor_text", "") or slot.slot_name),
+                    constraints=cons, source_id=source_id, source_title=title,
+                    source_url=source_url, source_domain=_host(source_url),
+                    source_role=source_role, contaminated=contaminated, snippet=snippet,
+                    det_by_cid=det_by, relational_by_cid=rel_by, object_anchored_by_cid=obj_by)
+                for c in cons:
+                    jd = results[c.constraint_id]
+                    a.judgments.append(jd.to_dict())
+                    for al in jd.candidate_aliases:
+                        if al and al not in a.candidate_aliases:
+                            a.candidate_aliases.append(al)
+                    if stop_candidate:
+                        if jd.judgment == "contradiction":
+                            con.append(c.constraint_id)
+                        continue
+                    if jd.judgment == "full_support":
+                        sup.append(c.constraint_id)
+                    elif jd.judgment == "contradiction":
+                        con.append(c.constraint_id)
+                        if _is_blocking(c):             # block support after a blocking contra
+                            stop_candidate = True
+                    elif jd.judgment == "partial_support":
+                        partial.append(c.constraint_id)
+                    elif jd.judgment == "requires_read":
+                        req_read.append(c.constraint_id)
+                if is_known and not sup:
+                    continue
+                proposed.append(slot.slot_id)
+                a.slot_support[slot.slot_id] = [sorted(sup), sorted(con)]
+                if partial:
+                    a.slot_partial[slot.slot_id] = sorted(partial)
+                if req_read:
+                    a.slot_requires_read[slot.slot_id] = sorted(req_read)
+                supports.update(sup)
+                contradicts.update(con)
+                continue
             for c in cons:
                 status, q = recognize_constraint_support(
                     c, text, role_e, source_role, title, snippet, contaminated=contaminated)
@@ -670,6 +887,32 @@ class EvidenceInterpreter:
             title, snippet)
         a.confidence = (0.4 if source_role in WEAK_ROLES else 0.85) + 0.1 * bool(supports)
         return a
+
+    def _note_prejudge_reject(self, reason: str, sel_cons) -> None:
+        """Record a pre-judge triage rejection (5i-K1) and the judge calls it saved."""
+        self.prejudge_rejected_count += 1
+        self.prejudge_rejected_by_reason[reason] += 1
+        if self.judge is not None and getattr(self.judge, "enabled", False):
+            saved = max(1, len(sel_cons or []))
+            self.judge_calls_saved_by_prejudge_triage += saved
+
+    @staticmethod
+    def _location_compat(explicit_locs: set, text: str, title: str, snippet: str) -> str:
+        """Compatibility of a candidate's source location against the explicit facet (5i-K2):
+        ``supported`` (explicit location present) / ``mismatch`` (only a different location,
+        no branch cue) / ``ambiguous`` (no location named) / ``ok``."""
+        body = f"{title} {snippet}"
+        present = _locations_in_context(body)
+        if explicit_locs & present:
+            return "supported"
+        other = present - explicit_locs
+        low = body.lower()
+        has_branch = any(cue in low for cue in _LOCATION_BRANCH_CUES)
+        if other and not has_branch:
+            return "mismatch"
+        if not present:
+            return "ambiguous"
+        return "ok"
 
     def _assert_constraint(self, con, source_role, text_l, title, snippet) -> ConstraintAssertion:
         cid = con.constraint_id

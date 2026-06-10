@@ -47,6 +47,11 @@ def main() -> int:
     headline = bool(verdict.get("headline_eligible_memory_claim",
                     report.get("headline_eligible_memory_claim",
                                elig.get("headline_eligible_memory_claim", report.get("headline_eligible")))))
+    # 5i-N: a debug/dev slice is NEVER headline eligible — claims stay conservative even if a
+    # tiny slice happened to satisfy other gates. (Existing headline criteria still apply too.)
+    from regimes_probe.eval.debug_slice import is_debug_slice_report
+    if is_debug_slice_report(report):
+        headline = False
     reasons = (verdict.get("reasons") or report.get("headline_eligibility_reasons")
                or elig.get("headline_eligibility_reasons") or elig.get("reasons") or [])
     checks = elig.get("checks", {})

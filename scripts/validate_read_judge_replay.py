@@ -32,8 +32,14 @@ _DEFAULT_ARTIFACTS = "results/live/browsecomp-llm-evidence-judge-5g-smoke-001"
 def main() -> int:
     ap = argparse.ArgumentParser(description="Offline read→judge replay validation (5j).")
     ap.add_argument("--artifacts", default=_DEFAULT_ARTIFACTS,
-                    help="recorded run dir to replay (reports unvalidated_cache_miss if absent)")
+                    help="recorded run dir to replay (reconstructs from debug_questions.jsonl "
+                         "+ caches; reports per-stage reasons; unvalidated_cache_miss if absent)")
     ap.add_argument("--json", action="store_true", help="emit a machine-readable JSON blob")
+    ap.add_argument("--allow-live-judge", action="store_true",
+                    help="OPT-IN: allow ONLY the targeted re-judgment to call the model live "
+                         "(all tool/provider data stays from cache); off by default")
+    ap.add_argument("--max-judge-calls", type=int, default=20,
+                    help="hard cap on live re-judgment calls (fail-closed when reached)")
     args = ap.parse_args()
 
     out: dict = {}
@@ -60,10 +66,16 @@ def main() -> int:
     # C — fixture-level mechanism effects (triage savings + promotion safety).
     out["C_fixture_effects"] = run_triage_promotion_fixture(
         json.loads(_TRIAGE_FIXTURE.read_text(encoding="utf-8")))
-    # Real-artifacts replay (honest cache-miss when absent).
-    av = validate_artifacts_dir(args.artifacts)
+    # Real-artifacts replay: reconstruct from a legacy run dir (per-stage reasons), honest
+    # cache-miss only when nothing is inspectable. Live re-judgment is OPT-IN + capped.
+    av = validate_artifacts_dir(args.artifacts, allow_live_judge=args.allow_live_judge,
+                                max_judge_calls=args.max_judge_calls)
     out["artifacts_replay"] = {"path": args.artifacts, **av.to_dict()}
-    out["live_calls"] = {"provider": 0, "model": 0}
+    out["live_calls"] = {"provider": int(av.metrics.get("live_provider_calls", 0)),
+                         "model": int(av.metrics.get("live_model_calls", 0))}
+    out["live_judge_tier"] = {"enabled": bool(args.allow_live_judge),
+                              "max_judge_calls": args.max_judge_calls,
+                              "default_is_offline": True}
 
     if args.json:
         print(json.dumps(out, indent=2))
@@ -88,9 +100,22 @@ def main() -> int:
           f"generic/title/chrome promotions={c['fixture_generic_source_candidate_promotion_count']}; "
           f"location_mismatch_promoted={c['explicit_location_mismatch_promoted_count']}")
     print(f"\nReal artifacts ({args.artifacts}): {av.overall_status}")
+    if av.obligations:
+        pm = av.metrics
+        print(f"   reconstructed={pm.get('reconstructed_count')} "
+              f"body_located={pm.get('body_located_count')} "
+              f"passages_scanned={pm.get('passages_scanned_count')} "
+              f"judged={pm.get('judged_count')} closed={pm.get('closed_count')}; "
+              f"beyond_4000={pm.get('passages_found_beyond_4000_count')}")
+        print(f"   stage_reasons: {json.dumps(pm.get('stage_reason_counts', {}))}")
     for nnote in av.notes:
         print(f"   note: {nnote}")
-    print("\nNo live provider/model calls were made. No benchmark/accuracy/memory claim is made.")
+    live_n = int(av.metrics.get("live_model_calls", 0))
+    print(f"\nLive judge tier: enabled={args.allow_live_judge} "
+          f"(default offline); live_model_calls={live_n}, live_provider_calls=0.")
+    if not args.allow_live_judge:
+        print("No live provider/model calls were made.")
+    print("No benchmark/accuracy/memory/generalization claim is made.")
     return 0
 
 

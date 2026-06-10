@@ -534,3 +534,26 @@ a silent pass. The **metric-derivation parity check** (`eval/metric_derivation.v
 recomputes event-backed metrics from the event log and asserts they match the inline counters —
 run as part of `pytest` (`tests/test_replay_validation_5j.py`). No live provider/model call is
 made and no benchmark/accuracy/memory/generalization claim follows from any of this.
+
+**Level 5k — real-artifact replay + opt-in live-judge tier.** The offline validator now
+consumes a real `results/live` run directory (not only synthetic fixtures):
+
+    python scripts/validate_read_judge_replay.py --artifacts results/live/<run-id> --json
+    python scripts/validate_read_judge_replay.py --artifacts results/live/<run-id> \
+        --allow-live-judge --max-judge-calls 20 --json
+
+Default (no `--allow-live-judge`) makes **zero** live calls: it reconstructs `requires_read`
+obligations from `debug_questions.jsonl` (a pre-5h trace has the judge events but not
+`PendingReadJudgment` objects — marked `reconstructed_from_legacy_trace`), locates the read
+body from the `cache/` RecordingCache (using the fuller `raw` payload when `store_raw` was on,
+so beyond-4000 retrieval is validated with no spend), runs the deterministic passage scan with
+question/constraint/target anchors (**never gold**), and reports a precise per-stage outcome
+(`reconstructed → body_located → passages_scanned → judged → closed`) with a reason such as
+`rejudgment_prompt_not_in_cache` — it does not collapse to a generic `unvalidated_cache_miss`
+when artifacts are inspectable. The **opt-in middle tier** (`--allow-live-judge`) lets ONLY the
+new targeted re-judgment call the model, capped by `--max-judge-calls`, **fail-closed** when the
+cap is reached, recording each verdict into the run's judge cache so the next replay is fully
+offline; all tool/provider data stays from cache and is never re-fetched, and `live_model_calls`
+is reported accurately. This is the standard way to validate a future judge/prompt change
+against historical traces without re-spending search budget. No benchmark/accuracy/memory claim
+follows from any of it.

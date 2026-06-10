@@ -1841,6 +1841,33 @@ class CandidateFrontier:
         return {"supports": "full_support", "contradicts": "contradiction",
                 "insufficient": "still_unresolved"}.get(det_status, "irrelevant")
 
+    # ---------- 5k-6: adaptive bounded re-read for truncation (LIVE runs only) ----------
+    def plan_reread_for_truncation(self, *, candidate_id, source_url, body_truncated_for_storage,
+                                   pending_resolved):
+        """LIVE-ONLY: if a read of a TRUNCATED body could not close a pending obligation,
+        return a single bounded re-read plan at a higher cap (``reread_max_chars``). Returns
+        ``None`` (no re-read) unless a pending obligation exists for this source AND the first
+        capped read both truncated and failed to close. Replay never calls this (it must not
+        fetch). The caller is responsible for actually issuing the (cached/live) fetch."""
+        if pending_resolved or not body_truncated_for_storage:
+            return None
+        pend = [p for p in self._open_pending_for(candidate_id, source_url)]
+        if not pend:
+            return None
+        # at most one re-read per obligation.
+        fresh = [p for p in pend if not getattr(p, "_reread_done", False)]
+        if not fresh:
+            return None
+        for p in fresh:
+            p._reread_done = True
+        cap = self.read_config.reread_max_chars
+        self._emit("read_reread_due_to_truncation", candidate_id=candidate_id,
+                   data={"url_host": _host(source_url), "reread_max_chars": cap,
+                         "pending_count": len(fresh)})
+        return {"url": source_url, "candidate_id": candidate_id, "reread_max_chars": cap,
+                "reason": "pending_judgment_unresolved_after_truncated_read",
+                "pending_read_judgment_ids": [p.pending_read_judgment_id for p in fresh]}
+
     def _head_noun(self, descriptor: str, slot) -> str:
         from regimes_probe.agent.task_frame import _ROLE_TRIGGERS
         toks = re.findall(r"[A-Za-z][A-Za-z'&]+", descriptor or "")

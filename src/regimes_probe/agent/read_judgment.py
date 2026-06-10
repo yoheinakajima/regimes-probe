@@ -36,10 +36,26 @@ _STOP = frozenset({
 
 @dataclass(frozen=True)
 class ReadJudgmentConfig:
-    """Cheap, deterministic defaults — do NOT raise the cap as the only fix (5h-B)."""
+    """Cheap, deterministic defaults — do NOT raise the cap as the only fix (5h-B).
+
+    5k-6 read-cap policy (config, not hardcode): the GLOBAL ``page_fetch`` adapter cap stays at
+    its conservative default (4000 chars) so ordinary reads stay cheap; a read that is BACKED by
+    a pending read-judgment may use a higher ``read_judgment_max_chars`` cap, because the judge
+    input is already bounded by ``read_passage_window_chars`` (so a bigger fetch does not blow up
+    judge cost — it only widens where a passage can be found). A single bounded RE-READ at
+    ``reread_max_chars`` is allowed (live runs only) when a truncated read cannot close a pending
+    obligation; replay never fetches."""
     read_max_chars_total: int = 20000
     read_passage_window_chars: int = 400
     read_max_passages_per_pending_judgment: int = 4
+    #: global adapter default (kept conservative/cheap).
+    page_fetch_default_max_chars: int = 4000
+    #: higher cap for a read-judgment-backed read (judge input still bounded by passage windows).
+    read_judgment_max_chars: int = 12000
+    #: single bounded re-read cap when a truncated read cannot close a pending obligation.
+    reread_max_chars: int = 16000
+    #: never re-read unboundedly; a re-read fires at most once per obligation.
+    max_rereads_per_pending_judgment: int = 1
 
 
 DEFAULT_READ_CONFIG = ReadJudgmentConfig()

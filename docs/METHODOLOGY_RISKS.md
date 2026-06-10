@@ -586,3 +586,19 @@ set — and the risk surface. Keep the experiment honest:
   And the parser duplicate-referent work is **diagnostics only** — the prompt nudge is staged,
   not applied, and no coreference cost reduction is claimed. The whole pass makes **zero** live
   provider/model calls and adds **no** benchmark/accuracy/memory/generalization claim.
+
+- **Level 5k — replaying a real trace without over-claiming.** Consuming a *real* run directory
+  introduces three honesty hazards. (1) *Calling a reconstruction a closure*: a pre-5h trace has
+  no `PendingReadJudgment` objects and never executed the 5h targeted re-judgment, so the loader
+  reconstructs obligations (flagged `reconstructed_from_legacy_trace`) and stops at
+  `rejudgment_prompt_not_in_cache` — it validates reconstruction + passage extraction, but does
+  **not** claim judge closure offline. (2) *A passage scan that secretly uses the answer*: scan
+  anchors are derived only from the question, the frame constraints, the target descriptor, and
+  recorded subject aliases — **never gold** — so finding a passage is a retrieval fact, not an
+  answer leak; the "beyond 4000 chars" claim is only made when the *raw* cached payload actually
+  contains the text (`body_source=raw_cache_payload`, `cached_payload_chars` recorded), and
+  truncation is asserted only when the fuller payload is also exhausted. (3) *A "validation" that
+  quietly re-spends*: the live-judge tier is opt-in, lets ONLY the re-judgment call the model
+  (never re-fetches tools), is hard-capped and fail-closed, and records verdicts so the next
+  replay is free — and it is off by default, exercised by no test. The default path makes zero
+  live calls and the whole pass adds no benchmark/accuracy/memory/generalization claim.

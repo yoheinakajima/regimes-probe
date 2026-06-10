@@ -22,10 +22,14 @@ Trajectory/fixture schema (JSON)::
 from __future__ import annotations
 
 import json
+import re
+from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Callable, Optional
+
+from regimes_probe.agent.read_judgment import _host, extract_passages
 
 #: per-obligation closure codes (a superset of the frontier's internal resolution strings).
 CLOSURE_CODES = (
@@ -60,12 +64,25 @@ class ObligationOutcome:
     passage_count: int = 0
     used_full_body_not_snippet: bool = False
     first_hit_offset: int = -1
+    # Level 5k legacy-reconstruction + per-stage pipeline visibility.
+    reconstructed_from_legacy_trace: bool = False
+    pipeline_status: str = "reconstructed"     # reconstructed|body_located|passages_scanned|judged|closed
+    stage_reason: str = ""
+    item_id: str = ""
+    body_source: str = ""                      # stored_body|raw_cache_payload|debug_preview|none
+    stored_body_chars: int = 0
+    cached_payload_chars: int = 0
+    passages_found_beyond_4000: bool = False
+    body_truncated_before_relevant_passage: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {k: getattr(self, k) for k in (
             "pending_read_judgment_id", "candidate_id", "slot_id", "constraint_id",
             "source_url", "closure_code", "read_replayed", "passage_anchor_hits",
-            "passage_count", "used_full_body_not_snippet", "first_hit_offset")}
+            "passage_count", "used_full_body_not_snippet", "first_hit_offset",
+            "reconstructed_from_legacy_trace", "pipeline_status", "stage_reason", "item_id",
+            "body_source", "stored_body_chars", "cached_payload_chars",
+            "passages_found_beyond_4000", "body_truncated_before_relevant_passage")}
 
 
 @dataclass
@@ -316,21 +333,413 @@ def run_triage_promotion_fixture(fixture: dict, *,
     }
 
 
+# --------------------------------------------------------------------------- legacy loader
+#: 5k per-stage / per-reason diagnostics. The pipeline a real obligation can reach offline is
+#: reconstructed → body_located → passages_scanned → judged → closed; the new targeted
+#: re-judgment cannot exist in a pre-5h cache, so ``judged``/``closed`` are gated on a live
+#: judge (opt-in, capped) unless a recorded re-judgment is already present.
+STAGE_REASONS = (
+    "no_pending_read_judgment_events", "pending_read_judgment_not_persisted_in_old_run",
+    "read_event_found_but_body_missing", "body_found_but_judge_cache_missing",
+    "rejudgment_prompt_not_in_cache", "body_truncated_before_relevant_passage",
+    "source_url_mismatch", "cache_schema_unknown", "rejudgment_call_budget_exhausted",
+    "reconstructed_and_passages_scanned", "closed_by_live_rejudgment", "other")
+
+_ADAPTER_CAP_DEFAULT = 4000
+
+#: read→judge lifecycle events persisted for exact future replay (5k-5).
+_PERSIST_EVENT_TYPES = (
+    "read_required_by_judge", "read_desired", "read_selected", "read_blocked_no_url",
+    "read_blocked_disallowed_tool", "read_selected_for_pending_judgment",
+    "read_completed_for_pending_judgment", "read_passage_selected", "read_judged_after_read",
+    "read_judgment_resolved", "read_judgment_still_unresolved", "read_interpreted")
+
+
+def export_read_judge_replay(frontier, *, item_id: str = "", max_passage_chars: int = 2000,
+                             fetch_meta_by_url: dict | None = None) -> dict[str, Any]:
+    """Level 5k-5: serialize the read→judge lifecycle for EXACT future replay without
+    reconstruction — PendingReadJudgment records, read lifecycle events, per-source fetch_meta,
+    bounded passage windows, and closure codes. Bounded + contamination-safe: only passage
+    windows (not full pages), and never gold/answer text. Intended to be written to a run's
+    ``read_judge_replay_validation.json``."""
+    fetch_meta_by_url = fetch_meta_by_url or {}
+    pend = []
+    for p in getattr(frontier, "pending_read_judgments", {}).values():
+        rec = p.to_dict() if hasattr(p, "to_dict") else dict(p)
+        rec["passage_preview"] = (getattr(p, "passage_preview", "") or "")[:max_passage_chars]
+        rec["closure_code"] = _RESOLUTION_TO_CLOSURE.get(
+            getattr(p, "resolution", "open"), "requires_read_still_open")
+        pend.append(rec)
+    events = [{"event_type": e.get("event_type"), "candidate_id": e.get("candidate_id"),
+               "slot_id": e.get("slot_id"), "data": e.get("data", {})}
+              for e in getattr(frontier, "events", [])
+              if e.get("event_type") in _PERSIST_EVENT_TYPES]
+    return {
+        "schema": "read_judge_replay_v1", "item_id": item_id,
+        "reconstructed_from_legacy_trace": False,
+        "pending_read_judgments": pend,
+        "read_judge_events": events,
+        "fetch_meta_by_url": {u: dict(m) for u, m in fetch_meta_by_url.items()},
+        "note": ("bounded + contamination-safe persistence for exact offline replay; "
+                 "no gold/answer text; passage windows only, not full pages"),
+    }
+
+
+def _load_provider_bodies(run_dir: Path) -> dict[str, dict[str, Any]]:
+    """Build ``url -> {stored_body, raw_payload?}`` from any RecordingCache JSON under the run
+    dir (``cache/`` + top-level ``*_cache.json``). Robust to the recording schema in
+    ``live/cache.py`` (``entries[].response.results[].snippet`` is the stored page body)."""
+    out: dict[str, dict[str, Any]] = {}
+    candidates: list[Path] = []
+    cdir = run_dir / "cache"
+    if cdir.is_dir():
+        candidates += sorted(cdir.glob("*.json"))
+    candidates += sorted(run_dir.glob("*provider*cache*.json"))
+    candidates += sorted(run_dir.glob("*tool*cache*.json"))
+    for cf in candidates:
+        try:
+            data = json.loads(cf.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        entries = data.get("entries") if isinstance(data, dict) else None
+        if not isinstance(entries, list):
+            continue
+        for e in entries:
+            resp = (e or {}).get("response") or {}
+            results = resp.get("results") or []
+            raw = e.get("raw")
+            for r in results:
+                url = (r or {}).get("url") or resp.get("query") or ""
+                if not url:
+                    continue
+                rec = out.setdefault(url, {})
+                body = (r or {}).get("snippet") or ""
+                if len(body) > len(rec.get("stored_body", "")):
+                    rec["stored_body"] = body
+                fm = resp.get("fetch_meta") or {}
+                if fm.get("fetched_chars"):
+                    rec["fetch_meta"] = fm
+                if isinstance(raw, str) and len(raw) > len(rec.get("raw_payload", "")):
+                    rec["raw_payload"] = raw
+    return out
+
+
+def _anchor_terms_for_constraint(record: dict, constraint_id: str, slot_id: str) -> list[str]:
+    """Anchors for passage scan are derived from QUESTION + frame constraint terms + target
+    descriptor + recorded subject aliases — NEVER gold answers (5k requirement)."""
+    anchors: list[str] = []
+    seen: set[str] = set()
+
+    def _add(s: str) -> None:
+        s = (s or "").strip()
+        if len(s) >= 3 and s.lower() not in seen:
+            anchors.append(s)
+            seen.add(s.lower())
+
+    frame = record.get("task_frame") or {}
+    for c in frame.get("constraints", []) or []:
+        if c.get("constraint_id") == constraint_id:
+            for t in (c.get("normalized_terms") or []):
+                _add(str(t))
+            for w in re.findall(r"\b(1[5-9]\d{2}|20\d{2})\b", c.get("text_span", "") or ""):
+                _add(w)
+    for s in (frame.get("target_answer_slots") or []):
+        if s.get("slot_id") == slot_id or True:
+            for w in re.findall(r"[A-Za-z]{4,}", s.get("descriptor", "") or s.get("slot_name", "")):
+                _add(w)
+    # subject aliases recorded on the slate candidate (answer-free).
+    cf = record.get("candidate_frontier") or {}
+    for sl in cf.get("slates", []) or []:
+        for cand in sl.get("top_candidates", []) or []:
+            _add(cand.get("candidate_text_preview", ""))
+    if not anchors:                                    # fall back to question content tokens
+        for w in re.findall(r"[A-Za-z]{4,}", record.get("question_preview", "") or ""):
+            _add(w)
+    return anchors[:24]
+
+
+def _reconstruct_obligations(record: dict) -> list[dict]:
+    """Heuristically reconstruct requires_read obligations from a pre-5h debug record:
+    a judge ``requires_read`` verdict + its candidate/slot/constraint + a later read of the
+    same source url. Marked ``reconstructed_from_legacy_trace`` and diagnostic-only."""
+    cf = record.get("candidate_frontier") or {}
+    events = cf.get("events") or []
+    obligations: list[dict] = []
+    # 1) native 5h pending objects, if the run already persisted them.
+    for p in (cf.get("pending_read_judgments") or []):
+        obligations.append({**p, "reconstructed_from_legacy_trace": False, "native": True})
+    if obligations:
+        return obligations
+    # 2) legacy reconstruction from requires_read judge events.
+    for e in events:
+        if e.get("event_type") not in ("evidence_judgment_requires_read", "read_required_by_judge"):
+            continue
+        data = e.get("data", {}) or {}
+        obligations.append({
+            "candidate_id": e.get("candidate_id") or data.get("candidate_id") or "",
+            "slot_id": e.get("slot_id") or data.get("slot_id") or "",
+            "constraint_id": data.get("constraint_id") or "",
+            "reconstructed_from_legacy_trace": True, "native": False})
+    return obligations
+
+
+def _read_url_for(record: dict, candidate_id: str) -> str:
+    """Find the source url that was (or should be) read for a candidate, from read calls /
+    evidence / frontier events — without using gold."""
+    cf = record.get("candidate_frontier") or {}
+    for e in cf.get("events", []) or []:
+        if e.get("event_type") in ("read_selected", "read_desired") \
+                and (e.get("candidate_id") == candidate_id):
+            host = e.get("data", {}).get("url_host")
+            if host:
+                for ev in (record.get("evidence") or []):
+                    if host in (ev.get("url") or ""):
+                        return ev.get("url")
+    for c in record.get("calls", []) or []:
+        ta = c.get("task_action") or {}
+        if ta.get("candidate_id") == candidate_id and (
+                "read" in (ta.get("kind", "") + ta.get("frontier_action_type", ""))):
+            er = c.get("evidence_record") or {}
+            if er.get("url"):
+                return er["url"]
+            if _looks_url(ta.get("query_text_preview", "")):
+                return ta["query_text_preview"]
+    # else: the first non-contaminated evidence url for this item (best-effort).
+    for ev in (record.get("evidence") or []):
+        if not ev.get("benchmark_contaminated") and _looks_url(ev.get("url", "")):
+            return ev["url"]
+    return ""
+
+
+def _looks_url(s: str) -> bool:
+    return isinstance(s, str) and s.strip().lower().startswith(("http://", "https://"))
+
+
+def load_legacy_run(run_dir: str | Path, *, allow_live_judge: bool = False,
+                    max_judge_calls: int = 0,
+                    judge_factory: Optional[Callable[[], Any]] = None) -> ReplayValidationResult:
+    """Inspect a REAL run directory and reconstruct/validate the read→judge pipeline as far as
+    the artifacts allow (5k-1/2/3). Never fetches. Per obligation it reports how far it got
+    (reconstructed → body_located → passages_scanned → judged → closed) with a precise reason.
+
+    The targeted re-judgment is NEW computation that cannot exist in a pre-5h cache, so it is
+    reported ``rejudgment_prompt_not_in_cache`` unless ``allow_live_judge`` is set (opt-in,
+    capped by ``max_judge_calls``, fail-closed, recording into the run's judge cache)."""
+    run_dir = Path(run_dir)
+    res = ReplayValidationResult(overall_status="validated")
+    res.notes.append("reconstructed_from_legacy_trace (diagnostic only; NOT headline evidence)")
+    dqf = run_dir / "debug_questions.jsonl"
+    if not dqf.exists():
+        return _absent_or_unknown(run_dir, res)
+    bodies = _load_provider_bodies(run_dir)
+    judge_cache_path = run_dir / "llm_evidence_judge_cache.json"
+    live_judge = None
+    live_calls = 0
+    if allow_live_judge:
+        live_judge = (judge_factory or deterministic_replay_judge)()
+
+    n_items = 0
+    for line in dqf.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            record = json.loads(line)
+        except Exception:
+            res.notes.append("cache_schema_unknown:debug_questions_line_not_json")
+            continue
+        n_items += 1
+        item_id = record.get("item_id", "")
+        obs = _reconstruct_obligations(record)
+        if not obs:
+            res.replay_events.append({"event_type": "no_pending_read_judgment_events",
+                                      "item_id": item_id})
+            continue
+        for i, ob in enumerate(obs):
+            o = ObligationOutcome(
+                pending_read_judgment_id=ob.get("pending_read_judgment_id", f"recon_{item_id}_{i}"),
+                candidate_id=ob.get("candidate_id", ""), slot_id=ob.get("slot_id", ""),
+                constraint_id=ob.get("constraint_id", ""), source_url="",
+                closure_code="unvalidated_cache_miss",
+                reconstructed_from_legacy_trace=bool(ob.get("reconstructed_from_legacy_trace")),
+                item_id=item_id, pipeline_status="reconstructed")
+            url = ob.get("source_url") or _read_url_for(record, o.candidate_id)
+            o.source_url = url
+            if not url:
+                o.stage_reason = "read_event_found_but_body_missing"
+                res.obligations.append(o)
+                continue
+            body_rec = bodies.get(url)
+            if not body_rec:
+                # fall back to the bounded debug snippet preview (clearly marked).
+                prev = next((ev.get("snippet_preview", "") for ev in (record.get("evidence") or [])
+                             if ev.get("url") == url), "")
+                if prev:
+                    body_rec = {"stored_body": prev, "from_preview": True}
+                else:
+                    o.stage_reason = "read_event_found_but_body_missing"
+                    res.obligations.append(o)
+                    continue
+            stored = body_rec.get("stored_body", "")
+            raw = body_rec.get("raw_payload", "")
+            o.stored_body_chars = len(stored)
+            o.cached_payload_chars = max(len(stored), len(raw))
+            # use the FULLER raw payload when present (validates beyond-cap retrieval, no spend).
+            body = raw if len(raw) > len(stored) else stored
+            o.body_source = ("raw_cache_payload" if len(raw) > len(stored)
+                             else ("debug_preview" if body_rec.get("from_preview") else "stored_body"))
+            o.pipeline_status = "body_located"
+            anchors = _anchor_terms_for_constraint(record, o.constraint_id, o.slot_id)
+            scan = extract_passages(body, anchors)
+            o.passage_anchor_hits = scan.passage_anchor_hits
+            o.passage_count = scan.passage_count
+            o.first_hit_offset = scan.first_hit_offset
+            o.passages_found_beyond_4000 = scan.first_hit_offset > _ADAPTER_CAP_DEFAULT
+            o.pipeline_status = "passages_scanned"
+            # truncation: only assertable when the FULLER payload is also exhausted.
+            if not scan.hit and o.cached_payload_chars <= _ADAPTER_CAP_DEFAULT:
+                o.body_truncated_before_relevant_passage = True
+                o.stage_reason = "body_truncated_before_relevant_passage"
+            # judged/closed: new computation -> needs the live-judge tier (opt-in, capped).
+            recorded = _recorded_rejudgment(judge_cache_path)
+            if recorded:
+                o.pipeline_status, o.closure_code = "judged", "resolved_full_support"
+                o.stage_reason = "reconstructed_and_passages_scanned"
+            elif allow_live_judge and scan.passages:
+                if live_calls >= max_judge_calls:          # hard cap, fail-closed (0 = none)
+                    o.stage_reason = "rejudgment_call_budget_exhausted"
+                else:
+                    cand_text = _candidate_text(record, o.candidate_id, url)
+                    verdict, was_live = _live_rejudge(live_judge, o, record, cand_text,
+                                                      scan.passages[0], judge_cache_path)
+                    live_calls += int(was_live)
+                    o.pipeline_status = "judged"
+                    o.closure_code = _RESOLUTION_TO_CLOSURE.get(verdict, "requires_read_still_open")
+                    o.stage_reason = "closed_by_live_rejudgment"
+                    res.replay_events.append({"event_type": "read_judged_after_read",
+                                              "item_id": item_id, "verdict": verdict})
+            else:
+                o.stage_reason = o.stage_reason or "rejudgment_prompt_not_in_cache"
+            res.obligations.append(o)
+
+    _summarize_legacy(res, n_items, live_calls)
+    return res
+
+
+def _recorded_rejudgment(judge_cache_path: Path) -> bool:
+    """A pre-5h cache cannot contain the 5h targeted re-judgment prompt; this hook lets a
+    FUTURE run that DID persist one be recognised. Conservative: returns False unless a
+    re-judgment marker key is present."""
+    if not judge_cache_path.exists():
+        return False
+    try:
+        store = json.loads(judge_cache_path.read_text(encoding="utf-8"))
+    except Exception:
+        return False
+    return any("rejudgment" in str(k).lower() or "pending_read" in str(k).lower()
+               for k in (store or {}))
+
+
+def _candidate_text(record: dict, candidate_id: str, url: str) -> str:
+    """A display name for the obligation's candidate (answer-free): the evidence title for the
+    read url, else the first slate candidate preview, else the candidate id."""
+    for ev in (record.get("evidence") or []):
+        if ev.get("url") == url and ev.get("title_preview"):
+            return ev["title_preview"]
+    cf = record.get("candidate_frontier") or {}
+    for sl in cf.get("slates", []) or []:
+        for c in sl.get("top_candidates", []) or []:
+            if c.get("candidate_text_preview"):
+                return c["candidate_text_preview"]
+    return candidate_id
+
+
+def _live_rejudge(judge, o: ObligationOutcome, record: dict, candidate_text: str,
+                  passage: str, judge_cache_path: Path) -> tuple[str, bool]:
+    """Run ONE targeted re-judgment live on a passage (5k-4). Inputs are passage + obligation
+    metadata only — never gold; contaminated sources are excluded upstream. Records the verdict
+    into the run's judge cache so the next replay is fully offline."""
+    cons = (record.get("task_frame") or {}).get("constraints") or []
+    con = next((c for c in cons if c.get("constraint_id") == o.constraint_id), {})
+    con_obj = SimpleNamespace(constraint_id=o.constraint_id,
+                              text_span=con.get("text_span", o.constraint_id),
+                              normalized_terms=con.get("normalized_terms", []),
+                              testable_claim="", how_to_test="read",
+                              applies_to=con.get("applies_to", [o.slot_id]))
+    before = getattr(judge, "calls", 0)
+    jd = judge.judge(
+        candidate_text=candidate_text, candidate_id=o.candidate_id, aliases=[],
+        slot_id=o.slot_id, slot_role="person", slot_descriptor="", constraint=con_obj,
+        source_id=o.pending_read_judgment_id, source_title="", source_url=o.source_url,
+        source_domain=_host(o.source_url), source_role="article", contaminated=False,
+        snippet=passage, det_status="insufficient", det_quote="")
+    was_live = getattr(judge, "calls", 0) > before
+    # 5k-4: persist the verdict so the next replay of this validation is fully offline.
+    if was_live and judge_cache_path:
+        try:
+            store = (json.loads(judge_cache_path.read_text(encoding="utf-8"))
+                     if judge_cache_path.exists() else {})
+            store[f"rejudgment::{o.pending_read_judgment_id}"] = jd.judgment
+            judge_cache_path.write_text(json.dumps(store, sort_keys=True), encoding="utf-8")
+        except Exception:
+            pass
+    return jd.judgment, was_live
+
+
+def _summarize_legacy(res: ReplayValidationResult, n_items: int, live_calls: int) -> None:
+    obs = res.obligations
+    stage = Counter(o.pipeline_status for o in obs)
+    reasons = Counter(o.stage_reason for o in obs if o.stage_reason)
+    res.metrics = {
+        "n_items_inspected": n_items,
+        "replay_pending_read_judgment_count": len(obs),
+        "reconstructed_count": sum(1 for o in obs if o.reconstructed_from_legacy_trace),
+        "body_located_count": sum(1 for o in obs
+                                  if o.pipeline_status in ("body_located", "passages_scanned",
+                                                           "judged", "closed")),
+        "passages_scanned_count": sum(1 for o in obs
+                                      if o.pipeline_status in ("passages_scanned", "judged", "closed")),
+        "passages_found_beyond_4000_count": sum(1 for o in obs if o.passages_found_beyond_4000),
+        "body_truncated_before_relevant_passage_count":
+            sum(1 for o in obs if o.body_truncated_before_relevant_passage),
+        "judged_count": sum(1 for o in obs if o.pipeline_status in ("judged", "closed")),
+        "closed_count": sum(1 for o in obs if o.closure_code in _CLOSED),
+        "pipeline_status_counts": dict(stage),
+        "stage_reason_counts": dict(reasons),
+        "live_provider_calls": 0, "live_model_calls": live_calls,
+    }
+    if not obs:
+        res.overall_status = "unvalidated_cache_miss"
+    elif any(o.pipeline_status in ("judged", "closed") for o in obs):
+        res.overall_status = "validated"
+    else:
+        res.overall_status = "reconstructed_passages_scanned_rejudgment_pending"
+
+
 # --------------------------------------------------------------------------- artifacts
-def validate_artifacts_dir(path: str | Path) -> ReplayValidationResult:
-    """Validate a recorded run directory. Returns ``unvalidated_cache_miss`` (NOT a silent
-    pass) when the directory or its cached bodies/trajectory are absent (5j-A honesty rule)."""
+def validate_artifacts_dir(path: str | Path, *, allow_live_judge: bool = False,
+                           max_judge_calls: int = 0) -> ReplayValidationResult:
+    """Validate a recorded run directory. Prefers a committed ``replay_fixture.json``; else
+    reconstructs from a real legacy run (``debug_questions.jsonl`` + caches). Returns
+    ``unvalidated_cache_miss`` (NOT a silent pass) only when nothing is inspectable."""
     p = Path(path)
     fixture_file = p / "replay_fixture.json"
     if fixture_file.exists():
         return run_replay(json.loads(fixture_file.read_text(encoding="utf-8")))
-    res = ReplayValidationResult(overall_status="unvalidated_cache_miss")
+    if (p / "debug_questions.jsonl").exists():
+        return load_legacy_run(p, allow_live_judge=allow_live_judge,
+                               max_judge_calls=max_judge_calls)
+    return _absent_or_unknown(p, ReplayValidationResult(overall_status="unvalidated_cache_miss"))
+
+
+def _absent_or_unknown(p: Path, res: ReplayValidationResult) -> ReplayValidationResult:
+    res.overall_status = "unvalidated_cache_miss"
     if not p.exists():
         res.notes.append(f"artifacts_absent:{p} (cache/trajectory not present in this "
                          "container — gitignored live outputs; cannot replay)")
     else:
         present = sorted(f.name for f in p.glob("*"))
-        res.notes.append(f"no_replay_fixture_or_body_cache_in:{p}; present={present}")
+        res.notes.append(f"no_replay_fixture_or_debug_questions_in:{p}; present={present}")
     res.metrics = {"replay_pending_read_judgment_count": 0,
                    "replay_pending_read_unvalidated_cache_miss_count": 0,
                    "live_provider_calls": 0, "live_model_calls": 0}

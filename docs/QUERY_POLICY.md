@@ -1138,3 +1138,35 @@ explicitly why it cannot.
   duplicate-referent **diagnostics** are added, but the parser-prompt nudge is **staged** (not
   applied — it would change the parser prompt hash/cache) and no coreference cost reduction is
   claimed. Nothing here is a benchmark/accuracy/memory/generalization claim.
+
+#### Level 5k: real-artifact replay, opt-in live-judge tier, future-run persistence, bounded re-read
+
+5j proved the loop on a synthetic fixture; 5k consumes a **real** `results/live` run directory.
+
+- **Legacy reconstruction (1/2).** `load_legacy_run` reads `debug_questions.jsonl` + the
+  `cache/` RecordingCache(s) + `llm_evidence_judge_cache.json`. A pre-5h trace has the judge's
+  `evidence_judgment_requires_read` events but no `PendingReadJudgment` objects, so obligations
+  are reconstructed (candidate/slot/constraint + a later read of the same url), marked
+  `reconstructed_from_legacy_trace`. Each obligation reports how far it got —
+  `reconstructed → body_located → passages_scanned → judged → closed` — with a precise reason
+  (e.g. `rejudgment_prompt_not_in_cache`, `read_event_found_but_body_missing`,
+  `body_truncated_before_relevant_passage`), never a generic cache-miss when artifacts exist.
+- **Passage scan on real bodies, beyond the cap (3).** Anchors come from the question, the
+  constraint terms, the target descriptor, and recorded subject aliases — **never gold**. When
+  the raw provider payload (`store_raw`) is fuller than the 4000-char stored body, the scan runs
+  on it (`body_source=raw_cache_payload`) and records `cached_payload_chars` vs
+  `stored_body_chars` + `passages_found_beyond_4000`, validating beyond-cap retrieval on real
+  data with zero spend. `body_truncated_before_relevant_passage` is asserted only when the
+  fuller payload is also exhausted.
+- **Opt-in live-judge tier (4).** Because the targeted re-judgment is *new* computation that
+  cannot exist in the 5g cache, `--allow-live-judge --max-judge-calls N` lets ONLY that call go
+  live (tool/provider data stays cached, never re-fetched), hard-capped + fail-closed, recording
+  each verdict so the next replay is offline. Off by default; no test exercises it.
+- **Persistence + bounded re-read (5/6).** `export_read_judge_replay` persists the read→judge
+  lifecycle (PendingReadJudgment records, read events, per-url `fetch_meta`, bounded passage
+  windows, closure codes — contamination-safe, no gold) so future runs replay without
+  reconstruction. The read-cap policy is config, not hardcode: the global `page_fetch` cap stays
+  4000; read-judgment-backed reads may use `read_judgment_max_chars` (12000, since judge input is
+  bounded by passage windows); a single bounded `reread_max_chars` (16000) re-read fires at most
+  once per obligation, **live runs only** (replay never fetches), when a truncated read cannot
+  close a pending obligation.

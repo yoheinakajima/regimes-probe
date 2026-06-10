@@ -133,6 +133,8 @@ class Events:
     ABSTAIN_WITHHELD_EXECUTABLE_ACTION_AVAILABLE = "abstain_withheld_executable_action_available"
     SOURCE_ACQUISITION_REJECTED = "source_acquisition_rejected"
     DEPENDENT_SLOT_SEARCH_DEFERRED = "dependent_slot_search_deferred"
+    # Level 5k adaptive bounded re-read for truncation (live runs only)
+    READ_REREAD_DUE_TO_TRUNCATION = "read_reread_due_to_truncation"
     # Level 5f LLM evidence judge
     LLM_EVIDENCE_JUDGMENT_CREATED = "llm_evidence_judgment.created"
     LLM_EVIDENCE_JUDGMENT_ACCEPTED = "llm_evidence_judgment.accepted"
@@ -197,7 +199,7 @@ EVIDENCE_INTERPRETATION_EVENTS: tuple[str, ...] = (
     Events.BIND_TARGET_ANSWER_SLOT_PROPOSED, Events.BIND_TARGET_ANSWER_SLOT_SELECTED,
     Events.SEED_QUERY_GENERIC_BLOCKED, Events.FUZZY_DUPLICATE_QUERY_REJECTED,
     Events.ABSTAIN_WITHHELD_EXECUTABLE_ACTION_AVAILABLE, Events.SOURCE_ACQUISITION_REJECTED,
-    Events.DEPENDENT_SLOT_SEARCH_DEFERRED,
+    Events.DEPENDENT_SLOT_SEARCH_DEFERRED, Events.READ_REREAD_DUE_TO_TRUNCATION,
     Events.SOURCE_SUBJECT_EXTRACTED, Events.SOURCE_SUBJECT_PROMOTED,
     Events.SOURCE_SUBJECT_REJECTED, Events.SOURCE_SUBJECT_USED_FOR_CANDIDATE,
     Events.SOURCE_SUBJECT_USED_FOR_RELATION_SUPPORT,

@@ -59,13 +59,16 @@ class SearchResponse:
     latency_s: float = 0.0
     error: Optional[str] = None
     error_meta: Optional[dict[str, Any]] = None   # structured failure (sanitized)
+    #: 5j-B: read/fetch accounting (e.g. fetched_chars vs stored_body_chars + truncation
+    #: flags). Additive + optional, so non-fetch tools and the synthetic demo are unaffected.
+    fetch_meta: Optional[dict[str, Any]] = None
 
     @property
     def failed(self) -> bool:
         return self.error is not None
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        d = {
             "provider": self.provider,
             "query": self.query,
             "results": [r.to_dict() for r in self.results],
@@ -74,6 +77,9 @@ class SearchResponse:
             "error": self.error,
             "error_meta": self.error_meta,
         }
+        if self.fetch_meta is not None:
+            d["fetch_meta"] = self.fetch_meta
+        return d
 
 
 class SearchProvider(ABC):

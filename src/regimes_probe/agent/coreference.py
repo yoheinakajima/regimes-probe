@@ -116,6 +116,37 @@ def propose_coreference(frame, *, auto_merge: bool = False) -> list[CoreferenceP
     return proposals
 
 
+def parser_referent_diagnostics(frame) -> dict[str, Any]:
+    """Level 5j-E: DIAGNOSTICS ONLY (no merge). Estimate how many task-frame slots are likely
+    duplicate references to one real-world entity, so a future parser-prompt increment can
+    prefer one variable per referent. We never auto-merge here and claim NO cost reduction.
+
+    The actual parser-prompt nudge ("prefer one variable per real-world referent; do not split
+    'this author'/'the author'/'the same person'; keep restaurant/hotel/museum/founder/birth
+    year distinct; never merge a target answer slot with its subject") is STAGED as the next
+    parser-only increment — applying it changes the parser prompt hash/cache, so it is kept out
+    of this offline-validation patch to preserve replay/demo stability."""
+    props = propose_coreference(frame)
+    target_ids = {s.slot_id for s in getattr(frame, "target_answer_slots", [])}
+    entity_vars = [s for s in getattr(frame, "all_slots", [])
+                   if getattr(s, "slot_status", "unbound_variable") != "known_constant"]
+    # duplicate-referent estimate = extra person slots beyond one per proposed coref group.
+    dup_estimate = sum(max(0, len(p.source_slot_ids) - 1)
+                       for p in props if p.merge_status == "proposed_only")
+    target_subject_blocked = sum(
+        1 for p in props if p.rejection_reason == "never_merge_target_value_with_subject")
+    return {
+        "parser_entity_variable_count": len(entity_vars),
+        "parser_target_answer_slot_count": len(target_ids),
+        "parser_duplicate_referent_slot_count_estimate": dup_estimate,
+        # nothing is merged in this patch, so prevention is staged (a prompt-time future fix).
+        "parser_prevented_duplicate_referent_slots_count": 0,
+        "parser_target_subject_merge_blocked_count": target_subject_blocked,
+        "parser_prompt_nudge_status": "staged_next_parser_only_increment",
+        "claims_coreference_cost_reduction": False,
+    }
+
+
 def coreference_metrics(proposals) -> dict[str, Any]:
     """Aggregate proposal stats. ``invalid_coreference_collapse_count`` counts any APPLIED
     merge that violated a safety rule — pinned 0 (default never auto-merges)."""

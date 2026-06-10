@@ -570,3 +570,19 @@ set — and the risk surface. Keep the experiment honest:
   place to fool yourself*: the slice is `headline_eligible=false`, deterministic, and
   dataset-immutable, and `generate_claims` refuses any performance/memory claim for it — its only
   output is mechanism-detector deltas, which are debug labels, not results.
+
+- **Level 5j — proving a mechanism offline without fooling yourself.** The temptation in a
+  "validation pass" is to declare victory. Two controls prevent that. (1) *The data may not be
+  there*: the referenced live 5g cache is gitignored and absent in a fresh container, so the
+  replay must — and does — return `unvalidated_cache_miss` rather than silently pass; a closure
+  is only claimed on a committed *synthetic* fixture that is explicitly diagnostic, not the real
+  trace and not a benchmark. (2) *A pinned-zero counter is necessary but not sufficient*: 5j adds
+  fixture-level before/after effects (judge-call reduction, valid-candidate-regression count,
+  promotion counts) so a mechanism that "passes" its invariants but quietly regresses a valid
+  candidate would be visible. The truncation finding is stated precisely (an *adapter* cap, not
+  a provider/storage/display cap) so no full-document claim is made when the body was capped at
+  4000 chars. Metrics are checked for **event-derivation parity** (recomputed from the log,
+  compared to inline counters) so a counter cannot drift from the events it claims to summarise.
+  And the parser duplicate-referent work is **diagnostics only** — the prompt nudge is staged,
+  not applied, and no coreference cost reduction is claimed. The whole pass makes **zero** live
+  provider/model calls and adds **no** benchmark/accuracy/memory/generalization claim.

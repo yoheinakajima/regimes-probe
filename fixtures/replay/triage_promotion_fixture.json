@@ -1,0 +1,74 @@
+{
+  "question": "What restaurant in New Mexico opened in 1985?",
+  "valid_candidate": "Rio Adobe Cafe",
+  "frame": {
+    "target_answer_slots": [
+      {
+        "slot_id": "R",
+        "slot_name": "restaurant",
+        "slot_role": "organization",
+        "is_target_answer_slot": true,
+        "is_intermediate_slot": false
+      }
+    ],
+    "latent_slots": [],
+    "constraints": [
+      {
+        "constraint_id": "cr",
+        "text_span": "restaurant in New Mexico opened 1985",
+        "normalized_terms": [
+          "restaurant",
+          "1985"
+        ],
+        "applies_to": [
+          "R"
+        ],
+        "discriminative_score": 1.4,
+        "specificity_score": 1.4,
+        "required": true,
+        "priority": "high",
+        "blocks_answer_if_unresolved": true,
+        "testable_claim": "x",
+        "how_to_test": "read",
+        "semantic_label": "venue"
+      }
+    ],
+    "dependency_edges": [],
+    "known_context_terms": [
+      "New Mexico"
+    ]
+  },
+  "steps": [
+    {
+      "kind": "search",
+      "directed_slot": "restaurant",
+      "directed_constraints": [
+        "cr"
+      ],
+      "observations": [
+        {
+          "title": "Login",
+          "snippet": "Sign in / Subscribe / Datasets / Trending",
+          "url": "https://x.example/login"
+        },
+        {
+          "title": "Restaurant Definition & Meaning",
+          "snippet": "Restaurant: a place where meals are served.",
+          "url": "https://dictionary.example/restaurant"
+        },
+        {
+          "title": "Lone Star Grill",
+          "snippet": "Lone Star Grill is a restaurant located in Texas.",
+          "url": "https://x.example/lonestar",
+          "source_authority": 0.7
+        },
+        {
+          "title": "Rio Adobe Cafe",
+          "snippet": "Rio Adobe Cafe is a restaurant in New Mexico that opened in 1985.",
+          "url": "https://x.example/rioadobe",
+          "source_authority": 0.8
+        }
+      ]
+    }
+  ]
+}

@@ -69,12 +69,27 @@ class PassageScan:
     missing_anchors: list[str] = field(default_factory=list)
     hit: bool = False                 # at least one direct anchor hit
     head_only: bool = False           # the document was shorter than one window (head == all)
+    input_chars: int = 0              # 5j-B: chars of body handed in (pre-cap)
+    scanned_chars: int = 0            # 5j-B: chars actually scanned (after read_max_chars_total)
+    first_hit_offset: int = -1        # 5j-B: char offset of the first anchor hit (-1 = none)
+
+    @property
+    def passage_anchor_hits(self) -> int:
+        return len(self.matched_anchors)
+
+    @property
+    def passage_count(self) -> int:
+        return len(self.passages)
 
     def to_dict(self) -> dict[str, Any]:
         return {"n_passages": len(self.passages),
                 "matched_anchors": list(self.matched_anchors)[:12],
                 "missing_anchors": list(self.missing_anchors)[:12],
-                "hit": self.hit, "head_only": self.head_only}
+                "hit": self.hit, "head_only": self.head_only,
+                "input_chars": self.input_chars, "scanned_chars": self.scanned_chars,
+                "first_hit_offset": self.first_hit_offset,
+                "passage_anchor_hits": self.passage_anchor_hits,
+                "passage_count": self.passage_count}
 
 
 def extract_passages(text: str, anchors, *, config: ReadJudgmentConfig = DEFAULT_READ_CONFIG,
@@ -87,12 +102,13 @@ def extract_passages(text: str, anchors, *, config: ReadJudgmentConfig = DEFAULT
     hits we fall back to the highest lexical-overlap windows (deterministic), so the judge
     still sees the most relevant part of the page rather than the head. The whole body is
     bounded by ``read_max_chars_total`` first, so cost stays cheap and replayable."""
-    body = " ".join((text or "").split())[: config.read_max_chars_total]
+    raw = " ".join((text or "").split())
+    body = raw[: config.read_max_chars_total]
     win = config.read_passage_window_chars
     head_only = len(body) <= win
     anchor_list = [str(a).strip() for a in anchors if str(a).strip()]
     extra = {str(t).lower() for t in extra_terms if str(t).strip()}
-    scan = PassageScan(head_only=head_only)
+    scan = PassageScan(head_only=head_only, input_chars=len(raw), scanned_chars=len(body))
     if not body:
         scan.missing_anchors = list(dict.fromkeys(anchor_list))
         return scan
@@ -105,6 +121,8 @@ def extract_passages(text: str, anchors, *, config: ReadJudgmentConfig = DEFAULT
         if idx >= 0:
             if a not in matched:
                 matched.append(a)
+            if scan.first_hit_offset < 0 or idx < scan.first_hit_offset:
+                scan.first_hit_offset = idx
             half = max(0, (win - len(al)) // 2)
             spans.append((max(0, idx - half), min(len(body), idx + len(al) + half)))
     scan.matched_anchors = matched

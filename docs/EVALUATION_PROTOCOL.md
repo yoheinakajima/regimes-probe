@@ -513,3 +513,24 @@ comparison, run on a **stable debug slice** (`scripts/make_debug_slice.py`, pinn
 `headline_eligible=false`) and diff the detector deltas via `compare_runs`; `generate_claims`
 refuses any headline/memory claim for a debug-slice report. Coreference (5i-J) is
 proposal-only: `invalid_coreference_collapse_count` = 0 and no judge-call reduction is claimed.
+
+**Level 5j — offline replay validation (zero live calls).** Before any live smoke, run the
+offline validation that proves the 5h/5i mechanisms close (or explicitly explain) the 5g
+failure surfaces, using replayable fixtures only:
+
+    python scripts/validate_read_judge_replay.py
+    python scripts/validate_read_judge_replay.py --artifacts results/live/<run-id> --json
+
+It reports: (A) read→judge **loop closure** on a committed synthetic fixture — a `requires_read`
+persists as a `PendingReadJudgment` and a later read of the same `source_url` routes the cached
+body into a targeted re-judgment that closes the obligation (closure codes incl.
+`unvalidated_cache_miss`); (B) the **truncation boundary** — the 4000-char cap is the
+`page_fetch` *adapter* cap (`PageFetch.max_chars`), and `extract_passages` finds the resolving
+fact past char 4000 when the body/cap allow it; (C) **fixture effects** — judge-call reduction
+(≥50% on chrome/title/generic) with zero unsafe promotions and zero valid-candidate regression.
+**Honesty rule:** when the referenced live artifacts/cache are absent (they are gitignored and
+not present in a fresh container), the artifacts replay returns `unvalidated_cache_miss`, never
+a silent pass. The **metric-derivation parity check** (`eval/metric_derivation.verify_metric_derivation`)
+recomputes event-backed metrics from the event log and asserts they match the inline counters —
+run as part of `pytest` (`tests/test_replay_validation_5j.py`). No live provider/model call is
+made and no benchmark/accuracy/memory/generalization claim follows from any of this.

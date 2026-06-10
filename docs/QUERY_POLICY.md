@@ -1109,3 +1109,32 @@ default, replayable, answer-free; the strict answer gate is untouched.
   deterministic, dataset-immutable 10–20 item slice manifest with pinned `item_ids`,
   `headline_eligible=False`; `compare_runs` surfaces mechanism-detector deltas (debug labels
   only), and `generate_claims` refuses any headline/memory claim for a debug-slice report.
+
+#### Level 5j: offline replay validation (prove the 5h/5i mechanisms close 5g's seams)
+
+Before any live smoke, a deterministic offline pass replays a 5g-shaped trajectory through the
+current code with **zero live provider/model calls** and proves the loop closes — or says
+explicitly why it cannot.
+
+- **Read→judge replay (A).** `eval/replay_validation.run_replay` rebuilds the frame + frontier,
+  replays recorded search/read steps, and routes each cached page body into the *pending*
+  `requires_read` obligation for the same `(candidate, slot, constraint, source_url)`. Each
+  obligation closes (`resolved_full_support`/…`partial`/…`contradiction`/…`irrelevant`/
+  `closed_no_relevant_passage`/`closed_read_unavailable`), stays open, or is
+  `unvalidated_cache_miss`. The real 5g artifacts are gitignored and absent in a fresh
+  container, so `validate_artifacts_dir` honestly returns `unvalidated_cache_miss` rather than
+  passing; the mechanism is proven on a committed *synthetic* fixture (generic placeholders).
+- **Truncation boundary (B).** The 5g trace's 4000-char read is a `page_fetch` **adapter** cap
+  (`PageFetch.max_chars`), applied to parsed text before storage/judging — now recorded in the
+  response's `fetch_meta` (`fetched_chars` vs `stored_body_chars` + `body_truncated_for_storage`).
+  `extract_passages` finds the resolving fact past char 4000 when the body/cap allow it
+  (the fixture places it at ~offset 6222); with the default cap, `body_truncated_for_storage`
+  is recorded and no full-document retrieval is claimed.
+- **Fixture effects + parity + terminology (C/D/F).** A fixed fixture shows ≥50% fewer judge
+  calls from triage with zero unsafe promotions and zero valid-candidate regression; a
+  metric-derivation check recomputes event-backed metrics from the log and asserts parity with
+  inline counters; and the `read_interpreted` event now distinguishes `read_added_candidates`
+  from `read_added_constraint_support` from `read_resolved_pending_judgment`. The parser
+  duplicate-referent **diagnostics** are added, but the parser-prompt nudge is **staged** (not
+  applied — it would change the parser prompt hash/cache) and no coreference cost reduction is
+  claimed. Nothing here is a benchmark/accuracy/memory/generalization claim.

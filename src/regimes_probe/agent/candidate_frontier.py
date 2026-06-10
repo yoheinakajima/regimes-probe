@@ -411,6 +411,10 @@ class CandidateFrontier:
         #: Level 5h-M regime detectors (debug labels only — never benchmark claims).
         self.read_loop_open_count = 0
         self.read_success_no_evidence_added_count = 0
+        #: Level 5j-F precise read outcomes (a read that only adds candidates is NOT support).
+        self.read_resolved_pending_judgment_count = 0
+        self.read_added_candidates_count = 0
+        self.read_added_constraint_support_count = 0
         self._cc = self._ec = self._hc = self._ac = self._evc = 0
         self._known = {_norm(t) for t in frame.known_context_terms}
         # one slate per slot that NEEDS binding (every unbound variable).
@@ -625,9 +629,6 @@ class CandidateFrontier:
         # NEW constraint support increments the streak; a read or any support resets it.
         if read_depth and read_depth >= 1:
             self.read_executed_count += 1
-            self._emit("read_interpreted", evidence_id=ev.evidence_id,
-                       data={"slot_id": directed_slot_id, "read_depth": read_depth,
-                             "new_support": sel_support_gain})
             # 5h-A: route the fetched page BODY back into any pending requires_read judgments
             # for this candidate/source (targeted passage re-judge), and detect a read that
             # produced chars but added no evidence (a read-loop-open seam — 5h-M).
@@ -640,6 +641,25 @@ class CandidateFrontier:
             if read_text and (read_candidate_id or read_url):
                 resolved = self.route_read_into_pending_judgments(
                     candidate_id=read_candidate_id, source_url=read_url, read_text=read_text)
+            # 5j-F: DISTINCT read outcomes — a read that only added candidates must NOT look
+            # like it resolved support, and a read that closed a pending obligation is visible.
+            read_added_candidates = bool(ev.newly_introduced_candidates)
+            read_added_constraint_support = sel_support_gain > 0
+            read_resolved_pending_judgment = resolved > 0
+            self.read_resolved_pending_judgment_count += int(read_resolved_pending_judgment)
+            self.read_added_candidates_count += int(read_added_candidates)
+            self.read_added_constraint_support_count += int(read_added_constraint_support)
+            self._emit("read_interpreted", evidence_id=ev.evidence_id,
+                       data={"slot_id": directed_slot_id, "read_depth": read_depth,
+                             # legacy fields kept for compatibility:
+                             "new_support": sel_support_gain,
+                             # 5j-F precise, non-overlapping read outcomes:
+                             "read_executed": True,
+                             "read_added_candidates": read_added_candidates,
+                             "read_added_constraint_support": read_added_constraint_support,
+                             "read_resolved_pending_judgment": read_resolved_pending_judgment,
+                             "read_body_chars": len(read_text),
+                             "pending_obligations_for_source": had_pending})
             evidence_added = bool(sel_support_gain or resolved
                                   or ev.newly_introduced_candidates)
             if read_text and not evidence_added:
@@ -2083,6 +2103,11 @@ class CandidateFrontier:
             # M — regime detectors (debug labels only).
             "read_loop_open_count": self.read_loop_open_count,
             "read_success_no_evidence_added_count": self.read_success_no_evidence_added_count,
+            # F (5j) — precise, non-overlapping read outcomes.
+            "read_executed_count": self.read_executed_count,
+            "read_added_candidates_count": self.read_added_candidates_count,
+            "read_added_constraint_support_count": self.read_added_constraint_support_count,
+            "read_resolved_pending_judgment_count": self.read_resolved_pending_judgment_count,
             # O — local-support label hygiene.
             "debug_confirmed_label_when_answer_gate_false_count": sum(
                 1 for c in self.candidates_by_id.values() if c.status == "confirmed"

@@ -79,14 +79,27 @@ class PageFetch(SearchProvider):
                 raw = resp.read().decode("utf-8", errors="replace")
             parser = _TextExtractor()
             parser.feed(raw)
-            text = parser.text[: self.max_chars]
+            full = parser.text
+            text = full[: self.max_chars]
             results = (
                 SearchResult(title=query, url=query, snippet=text, rank=0),
             )
             err = None
+            # 5j-B: the 4000-char cap is an ADAPTER cap (this tool's ``max_chars``), applied to
+            # the parsed page text BEFORE it becomes the stored/judged snippet. Record both the
+            # fetched (parsed) length and the stored length so truncation is auditable, not a
+            # silent display artifact.
+            fetch_meta = {
+                "fetched_chars": len(full),
+                "stored_body_chars": len(text),
+                "adapter_max_chars": self.max_chars,
+                "body_truncated_for_storage": len(full) > self.max_chars,
+                "truncation_origin": "page_fetch_adapter_max_chars",
+            }
         except Exception as exc:  # network failure surfaces as an error response
             results = ()
             err = str(exc)
+            fetch_meta = None
         return SearchResponse(
             provider=self.name,
             query=query,
@@ -94,4 +107,5 @@ class PageFetch(SearchProvider):
             cost=self.cost_per_call,
             latency_s=time.monotonic() - t0,
             error=err,
+            fetch_meta=fetch_meta,
         )

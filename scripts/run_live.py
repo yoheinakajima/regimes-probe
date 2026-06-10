@@ -327,9 +327,15 @@ def main() -> int:
     # can see whether the run stored raw read bodies and which read caps were active.
     read_persistence = {
         "read_cache_store_raw": bool(args.read_cache_store_raw),
+        # bounded raw cap (never unbounded): 0 when raw storage is off.
         "read_cache_raw_chars": (_DEFAULT_READ_RAW_CHARS
                                  if args.read_cache_store_raw else 0),
         "read_max_chars": int(args.read_max_chars or 0),
+        # 5o-4: the read-judgment cap + the EFFECTIVE read-class adapter caps are visible in
+        # the dry-run plan and manifest, so a replay validator can interpret stored bodies.
+        "read_judgment_max_chars": _READ_CFG.read_judgment_max_chars,
+        "firecrawl_scrape_max_chars": int(args.read_max_chars or 4000),
+        "page_fetch_max_chars": int(args.read_max_chars or 4000),
     }
     plan.manifest["read_persistence"] = read_persistence
     _plan_file = Path(plan.run_dir) / "plan.json"

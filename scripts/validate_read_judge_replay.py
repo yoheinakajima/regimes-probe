@@ -115,10 +115,16 @@ def main() -> int:
         pm = av.metrics
         print(f"   reconstructed={pm.get('reconstructed_count')} "
               f"actual_read_bodies={pm.get('body_located_count')} "
+              f"(read_call_matched={pm.get('matched_read_call_count')} "
+              f"read_body_matched={pm.get('matched_read_body_count')}) "
               f"passages_scanned={pm.get('passages_scanned_count')} "
               f"(predicate_relevant={pm.get('predicate_relevant_passage_count')} "
-              f"subject_only={pm.get('subject_only_passage_count')}) "
-              f"judged={pm.get('judged_count')} closed={pm.get('closed_count')}")
+              f"subject_only={pm.get('subject_only_passage_count')} "
+              f"weak_predicate={pm.get('weak_predicate_candidate_only_count')}) "
+              f"judged={pm.get('judged_count')} "
+              f"(unclosed={pm.get('judged_unclosed_count')}) closed={pm.get('closed_count')}")
+        print(f"   closure_counts: {json.dumps(pm.get('closure_counts', {}))} "
+              f"target_relevance: {json.dumps(pm.get('target_passage_relevance_counts', {}))}")
         print(f"   diagnostic-only (never counted as bodies): "
               f"search_snippets={pm.get('search_snippet_only_count')} "
               f"debug_snippets={pm.get('debug_snippet_scanned_count')}; "

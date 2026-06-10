@@ -49,6 +49,9 @@ _RESOLUTION_TO_CLOSURE = {
 }
 _CLOSED = {"resolved_full_support", "resolved_partial_support", "resolved_contradiction",
            "resolved_irrelevant", "closed_no_relevant_passage", "closed_read_unavailable"}
+#: 5o-1: a rejudgment only genuinely CLOSES an obligation when it resolves support one way
+#: or the other. requires_read_still_open / irrelevant / partial-only are JUDGED, not closed.
+_RESOLVING_CLOSURES = {"resolved_full_support", "resolved_contradiction"}
 
 
 @dataclass
@@ -103,8 +106,18 @@ class ObligationOutcome:
     #: read_call | read_provider_cache | replay_export | search_provider_cache | debug_record | none
     body_match_source: str = "none"
     anchor_category_counts: dict = field(default_factory=dict)
-    #: predicate_relevant | subject_only | no_relevant_anchor | ""
+    #: predicate_relevant | weak_predicate_candidate_only | subject_only |
+    #: subject_only_no_target_anchor | no_relevant_anchor | ""
     passage_relevance: str = ""
+    # Level 5o split read-matching semantics: matching a READ CALL in record["calls"] is
+    # distinct from locating a read-class BODY in the provider cache (legacy runs often have
+    # the body but incomplete call metadata). ``matched_read`` stays as a back-compat alias
+    # for ``matched_read_call``.
+    matched_read_call: bool = False
+    matched_read_body: bool = False
+    read_body_chars: int = 0
+    read_body_provider: str = ""
+    is_target_constraint: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {k: getattr(self, k) for k in (
@@ -121,7 +134,8 @@ class ObligationOutcome:
             "matched_read_url", "matched_body_url", "debug_snippet_chars",
             "live_rejudgment_source", "body_provider", "body_is_actual_read_body",
             "body_is_search_snippet", "body_match_source", "anchor_category_counts",
-            "passage_relevance")}
+            "passage_relevance", "matched_read_call", "matched_read_body",
+            "read_body_chars", "read_body_provider", "is_target_constraint")}
 
 
 @dataclass
@@ -748,6 +762,16 @@ def _constraint_slots(record: dict, constraint_id: str) -> list[str]:
     return []
 
 
+def _is_target_constraint(record: dict, constraint_id: str, slot_id: str) -> bool:
+    """Whether an obligation's constraint binds a TARGET-ANSWER slot (5o-3): such passages
+    need an actual target anchor, not merely subject + generic facet hits."""
+    targets = {s.get("slot_id") for s in
+               ((record.get("task_frame") or {}).get("target_answer_slots") or [])}
+    if slot_id in targets:
+        return True
+    return bool(set(_constraint_slots(record, constraint_id)) & targets)
+
+
 def _reconstruct_obligations(record: dict) -> tuple[list[dict], dict]:
     """Reconstruct ``requires_read`` obligations from a debug record (5l fix). Returns
     ``(obligations, coverage)``. Three paths, in order of fidelity:
@@ -1054,13 +1078,16 @@ def load_legacy_run(run_dir: str | Path, *, allow_live_judge: bool = False,
                 o.stage_reason = "legacy_missing_candidate_slot_or_constraint"
                 res.obligations.append(o)
                 continue
-            # 5l-2 / 5m-3: match the read CALL. matched_read REQUIRES a URL relation
-            # (exact|prefix|host_only) — never a candidate-id coincidence alone.
+            # 5l-2 / 5m-3 / 5o-2: match the read CALL. matched_read_call REQUIRES a URL
+            # relation (exact|prefix|host_only) — never a candidate-id coincidence alone.
+            # ``matched_read`` is kept as a back-compat alias for matched_read_call;
+            # locating a read-class BODY in the cache is the separate matched_read_body.
             rc = _match_read_call(record, o.candidate_id, o.source_url)
-            o.matched_read, o.read_tool = rc["matched_read"], rc["read_tool"]
+            o.matched_read_call = rc["matched_read"]
+            o.matched_read, o.read_tool = o.matched_read_call, rc["read_tool"]
             o.read_success, o.read_chars = rc["read_success"], rc["read_chars"]
             o.matched_read_url = rc.get("read_url", "")
-            if o.matched_read:
+            if o.matched_read_call:
                 o.url_match_method = rc["read_url_match_method"]
                 o.pipeline_status = "read_matched"
             stored_url = o.source_url or rc.get("read_url", "") or _read_url_for(record, o.candidate_id)
@@ -1081,6 +1108,7 @@ def load_legacy_run(run_dir: str | Path, *, allow_live_judge: bool = False,
                 o.body_match_source = "read_call"
                 o.body_provider = rc["read_tool"]
                 o.body_is_actual_read_body = True
+                o.matched_read_body = True
                 o.matched_body_url = o.matched_read_url
             else:
                 exp_url, exp_method = _match_url(stored_url, list(export_bodies.keys()))
@@ -1090,12 +1118,13 @@ def load_legacy_run(run_dir: str | Path, *, allow_live_judge: bool = False,
                     o.body_match_source = "replay_export"
                     o.body_provider = "read_judge_replay_v1"
                     o.body_is_actual_read_body = True
+                    o.matched_read_body = True
                     o.matched_body_url = exp_url
-                    if not o.matched_read:
+                    if not o.matched_read_call:
                         o.url_match_method = exp_method
                 else:
                     matched_url, method = _match_url(stored_url, cache_urls)
-                    if not o.matched_read:
+                    if not o.matched_read_call:
                         o.url_match_method = method
                     if matched_url:
                         o.matched_body_url = matched_url
@@ -1108,11 +1137,10 @@ def load_legacy_run(run_dir: str | Path, *, allow_live_judge: bool = False,
                             o.body_match_source = "read_provider_cache"
                             o.body_provider = body_rec.get("read_provider", "")
                             o.body_is_actual_read_body = True
-                            # a read-provider cache entry with a URL match IS a matched read.
-                            if not o.matched_read:
-                                o.matched_read = True
-                                o.read_tool = o.read_tool or o.body_provider
-                                o.pipeline_status = "read_matched"
+                            # 5o-2: a read-class CACHE body is matched_read_body — it does NOT
+                            # fabricate a matched read CALL (legacy call metadata may be gone).
+                            o.matched_read_body = True
+                            o.read_tool = o.read_tool or o.body_provider
                         elif body_rec.get("search_snippet"):
                             # (C) SEARCH SNIPPET: diagnostic only — never an actual body,
                             # never advances, never judged (5n-1/2).
@@ -1122,9 +1150,9 @@ def load_legacy_run(run_dir: str | Path, *, allow_live_judge: bool = False,
                             o.body_is_search_snippet = True
                             o.debug_snippet_chars = len(body_rec["search_snippet"])
                             o.pipeline_status = ("read_matched_search_snippet_only"
-                                                 if o.matched_read else "reconstructed")
+                                                 if o.matched_read_call else "reconstructed")
                             o.stage_reason = ("read_body_not_persisted_legacy_run"
-                                              if o.matched_read
+                                              if o.matched_read_call
                                               else "search_snippet_only_no_read_body")
                             res.obligations.append(o)
                             continue
@@ -1161,11 +1189,25 @@ def load_legacy_run(run_dir: str | Path, *, allow_live_judge: bool = False,
                 continue
             # an ACTUAL read body (call-embedded / replay-export / read-provider cache).
             o.pipeline_status = "actual_body_located"
+            o.read_body_chars = o.stored_body_chars
+            o.read_body_provider = o.body_provider
             cats = _categorized_anchors(record, o.constraint_id, o.slot_id,
                                         candidate_text=o.candidate_text,
                                         source_title=_candidate_text(record, o.candidate_id,
                                                                      o.source_url))
             scan, cat_counts, relevance = _scan_with_relevance(body, cats)
+            # 5o-3: TARGET-answer constraints need a TARGET anchor (target_descriptor /
+            # numeric_or_year / relation_predicate / quoted_phrase) — candidate-alias plus a
+            # generic constraint facet is only a WEAK candidate, not predicate evidence.
+            o.is_target_constraint = _is_target_constraint(record, o.constraint_id, o.slot_id)
+            if o.is_target_constraint and relevance == "predicate_relevant":
+                target_hits = sum(cat_counts.get(c, 0) for c in (
+                    "target_descriptor", "numeric_or_year", "relation_predicate",
+                    "quoted_phrase"))
+                if target_hits == 0:
+                    relevance = ("weak_predicate_candidate_only"
+                                 if cat_counts.get("candidate_alias", 0) > 0
+                                 else "subject_only_no_target_anchor")
             o.anchor_category_counts = cat_counts
             o.passage_relevance = relevance
             o.passage_anchor_hits = scan.passage_anchor_hits
@@ -1176,11 +1218,15 @@ def load_legacy_run(run_dir: str | Path, *, allow_live_judge: bool = False,
             near_cap = (abs(o.stored_body_chars - _ADAPTER_CAP_DEFAULT) <= 16
                         or bool(fm.get("body_truncated_for_storage")))
             if relevance != "predicate_relevant":
-                # 5n-4: subject/title hits alone are NOT judgeable passages. If the actual
-                # body is capped with no raw, the predicate may lie beyond the cap.
+                # 5n-4/5o-3: subject/title/weak hits alone are NOT judgeable passages. If the
+                # actual body is capped with no raw, the predicate may lie beyond the cap.
                 if o.raw_unavailable and near_cap:
                     o.body_truncated_before_relevant_passage = True
                     o.stage_reason = "body_truncated_before_relevant_passage(raw_unavailable)"
+                elif relevance == "weak_predicate_candidate_only":
+                    o.stage_reason = "weak_predicate_candidate_only"
+                elif relevance == "subject_only_no_target_anchor":
+                    o.stage_reason = "subject_only_no_target_anchor"
                 elif relevance == "subject_only":
                     o.stage_reason = "subject_only_passage_no_predicate_anchor"
                 else:
@@ -1200,8 +1246,14 @@ def load_legacy_run(run_dir: str | Path, *, allow_live_judge: bool = False,
                 closure = _RESOLUTION_TO_CLOSURE.get(recorded, "requires_read_still_open")
                 o.closure_code = closure
                 o.live_rejudgment_source = "recorded_rejudgment_cache"
-                o.pipeline_status = "closed" if closure in _CLOSED else "judged_unclosed"
-                o.stage_reason = "closed_by_recorded_strict_rejudgment"
+                # 5o-1: "closed" only when the verdict RESOLVES support; a judged-but-open
+                # verdict never carries a closed_by_* stage reason.
+                if closure in _RESOLVING_CLOSURES:
+                    o.pipeline_status = "closed"
+                    o.stage_reason = "closed_by_recorded_strict_rejudgment"
+                else:
+                    o.pipeline_status = "judged_unclosed"
+                    o.stage_reason = "judged_by_recorded_strict_rejudgment_still_open"
             elif allow_live_judge and scan.passages:
                 if live_calls >= max_judge_calls:          # hard cap, fail-closed (0 = none)
                     o.pipeline_status = "rejudgment_pending"
@@ -1216,8 +1268,12 @@ def load_legacy_run(run_dir: str | Path, *, allow_live_judge: bool = False,
                     closure = _RESOLUTION_TO_CLOSURE.get(verdict, "requires_read_still_open")
                     o.closure_code = closure
                     o.live_rejudgment_source = o.body_source
-                    o.pipeline_status = "closed" if closure in _CLOSED else "judged_unclosed"
-                    o.stage_reason = "closed_by_live_rejudgment"
+                    if closure in _RESOLVING_CLOSURES:
+                        o.pipeline_status = "closed"
+                        o.stage_reason = "closed_by_live_rejudgment"
+                    else:
+                        o.pipeline_status = "judged_unclosed"
+                        o.stage_reason = "judged_by_live_rejudgment_still_open"
                     res.replay_events.append({"event_type": "read_judged_after_read",
                                               "item_id": item_id, "verdict": verdict,
                                               "rejudgment_source": o.body_source})
@@ -1350,8 +1406,10 @@ def _summarize_legacy(res: ReplayValidationResult, n_items: int, live_calls: int
                     if o.pipeline_status in ("passages_scanned", "rejudgment_pending",
                                              "judged_unclosed", "closed"))
     judged = sum(1 for o in obs if o.pipeline_status in ("judged_unclosed", "closed"))
+    # 5o-1: closed only counts genuinely RESOLVING closures on actual bodies.
     closed = sum(1 for o in obs if o.pipeline_status == "closed"
-                 and o.closure_code in _CLOSED and o.body_is_actual_read_body)
+                 and o.closure_code in _RESOLVING_CLOSURES and o.body_is_actual_read_body)
+    judged_unclosed = sum(1 for o in obs if o.pipeline_status == "judged_unclosed")
     res.metrics = {
         "n_items_inspected": n_items,
         "replay_pending_read_judgment_count": len(obs),
@@ -1368,24 +1426,38 @@ def _summarize_legacy(res: ReplayValidationResult, n_items: int, live_calls: int
         "body_truncated_before_relevant_passage_count":
             sum(1 for o in real_body if o.body_truncated_before_relevant_passage),
         "judged_count": judged,
+        "judged_unclosed_count": judged_unclosed,
         "closed_count": closed,
+        # 5o-1: closure breakdown derived from closure_code (not from stage reasons).
+        "closure_counts": dict(Counter(o.closure_code for o in obs
+                                       if o.closure_code != "unvalidated_cache_miss")),
         # 5n-4 passage-relevance split (subject hits alone are not judgeable).
         "predicate_relevant_passage_count": sum(
             1 for o in real_body if o.passage_relevance == "predicate_relevant"),
         "subject_only_passage_count": sum(
-            1 for o in real_body if o.passage_relevance == "subject_only"),
+            1 for o in real_body if o.passage_relevance in ("subject_only",
+                                                            "subject_only_no_target_anchor")),
         "alias_only_passage_count": sum(
             1 for o in real_body if o.passage_relevance == "subject_only"
             and o.anchor_category_counts.get("candidate_alias", 0) > 0
             and o.anchor_category_counts.get("source_title", 0) == 0),
+        "weak_predicate_candidate_only_count": sum(
+            1 for o in real_body if o.passage_relevance == "weak_predicate_candidate_only"),
+        # 5o-3: target-answer constraints get their own relevance breakdown.
+        "target_passage_relevance_counts": dict(Counter(
+            o.passage_relevance for o in real_body
+            if o.is_target_constraint and o.passage_relevance)),
         "predicate_relevant_passages_scanned_count": n_scanned,
+        # 5o-2 read-matching split: a matched read CALL vs a located read-class BODY.
+        "matched_read_call_count": sum(1 for o in obs if o.matched_read_call),
+        "matched_read_body_count": sum(1 for o in obs if o.matched_read_body),
         "pipeline_status_counts": dict(stage),
         "stage_reason_counts": dict(reasons),
         "url_match_method_counts": dict(Counter(o.url_match_method for o in obs)),
         "body_source_counts": dict(Counter(o.body_source for o in obs if o.body_source)),
         "body_provider_counts": dict(Counter(o.body_provider for o in obs if o.body_provider)),
         "recorded_rejudgment_cache_version_mismatch_count": rejudge_version_mismatches,
-        # INVARIANTS (5n-2/3), pinned 0 by construction:
+        # INVARIANTS (5n-2/3 + 5o-2), pinned 0 by construction:
         "matched_read_with_no_url_match_method_count": sum(
             1 for o in obs if o.matched_read and o.url_match_method == "none"),
         "actual_body_located_without_read_body_provenance_count": sum(
@@ -1394,6 +1466,11 @@ def _summarize_legacy(res: ReplayValidationResult, n_items: int, live_calls: int
         "search_snippet_counted_as_body_count": sum(
             1 for o in obs if o.body_is_search_snippet
             and o.pipeline_status in _BODY_STAGES),
+        "matched_read_true_without_read_call_or_read_body_count": sum(
+            1 for o in obs if o.matched_read
+            and not (o.matched_read_call or o.matched_read_body)),
+        "actual_body_located_without_matched_read_body_count": sum(
+            1 for o in obs if o.body_is_actual_read_body and not o.matched_read_body),
         "reconstruction_coverage_bounded": coverage_bounded,
         "cache_report": dict(cache_report or {}),
         "live_provider_calls": 0, "live_model_calls": live_calls,

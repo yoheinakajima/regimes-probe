@@ -622,3 +622,22 @@ actual-body predicate-relevant passages (else `no_actual_body_predicate_relevant
 zero calls). `--inspect-schema` splits cache entries by provider class so it is obvious
 whether a legacy run holds page bodies or only snippets. Zero live calls in default mode; no
 benchmark/accuracy/memory/generalization claim follows.
+
+**Level 5o — rejudgment-semantics cleanup.** Three naming/semantics fixes before the next live
+smoke: (1) `closed_by_*` stage reasons appear ONLY when the rejudgment verdict genuinely
+resolves support (`resolved_full_support`/`resolved_contradiction`); a judged-but-open verdict
+(`requires_read_still_open`, irrelevant, partial-only) reports
+`judged_by_live_rejudgment_still_open` / `judged_by_recorded_strict_rejudgment_still_open` with
+`pipeline_status=judged_unclosed`, and `closed_count`/`closure_counts`/`judged_unclosed_count`
+are derived from `closure_code`. (2) Matching a read CALL (`matched_read_call`) is split from
+locating a read-class cache BODY (`matched_read_body`, with `read_body_chars`/
+`read_body_provider`) — pinned 0: `matched_read_true_without_read_call_or_read_body_count`,
+`actual_body_located_without_matched_read_body_count` — so old-run replays where the body
+survives but call metadata didn't are self-explanatory. (3) Target-answer obligations are
+`predicate_relevant` only with a real TARGET anchor (target descriptor / numeric-or-year /
+relation verb / quoted phrase, all from the question/frame, never gold); candidate-alias +
+generic facet hits alone are `weak_predicate_candidate_only` and never reach the live judge
+(`target_passage_relevance_counts` emitted). The run_live dry-run plan + manifest expose the
+full read-persistence config (`read_cache_store_raw`, bounded `read_cache_raw_chars`,
+`read_max_chars`, `read_judgment_max_chars`, per-adapter caps). Zero live calls in default
+mode; no benchmark/accuracy/memory/generalization claim follows.

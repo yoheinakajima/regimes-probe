@@ -373,6 +373,8 @@ class CandidateFrontier:
         self.read_selected_count = 0
         self.read_blocked_no_url_count = 0
         self.read_blocked_tool_count = 0
+        #: 5p-3: reads that ignored an open pending obligation's exact source_url.
+        self.read_scheduled_for_different_url_than_pending_obligation_count = 0
         #: Level 5h-A/B pending read->judge loop + targeted passage retrieval.
         from regimes_probe.agent.read_judgment import DEFAULT_READ_CONFIG
         self.read_config = DEFAULT_READ_CONFIG
@@ -1491,16 +1493,35 @@ class CandidateFrontier:
                 self._emit("read_blocked_disallowed_tool", action_id=sel.action_id,
                            data={"reason": "no_reading_tool_available"})
                 return StepPlan(sel.action_id, at, "unexecutable", reason="read_blocked_no_tool")
+            # 0) 5p-3: an OPEN pending read-judgment obligation for this candidate pins the
+            #    EXACT source_url to read -- the judge asked for THAT page, not a better one.
+            chosen = self._read_pending_obligation_url(
+                sel.candidate_id, scraped_urls, no_progress_domains, page_fetch_available,
+                scrape_available, allow_social, force_page_fetch)
             # 1) a URL among the observations that ties candidate+slot+constraint.
-            chosen = self._resolve_read(observations, scraped_urls, no_progress_domains,
-                                        page_fetch_available, scrape_available, allow_social,
-                                        force_page_fetch)
+            if chosen is None:
+                chosen = self._resolve_read(observations, scraped_urls, no_progress_domains,
+                                            page_fetch_available, scrape_available,
+                                            allow_social, force_page_fetch)
             # 2) fall back to a CLEAN URL stored on the selected candidate's provenance, so a
             #    forced/judge read actually executes instead of silently becoming a search.
             if chosen is None:
                 chosen = self._read_candidate_url(
                     sel.candidate_id, sel.constraint_ids, scraped_urls, no_progress_domains,
                     page_fetch_available, scrape_available, allow_social, force_page_fetch)
+            # 5p-3: a read whose URL differs from an OPEN pending obligation's url for this
+            # candidate is a TARGETING violation (counted; the obligation stays open).
+            if chosen is not None:
+                pend_urls = {p.source_url for p in self.pending_read_judgments.values()
+                             if p.open and p.source_url
+                             and p.candidate_id == (sel.candidate_id or "")}
+                url_chosen = getattr(chosen[0], "url", "")
+                if pend_urls and url_chosen not in pend_urls:
+                    self.read_scheduled_for_different_url_than_pending_obligation_count += 1
+                    self._emit("read_scheduled_for_different_url_than_pending_obligation",
+                               action_id=sel.action_id, candidate_id=sel.candidate_id,
+                               data={"chosen_url_host": _host(url_chosen),
+                                     "pending_count": len(pend_urls)})
             if chosen is None:
                 self.read_blocked_no_url_count += 1
                 self._emit("read_blocked_no_url", action_id=sel.action_id,
@@ -1669,6 +1690,52 @@ class CandidateFrontier:
                 tested = list(cand.requires_read_constraint_ids or cand.constraints_unknown
                               or constraint_ids or [])
                 return o, rd, tested
+        return None
+
+    def _read_pending_obligation_url(self, candidate_id, scraped_urls, no_progress_domains,
+                                     page_fetch_available, scrape_available, allow_social,
+                                     force_page_fetch):
+        """5p-3: read the EXACT source_url of an OPEN pending read-judgment obligation for
+        this candidate (the judge asked for that page). Returns ``(obs, decision, tested)``
+        or None. A disallowed URL is recorded and the obligation stays open (never lost)."""
+        from types import SimpleNamespace
+        from urllib.parse import urlparse as _up
+        from regimes_probe.agent.reading_policy import normalize_url, select_reading_tool
+        for pend in self.pending_read_judgments.values():
+            if not pend.open or not pend.source_url:
+                continue
+            if candidate_id and pend.candidate_id and pend.candidate_id != candidate_id:
+                continue
+            url = pend.source_url
+            if not _is_clean_url(url):
+                continue
+            host = (_up(url).hostname or "").lower()
+            if normalize_url(url) in scraped_urls or host in no_progress_domains:
+                continue
+            cand = self.candidates_by_id.get(pend.candidate_id)
+            title = (cand.candidate_text if cand else pend.source_subject) or url
+            o = SimpleNamespace(url=url, title=title, snippet=title,
+                                source_authority=(cand.source_authority_score if cand else 0.5),
+                                failed=False, benchmark_contaminated=False, fetchable=True)
+            rd = select_reading_tool(
+                url=url, title=title, snippet=title,
+                source_authority=float(getattr(o, "source_authority", 0.5)),
+                contaminated=False, unresolved_clue_terms=[], answer_shape=[],
+                cross_provider_domains=set(), page_fetch_available=page_fetch_available,
+                scrape_available=scrape_available, scraped_urls=scraped_urls,
+                no_progress_domains=no_progress_domains, allow_social=allow_social,
+                prefer_page_fetch=force_page_fetch, force_read=True)
+            if rd.tool:
+                self._emit("read_selected_for_pending_obligation",
+                           candidate_id=pend.candidate_id, slot_id=pend.slot_id,
+                           data={"pending_read_judgment_id": pend.pending_read_judgment_id,
+                                 "url_host": host})
+                return o, rd, [pend.constraint_id]
+            # the exact URL is disallowed by the reading policy: record + keep the obligation.
+            self._emit("read_blocked_disallowed_tool", candidate_id=pend.candidate_id,
+                       data={"pending_read_judgment_id": pend.pending_read_judgment_id,
+                             "reason": "pending_obligation_url_disallowed",
+                             "url_host": host})
         return None
 
     # ---------- 5h-A/B: pending read -> judge loop + targeted passage retrieval ----------
@@ -1985,6 +2052,10 @@ class CandidateFrontier:
             "events": list(self.events),
             "interpretations": [i.to_dict() for i in self.interpretations][:20],
             "interpreter_stats": (self.interpreter.stats() if self.interpreter is not None else {}),
+            # 5p-1: NATIVE persistence of the read->judge obligations (full source_url) so a
+            # future-run replay validates without structured-legacy reconstruction.
+            "pending_read_judgments": [p.to_dict()
+                                       for p in self.pending_read_judgments.values()][:40],
             "metrics": self.metrics(),
         }
 
@@ -2089,6 +2160,17 @@ class CandidateFrontier:
             "judge_reused_truncated_excerpt_after_full_read_count": 0,   # invariant (5h-A)
             "pending_read_judgments_count": len(pend),
             "pending_read_judgments_open_count": sum(1 for p in pend if p.open),
+            # 5p-3 read-targeting invariants (event-derived from pending state).
+            "pending_read_judgment_without_source_url_count": sum(
+                1 for p in pend if p.open and not p.source_url),
+            "requires_read_obligation_lost_before_read_count": 0,   # pendings are persistent
+            "read_scheduled_for_different_url_than_pending_obligation_count":
+                self.read_scheduled_for_different_url_than_pending_obligation_count,
+            # an open obligation with a clean URL that never got its read is the seam the
+            # 5o raw-read smoke exposed (pinned 0 once targeting works + budget allows).
+            "pending_read_obligation_only_search_snippet_after_read_budget_count": sum(
+                1 for p in pend if p.open and _is_clean_url(p.source_url)
+                and not p.read_selected),
             # B — targeted passage retrieval.
             "read_passage_hits_count": self.read_passage_hits_count,
             "read_passage_no_hits_count": self.read_passage_no_hits_count,

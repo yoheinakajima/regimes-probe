@@ -84,7 +84,7 @@ class ObligationOutcome:
     requires_read_reason: str = ""
     judgment_id: str = ""
     prompt_hash: str = ""
-    reconstruction_method: str = ""            # structured_interpretations|legacy_events|native_5h
+    reconstruction_method: str = ""            # native_persisted|native_events|structured_interpretations|legacy_events
     reconstruction_missing_fields: list = field(default_factory=list)
     matched_read: bool = False
     read_tool: str = ""
@@ -796,11 +796,28 @@ def _reconstruct_obligations(record: dict) -> tuple[list[dict], dict]:
         "reconstruction_coverage_bounded": bool(cf.get("events_truncated")) or len(interps) >= 20,
     }
     obligations: list[dict] = []
-    # 1) native 5h pending objects.
+    # 1) NATIVE persisted pending objects (a future run writes them via to_debug; full
+    #    source_url) — preferred over any reconstruction (5p-1).
     for p in (cf.get("pending_read_judgments") or []):
-        obligations.append({**p, "reconstructed_from_legacy_trace": False, "native": True,
-                            "reconstruction_method": "native_5h"})
+        obligations.append({**p, "candidate_text": p.get("source_subject", ""),
+                            "reconstructed_from_legacy_trace": False, "native": True,
+                            "reconstruction_method": "native_persisted"})
     if obligations:
+        coverage["reconstruction_source"] = "native_persisted"
+        return obligations, coverage
+    # 1b) NATIVE read_required_by_judge events (5h-era runs without the full export).
+    for e in events:
+        if e.get("event_type") != "read_required_by_judge":
+            continue
+        data = e.get("data", {}) or {}
+        obligations.append({
+            "pending_read_judgment_id": data.get("pending_read_judgment_id", ""),
+            "candidate_id": e.get("candidate_id") or "",
+            "slot_id": e.get("slot_id") or "", "constraint_id": data.get("constraint_id", ""),
+            "reconstructed_from_legacy_trace": False, "native": True,
+            "reconstruction_method": "native_events"})
+    if obligations:
+        coverage["reconstruction_source"] = "native_events"
         return obligations, coverage
 
     # 2) STRUCTURED INTERPRETATIONS (the real 5g path).
@@ -859,6 +876,7 @@ def _reconstruct_obligations(record: dict) -> tuple[list[dict], dict]:
                     "reconstruction_method": "structured_interpretations",
                     "reconstruction_missing_fields": ["judgment_detail"]})
     if obligations:
+        coverage["reconstruction_source"] = "structured_interpretations"
         return obligations, coverage
 
     # 3) legacy 5h events (forward-compatible).
@@ -872,6 +890,7 @@ def _reconstruct_obligations(record: dict) -> tuple[list[dict], dict]:
             "constraint_id": data.get("constraint_id") or "",
             "reconstructed_from_legacy_trace": True, "native": False,
             "reconstruction_method": "legacy_events"})
+    coverage["reconstruction_source"] = ("legacy_events" if obligations else "none")
     return obligations, coverage
 
 
@@ -1038,6 +1057,7 @@ def load_legacy_run(run_dir: str | Path, *, allow_live_judge: bool = False,
 
     n_items = 0
     coverage_bounded = False
+    recon_sources: list[str] = []
     cache_urls = list(bodies.keys())
     for line in dqf.read_text(encoding="utf-8").splitlines():
         line = line.strip()
@@ -1051,6 +1071,7 @@ def load_legacy_run(run_dir: str | Path, *, allow_live_judge: bool = False,
         n_items += 1
         item_id = record.get("item_id", "")
         obs, coverage = _reconstruct_obligations(record)
+        recon_sources.append(coverage.get("reconstruction_source", "none"))
         if coverage.get("reconstruction_coverage_bounded"):
             coverage_bounded = True
             res.replay_events.append({"event_type": "reconstruction_coverage_bounded",
@@ -1284,7 +1305,8 @@ def load_legacy_run(run_dir: str | Path, *, allow_live_judge: bool = False,
 
     _summarize_legacy(res, n_items, live_calls, coverage_bounded=coverage_bounded,
                       allow_live_judge=allow_live_judge, cache_report=cache_report,
-                      rejudge_version_mismatches=rejudge_version_mismatches)
+                      rejudge_version_mismatches=rejudge_version_mismatches,
+                      bodies=bodies, recon_sources=recon_sources)
     return res
 
 
@@ -1394,7 +1416,9 @@ _BODY_STAGES = ("actual_body_located", "passages_scanned", "rejudgment_pending",
 def _summarize_legacy(res: ReplayValidationResult, n_items: int, live_calls: int, *,
                       coverage_bounded: bool = False, allow_live_judge: bool = False,
                       cache_report: Optional[dict] = None,
-                      rejudge_version_mismatches: int = 0) -> None:
+                      rejudge_version_mismatches: int = 0,
+                      bodies: Optional[dict] = None,
+                      recon_sources: Optional[list] = None) -> None:
     obs = res.obligations
     stage = Counter(o.pipeline_status for o in obs)
     reasons = Counter(o.stage_reason for o in obs if o.stage_reason)
@@ -1475,6 +1499,51 @@ def _summarize_legacy(res: ReplayValidationResult, n_items: int, live_calls: int
         "cache_report": dict(cache_report or {}),
         "live_provider_calls": 0, "live_model_calls": live_calls,
     }
+    # 5p-1: reconstruction provenance — was this a NATIVE future run or a legacy rebuild?
+    src_priority = ("native_persisted", "native_events", "structured_interpretations",
+                    "legacy_events", "none")
+    seen_sources = [x for x in (recon_sources or []) if x and x != "none"]
+    res.metrics["reconstruction_source"] = next(
+        (sp for sp in src_priority if sp in seen_sources), "none")
+    res.metrics["reconstruction_source_counts"] = dict(Counter(recon_sources or []))
+    res.metrics["native_pending_read_judgment_count"] = sum(
+        1 for o in obs if o.reconstruction_method in ("native_persisted", "native_events"))
+    res.metrics["legacy_reconstructed_pending_read_judgment_count"] = sum(
+        1 for o in obs if o.reconstructed_from_legacy_trace)
+    # 5p-2: URL-set diagnostics — which urls were READ vs which urls the OBLIGATIONS wanted.
+    def _trunc(u: str) -> str:
+        return (u or "")[:120]
+    body_urls = sorted(u for u, r in (bodies or {}).items() if r.get("read_body"))
+    ob_urls = sorted({o.source_url for o in obs if o.source_url})
+    matched_ob, matched_body = set(), set()
+    for ou in ob_urls:
+        mu, method = _match_url(ou, body_urls)
+        if method != "none" and mu:
+            matched_ob.add(ou)
+            matched_body.add(mu)
+    unmatched_ob = [u for u in ob_urls if u not in matched_ob]
+    unmatched_body = [u for u in body_urls if u not in matched_body]
+    res.metrics.update({
+        "read_body_url_count": len(body_urls),
+        "obligation_source_url_count": len(ob_urls),
+        "read_body_urls_without_obligations_count": len(unmatched_body),
+        "obligations_without_read_body_count": len(unmatched_ob),
+        "obligation_source_urls_sample": [_trunc(u) for u in ob_urls[:5]],
+        "actual_read_body_urls_sample": [_trunc(u) for u in body_urls[:5]],
+        "unmatched_obligation_source_urls_sample": [_trunc(u) for u in unmatched_ob[:5]],
+        "unmatched_read_body_urls_sample": [_trunc(u) for u in unmatched_body[:5]],
+    })
+    # 5p-5: detector — read bodies exist but NONE were linked to a requires_read obligation.
+    # This is a read-TARGETING failure, not a route_miss and not a benchmark failure.
+    if obs and body_urls and not matched_body:
+        res.metrics["read_body_unlinked_to_requires_read_obligation"] = True
+        res.metrics["pending_read_not_targeted_count"] = len(unmatched_ob)
+        res.replay_events.append({"event_type": "read_body_unlinked_to_requires_read_obligation",
+                                  "read_body_url_count": len(body_urls),
+                                  "obligation_source_url_count": len(ob_urls)})
+    else:
+        res.metrics["read_body_unlinked_to_requires_read_obligation"] = False
+        res.metrics["pending_read_not_targeted_count"] = 0
     # 5n-6: unambiguous live-judge tier; only actual-body PREDICATE-RELEVANT passages qualify.
     if allow_live_judge:
         skip = None

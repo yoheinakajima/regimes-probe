@@ -125,6 +125,19 @@ def main() -> int:
               f"(unclosed={pm.get('judged_unclosed_count')}) closed={pm.get('closed_count')}")
         print(f"   closure_counts: {json.dumps(pm.get('closure_counts', {}))} "
               f"target_relevance: {json.dumps(pm.get('target_passage_relevance_counts', {}))}")
+        print(f"   reconstruction_source={pm.get('reconstruction_source')} "
+              f"(native={pm.get('native_pending_read_judgment_count')} "
+              f"legacy={pm.get('legacy_reconstructed_pending_read_judgment_count')}); "
+              f"urls: obligations={pm.get('obligation_source_url_count')} "
+              f"read_bodies={pm.get('read_body_url_count')} "
+              f"unmatched_obligations={pm.get('obligations_without_read_body_count')} "
+              f"unmatched_bodies={pm.get('read_body_urls_without_obligations_count')} "
+              f"unlinked_detector={pm.get('read_body_unlinked_to_requires_read_obligation')}")
+        if pm.get("unmatched_obligation_source_urls_sample"):
+            print(f"   unmatched obligation urls: "
+                  f"{pm['unmatched_obligation_source_urls_sample']}")
+        if pm.get("unmatched_read_body_urls_sample"):
+            print(f"   unmatched read-body urls: {pm['unmatched_read_body_urls_sample']}")
         print(f"   diagnostic-only (never counted as bodies): "
               f"search_snippets={pm.get('search_snippet_only_count')} "
               f"debug_snippets={pm.get('debug_snippet_scanned_count')}; "

@@ -209,6 +209,9 @@ class PendingReadJudgment:
         return {"pending_read_judgment_id": self.pending_read_judgment_id,
                 "candidate_id": self.candidate_id, "slot_id": self.slot_id,
                 "constraint_id": self.constraint_id,
+                # 5p-1: persist the FULL source_url (bounded) — host-only persistence made
+                # native obligations unmatchable against read bodies in replay validation.
+                "source_url": (self.source_url or "")[:300],
                 "source_url_host": _host(self.source_url),
                 "source_subject": self.source_subject[:80],
                 "missing_anchors": list(self.missing_anchors)[:8],

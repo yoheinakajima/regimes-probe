@@ -641,3 +641,22 @@ generic facet hits alone are `weak_predicate_candidate_only` and never reach the
 full read-persistence config (`read_cache_store_raw`, bounded `read_cache_raw_chars`,
 `read_max_chars`, `read_judgment_max_chars`, per-adapter caps). Zero live calls in default
 mode; no benchmark/accuracy/memory/generalization claim follows.
+
+**Level 5p — read targeting + obligation/read-body linking.** The 5o raw-read smoke was a
+useful NEGATIVE mechanism result: raw read persistence worked (3 actual read bodies), but zero
+of 20 obligations matched any read body — the agent read different URLs than the judge's
+requires_read obligations asked for, and native pendings never reached the artifacts. 5p closes
+the loop end-to-end: pendings persist with the FULL `source_url` and are exported in the debug
+record (`to_debug.pending_read_judgments`), the validator consumes them native-first
+(`reconstruction_source=native_persisted|native_events|structured_interpretations|...`), and
+the read scheduler reads the OPEN obligation's exact URL first
+(`read_selected_for_pending_obligation`; mismatches counted by
+`read_scheduled_for_different_url_than_pending_obligation_count`; a disallowed URL preserves
+the obligation). URL-set diagnostics (bounded samples of obligation vs read-body URLs and both
+unmatched sets) make the seam visible, and the failure is named precisely —
+`read_body_unlinked_to_requires_read_obligation` / `pending_read_not_targeted_count` — never
+route_miss, never a benchmark label. Next raw-read smoke success criterion (mechanism only):
+`native_pending_read_judgment_count > 0`, `body_located_count > 0` for OBLIGATIONS,
+`read_body_urls_without_obligations_count` bounded/explainable,
+`search_snippet_counted_as_body_count = 0`, zero live calls in default validation, and no
+benchmark/accuracy/memory/generalization claim.

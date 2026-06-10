@@ -61,8 +61,11 @@ def test_replay_cache_miss_is_not_a_silent_pass():
     assert any(o.closure_code == "unvalidated_cache_miss" for o in res.obligations)
 
 
-def test_validate_absent_artifacts_dir_returns_unvalidated_cache_miss():
-    res = validate_artifacts_dir("results/live/browsecomp-llm-evidence-judge-5g-smoke-001")
+def test_validate_absent_artifacts_dir_returns_unvalidated_cache_miss(tmp_path):
+    missing = tmp_path / "definitely_absent_live_run"
+    assert not missing.exists()
+
+    res = validate_artifacts_dir(str(missing))
     assert res.overall_status == "unvalidated_cache_miss"
     assert any("artifacts_absent" in n for n in res.notes)
     assert res.metrics["live_model_calls"] == 0

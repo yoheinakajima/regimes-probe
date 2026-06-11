@@ -246,6 +246,8 @@ class StepPlan:
     constraint_ids: list[str] = field(default_factory=list)
     read_obs: Any = None
     read_decision: Any = None
+    #: 5t-6: per-call tool opts for a read (e.g. a bounded higher max_chars re-read cap).
+    read_opts: dict[str, Any] = field(default_factory=dict)
     reason: str = ""
     is_discriminative_constraint: bool = False
     is_generic_query: bool = False
@@ -386,6 +388,31 @@ class CandidateFrontier:
         self.read_blocked_generic_source_count = 0
         #: 5s-4: pending obligations served by the priority read policy.
         self.pending_snippet_read_attempted_count = 0
+        #: 5t-1/2: URL-level pending-service registry (normalized URL -> service record). Many
+        #: obligations share one URL; each clean URL is read at most once (plus one bounded
+        #: same-URL fallback), and a success marks all its obligations body-available.
+        self.pending_service_urls: dict[str, dict] = {}
+        #: 5t-6: bounded predicate re-read plans queued for execution (live runs only).
+        self.predicate_reread_plans: list[dict] = []
+        #: 5t-5: pending-read fallback/zero-chars accounting.
+        self.pending_read_primary_failed_count = 0
+        self.pending_read_fallback_attempted_count = 0
+        self.pending_read_fallback_success_count = 0
+        self.pending_read_fallback_failed_count = 0
+        self.pending_read_zero_chars_count = 0
+        #: 5t-6: bounded predicate re-read outcome accounting.
+        self.predicate_reread_scheduled_count = 0
+        self.predicate_reread_attempted_count = 0
+        self.predicate_reread_success_count = 0
+        self.predicate_reread_saw_beyond_original_cap_count = 0
+        self.predicate_reread_resolved_pending_judgment_count = 0
+        self.predicate_reread_still_open_count = 0
+        self.predicate_reread_blocked_count = 0
+        #: 5t-4: live targeted-rejudgment accounting (persisted strict verdicts).
+        self.pending_read_targeted_rejudgment_attempted_count = 0
+        self.pending_read_targeted_rejudgment_recorded_count = 0
+        self.pending_read_targeted_rejudgment_closed_count = 0
+        self.pending_read_targeted_rejudgment_still_open_count = 0
         #: Level 5h-A/B pending read->judge loop + targeted passage retrieval.
         from regimes_probe.agent.read_judgment import DEFAULT_READ_CONFIG
         self.read_config = DEFAULT_READ_CONFIG
@@ -1463,30 +1490,17 @@ class CandidateFrontier:
         terminal. If a selected action cannot be executed it returns kind
         ``unexecutable`` so the loop falls back to the old planner."""
         self.generate_frontier_actions()
-        # 5s-4: SERVICE POLICY — open clean pending obligations are read FIRST, before any
-        # EIG-selected search/verify of already-supported constraints. Concrete URL reads
-        # only; suppressed/contaminated pendings never enter the queue (5q-4).
-        if reading_tools and budget_remaining > 0 and self.select_pending_read_obligation_url():
-            chosen = self._read_pending_obligation_url(
-                None, scraped_urls, no_progress_domains, page_fetch_available,
-                scrape_available, allow_social, force_page_fetch)
-            if chosen is not None:
-                o, rd, tested = chosen
-                self.read_desired_count += 1
-                self.read_selected_count += 1
-                self.pending_snippet_read_attempted_count += 1
-                self._emit("read_desired", data={"reason": "pending_obligation_service"})
-                self._emit("read_selected", data={"url_host": _host(getattr(o, "url", "")),
-                                                  "reason": "pending_obligation_service"})
-                self._ac += 1
-                fa = FrontierAction(action_id=f"fa{self._ac}",
-                                    action_type="read_candidate_source",
-                                    constraint_ids=list(tested), selected=True,
-                                    selected_reason="pending_obligation_service")
-                self.frontier_actions.append(fa)
-                return StepPlan(fa.action_id, "read_candidate_source", "read", read_obs=o,
-                                read_decision=rd, constraint_ids=tested,
-                                reason="pending_obligation_service")
+        # 5s-4/5t-1: SERVICE POLICY — open clean pending obligations are read FIRST, before
+        # any EIG-selected search/verify of already-supported constraints. Concrete URL reads
+        # only; suppressed/contaminated pendings never enter the queue (5q-4). The same
+        # first-class step is also called TOP-LEVEL by the loop (before the LLM planner).
+        if reading_tools and budget_remaining > 0:
+            sp = self.propose_pending_service_read(
+                budget_remaining=budget_remaining, scraped_urls=scraped_urls,
+                page_fetch_available=page_fetch_available, scrape_available=scrape_available,
+                allow_social=allow_social, force_page_fetch=force_page_fetch)
+            if sp is not None:
+                return sp
         sel = self.select_frontier_action(budget_remaining=budget_remaining,
                                           reading_available=reading_tools)
         if sel is None:
@@ -1880,11 +1894,354 @@ class CandidateFrontier:
             out.append(p)
         return out
 
+    # ---------- 5t-1/2/5/6: first-class, URL-deduped pending-service step ----------
+    @staticmethod
+    def _service_norm(url: str) -> str:
+        return (url or "").strip().lower().rstrip("/")
+
+    def _service_rec(self, url: str) -> dict:
+        """The URL-level service record (created lazily). Many obligations share one URL;
+        the URL is read at most once plus one bounded same-URL fallback (5t-1/5)."""
+        norm = self._service_norm(url)
+        rec = self.pending_service_urls.get(norm)
+        if rec is None:
+            rec = {"url": (url or "")[:300], "url_host": _host(url), "obligation_ids": [],
+                   "attempted": False, "attempt_tool": "", "tools_tried": [],
+                   "success": False, "failed": False, "zero_chars": False,
+                   "fallback_scheduled": False, "fallback_attempted": False,
+                   "fallback_success": False, "blocked_reason": "",
+                   "outcome_recorded": False, "status": ""}
+            self.pending_service_urls[norm] = rec
+        return rec
+
+    def _sync_service_registry(self) -> None:
+        """Register every CLEAN, non-suppressed pending obligation URL (URL-level dedupe)."""
+        for p in self.pending_read_judgments.values():
+            if p.suppressed_reason or not _is_clean_url(p.source_url):
+                continue
+            rec = self._service_rec(p.source_url)
+            if p.pending_read_judgment_id not in rec["obligation_ids"]:
+                rec["obligation_ids"].append(p.pending_read_judgment_id)
+
+    def _pendings_for_url(self, url: str) -> list:
+        norm = self._service_norm(url)
+        host = _host(url or "")
+        return [p for p in self.pending_read_judgments.values()
+                if self._service_norm(p.source_url) == norm
+                or (host and _host(p.source_url) == host)]
+
+    def _build_service_read_plan(self, rec, *, page_fetch_available, scrape_available,
+                                 allow_social=False, force_page_fetch=False, tool=None,
+                                 reason="pending_obligation_service", read_opts=None):
+        """Translate a service-registry record into an executable concrete-URL read StepPlan.
+        ``tool`` forces a specific read tool (the 5t-5 same-URL fallback). Never a search."""
+        from types import SimpleNamespace
+        from regimes_probe.agent.reading_policy import select_reading_tool
+        pends = [self.pending_read_judgments[i] for i in rec["obligation_ids"]
+                 if i in self.pending_read_judgments]
+        lead = next((p for p in pends if p.open or p.reread_pending),
+                    pends[0] if pends else None)
+        if lead is None:
+            return None
+        url = lead.source_url
+        cand = self.candidates_by_id.get(lead.candidate_id)
+        title = (cand.candidate_text if cand else lead.source_subject) or url
+        o = SimpleNamespace(url=url, title=title, snippet=title,
+                            source_authority=(cand.source_authority_score if cand else 0.5),
+                            failed=False, benchmark_contaminated=False, fetchable=True)
+        # the judge pinned THIS exact URL: each clean URL is attempted at most once (plus one
+        # bounded fallback), so scraped/no-progress gating does not apply to the service read.
+        rd = select_reading_tool(
+            url=url, title=title, snippet=title,
+            source_authority=float(getattr(o, "source_authority", 0.5)), contaminated=False,
+            unresolved_clue_terms=[], answer_shape=[], cross_provider_domains=set(),
+            page_fetch_available=page_fetch_available and (tool in (None, "page_fetch")),
+            scrape_available=scrape_available and (tool in (None, "firecrawl_scrape")),
+            scraped_urls=frozenset(), no_progress_domains=frozenset(),
+            allow_social=allow_social, prefer_page_fetch=force_page_fetch, force_read=True)
+        if not rd.tool:
+            rec["blocked_reason"] = rec["blocked_reason"] or "url_disallowed"
+            self._emit("read_blocked_disallowed_tool", candidate_id=lead.candidate_id,
+                       data={"pending_read_judgment_id": lead.pending_read_judgment_id,
+                             "reason": "pending_obligation_url_disallowed",
+                             "url_host": rec["url_host"]})
+            return None
+        tested: list[str] = []
+        for p in pends:
+            if p.open or p.reread_pending:
+                p.read_selected = True
+                p.selected_read_url = url
+                p.read_tool = rd.tool
+                if p.constraint_id not in tested:
+                    tested.append(p.constraint_id)
+        self._ac += 1
+        fa = FrontierAction(action_id=f"fa{self._ac}", action_type="read_candidate_source",
+                            target_slot_id=lead.slot_id, candidate_id=lead.candidate_id,
+                            constraint_ids=list(tested), selected=True, selected_reason=reason)
+        self.frontier_actions.append(fa)
+        self._emit("read_selected_for_pending_obligation",
+                   candidate_id=lead.candidate_id, slot_id=lead.slot_id,
+                   data={"pending_read_judgment_id": lead.pending_read_judgment_id,
+                         "selected_read_url_host": rec["url_host"], "read_tool": rd.tool,
+                         "url_host": rec["url_host"], "reason": reason,
+                         "obligations_on_url": len(rec["obligation_ids"])})
+        return StepPlan(fa.action_id, "read_candidate_source", "read", read_obs=o,
+                        read_decision=rd, read_opts=dict(read_opts or {}),
+                        target_slot_id=lead.slot_id, candidate_id=lead.candidate_id,
+                        constraint_ids=list(tested), reason=reason)
+
+    def propose_pending_service_read(self, *, budget_remaining: int = 99,
+                                     scraped_urls=frozenset(),
+                                     page_fetch_available: bool = False,
+                                     scrape_available: bool = False,
+                                     allow_social: bool = False,
+                                     force_page_fetch: bool = False) -> Optional["StepPlan"]:
+        """5t-1: the FIRST-CLASS pending-service step. Runs before frontier/EIG selection
+        (the loop also calls it top-level, before the LLM planner can override it). Selects a
+        concrete clean pending obligation URL read — never a search translation — with
+        URL-level dedupe, a bounded same-URL fallback (5t-5), and the bounded predicate
+        re-read queue (5t-6). Returns None when nothing is serviceable."""
+        if budget_remaining <= 0 or not (page_fetch_available or scrape_available):
+            return None
+        self._sync_service_registry()
+        from regimes_probe.agent.reading_policy import normalize_url
+        enabled = [t for t, ok in (("page_fetch", page_fetch_available),
+                                   ("firecrawl_scrape", scrape_available)) if ok]
+        # (a) bounded same-URL FALLBACK for a failed/zero-chars primary attempt (5t-5):
+        # retry the SAME pending URL once with the other enabled read tool — never a
+        # different URL, never a search.
+        for rec in self.pending_service_urls.values():
+            if not rec["fallback_scheduled"] or rec["fallback_attempted"]:
+                continue
+            alt = next((t for t in enabled if t not in rec["tools_tried"]), None)
+            if alt is None:
+                rec["fallback_scheduled"] = False
+                continue
+            sp = self._build_service_read_plan(
+                rec, page_fetch_available=page_fetch_available,
+                scrape_available=scrape_available, allow_social=allow_social,
+                force_page_fetch=force_page_fetch, tool=alt,
+                reason="pending_obligation_service_fallback")
+            if sp is not None:
+                rec["fallback_attempted"] = True
+                rec["tools_tried"].append(alt)
+                rec["outcome_recorded"] = False
+                self.pending_read_fallback_attempted_count += 1
+                self._emit("pending_read_fallback_attempted",
+                           data={"url_host": rec["url_host"], "read_tool": alt})
+                return sp
+            rec["fallback_scheduled"] = False
+        # (b) fresh, never-attempted clean pending URLs (priority queue, URL-deduped).
+        for pend in self.select_pending_read_obligation_url():
+            rec = self._service_rec(pend.source_url)
+            if rec["attempted"] or rec["blocked_reason"]:
+                continue
+            if normalize_url(pend.source_url) in scraped_urls:
+                # the URL was already read outside the service path; never re-read it here.
+                rec["status"] = "pending_service_duplicate_url_already_attempted"
+                continue
+            sp = self._build_service_read_plan(
+                rec, page_fetch_available=page_fetch_available,
+                scrape_available=scrape_available, allow_social=allow_social,
+                force_page_fetch=force_page_fetch)
+            if sp is None:
+                continue                       # URL disallowed (recorded); try the next URL
+            rec["attempted"] = True
+            rec["attempt_tool"] = sp.read_decision.tool
+            rec["tools_tried"].append(sp.read_decision.tool)
+            rec["outcome_recorded"] = False
+            self.read_desired_count += 1
+            self.read_selected_count += 1
+            self.pending_snippet_read_attempted_count += 1
+            self._emit("read_desired", data={"reason": "pending_obligation_service"})
+            self._emit("read_selected", data={"url_host": rec["url_host"],
+                                              "reason": "pending_obligation_service"})
+            return sp
+        # (c) bounded predicate re-reads (5t-6; at most one per obligation, live runs only).
+        while self.predicate_reread_plans:
+            meta = self.predicate_reread_plans.pop(0)
+            rec = self._service_rec(meta["url"])
+            sp = self._build_service_read_plan(
+                rec, page_fetch_available=page_fetch_available,
+                scrape_available=scrape_available, allow_social=allow_social,
+                force_page_fetch=force_page_fetch, reason="predicate_reread",
+                read_opts={"max_chars": meta.get("predicate_reread_max_chars",
+                                                 self.read_config.reread_max_chars)})
+            if sp is not None:
+                self.predicate_reread_attempted_count += 1
+                self._emit("predicate_reread_attempted",
+                           data={"url_host": rec["url_host"],
+                                 "predicate_reread_max_chars":
+                                     meta.get("predicate_reread_max_chars")})
+                return sp
+        return None
+
+    def record_pending_service_outcome(self, *, url: str, tool: str = "",
+                                       failed: bool = False, zero_chars: bool = False,
+                                       body_chars: int = 0,
+                                       page_fetch_available: bool = False,
+                                       scrape_available: bool = False) -> None:
+        """5t-2/5: record the executed service read's outcome on the URL record. A success
+        marks ALL pending obligations for that normalized URL body-available; a primary
+        failure schedules the bounded same-URL fallback (other enabled tool, once)."""
+        rec = self._service_rec(url)
+        is_fallback = bool(rec["fallback_attempted"] and rec["fallback_scheduled"])
+        rec["outcome_recorded"] = True
+        ok = not failed and not zero_chars
+        if zero_chars:
+            self.pending_read_zero_chars_count += 1
+            self._emit("pending_read_zero_chars",
+                       data={"url_host": rec["url_host"], "read_tool": tool})
+        if ok:
+            rec["success"], rec["failed"], rec["zero_chars"] = True, False, False
+            rec["fallback_scheduled"] = False
+            rec["status"] = "pending_service_success"
+            if is_fallback:
+                rec["fallback_success"] = True
+                self.pending_read_fallback_success_count += 1
+                self._emit("pending_read_fallback_success",
+                           data={"url_host": rec["url_host"], "read_tool": tool})
+            served = 0
+            for p in self._pendings_for_url(url):
+                if not p.suppressed_reason:
+                    p.body_available = True
+                    served += 1
+            self._emit("pending_service_read_succeeded",
+                       data={"url_host": rec["url_host"], "read_tool": tool,
+                             "body_chars": body_chars, "obligations_served": served})
+            return
+        rec["failed"] = True
+        rec["zero_chars"] = rec["zero_chars"] or zero_chars
+        if is_fallback:
+            rec["fallback_scheduled"] = False
+            rec["status"] = ("pending_service_attempted_zero_chars" if zero_chars
+                             else "pending_service_attempted_failed")
+            self.pending_read_fallback_failed_count += 1
+            self._emit("pending_read_fallback_failed",
+                       data={"url_host": rec["url_host"], "read_tool": tool})
+            return
+        self.pending_read_primary_failed_count += 1
+        self._emit("pending_read_primary_failed",
+                   data={"url_host": rec["url_host"], "read_tool": tool,
+                         "zero_chars": zero_chars})
+        enabled = [t for t, okk in (("page_fetch", page_fetch_available),
+                                    ("firecrawl_scrape", scrape_available)) if okk]
+        if any(t not in rec["tools_tried"] for t in enabled):
+            rec["fallback_scheduled"] = True
+        else:
+            rec["status"] = ("pending_service_attempted_zero_chars" if zero_chars
+                             else "pending_service_attempted_failed")
+
+    def schedule_predicate_rereads_after_read(self, *, url: str,
+                                              body_truncated_for_storage: bool,
+                                              raw_unavailable: bool) -> list[dict]:
+        """5t-6 (LIVE runs only; replay validation never fetches): after a service read whose
+        body was truncated with raw unavailable and which yielded no predicate-relevant
+        passage, queue AT MOST ONE bounded higher-cap re-read of the SAME clean URL."""
+        plans: list[dict] = []
+        for p in self._pendings_for_url(url):
+            if p.suppressed_reason or not _is_clean_url(p.source_url):
+                continue
+            plan = self.plan_predicate_reread(
+                pending_read_judgment_id=p.pending_read_judgment_id,
+                body_truncated_for_storage=body_truncated_for_storage,
+                raw_unavailable=raw_unavailable,
+                passage_relevance=p.passage_relevance or "no_relevant_anchor")
+            if plan:
+                p.reread_pending = True
+                p.closure_state = "body_truncated_before_relevant_passage(raw_unavailable)"
+                self.predicate_reread_scheduled_count += 1
+                plans.append(plan)
+        self.predicate_reread_plans.extend(plans)
+        return plans
+
+    def record_predicate_reread_outcome(self, *, url: str, failed: bool = False,
+                                        zero_chars: bool = False, body_chars: int = 0,
+                                        saw_beyond_original_cap: bool = False) -> None:
+        """5t-6: record the bounded re-read's outcome. Resolution/still-open accounting for
+        a SUCCESSFUL re-read happens in the route (the re-judge sees the bigger body)."""
+        ok = not failed and not zero_chars
+        if ok:
+            self.predicate_reread_success_count += 1
+            if saw_beyond_original_cap:
+                self.predicate_reread_saw_beyond_original_cap_count += 1
+        self._emit("predicate_reread_outcome_recorded",
+                   data={"url_host": _host(url), "success": ok, "zero_chars": zero_chars,
+                         "body_chars": body_chars,
+                         "saw_beyond_original_cap": bool(ok and saw_beyond_original_cap)})
+        if not ok:
+            for p in self._pendings_for_url(url):
+                if p.reread_pending:
+                    p.reread_pending = False
+                    self.predicate_reread_still_open_count += 1
+
+    def finalize_pending_service(self, *, budget_remaining: int = 0,
+                                 reading_tools_enabled: bool = True) -> None:
+        """5t-2: end-of-item — every pending obligation records exactly one explicit service
+        reason (never an ambiguous 'snippet-only with no reason'). URL records get a
+        terminal status too. Suppressed pendings are diagnostics, never service failures."""
+        self._sync_service_registry()
+        for p in self.pending_read_judgments.values():
+            if p.service_status:
+                continue
+            if p.suppressed_reason:
+                p.service_status = "pending_service_suppressed_source"
+                continue
+            if not _is_clean_url(p.source_url):
+                p.service_status = "pending_service_url_disallowed"
+                continue
+            rec = self.pending_service_urls.get(self._service_norm(p.source_url)) or {}
+            if rec.get("success"):
+                p.service_status = ("pending_service_success" if p.body_available
+                                    else "pending_service_attempted_body_not_persisted")
+            elif rec.get("attempted") or rec.get("fallback_attempted"):
+                if not rec.get("outcome_recorded"):
+                    # selected but the loop ended before the call executed.
+                    p.service_status = "pending_service_budget_exhausted"
+                elif rec.get("zero_chars"):
+                    p.service_status = "pending_service_attempted_zero_chars"
+                else:
+                    p.service_status = "pending_service_attempted_failed"
+            elif rec.get("blocked_reason"):
+                p.service_status = "pending_service_url_disallowed"
+            elif rec.get("status") == "pending_service_duplicate_url_already_attempted":
+                p.service_status = "pending_service_duplicate_url_already_attempted"
+            elif not reading_tools_enabled:
+                p.service_status = "pending_service_no_read_tool_enabled"
+            else:
+                p.service_status = "pending_service_budget_exhausted"
+        for rec in self.pending_service_urls.values():
+            if rec.get("status"):
+                continue
+            if rec.get("success"):
+                rec["status"] = "pending_service_success"
+            elif rec.get("attempted"):
+                if not rec.get("outcome_recorded"):
+                    rec["status"] = "pending_service_budget_exhausted"
+                elif rec.get("zero_chars"):
+                    rec["status"] = "pending_service_attempted_zero_chars"
+                else:
+                    rec["status"] = "pending_service_attempted_failed"
+            elif rec.get("blocked_reason"):
+                rec["status"] = "pending_service_url_disallowed"
+            elif not reading_tools_enabled:
+                rec["status"] = "pending_service_no_read_tool_enabled"
+            else:
+                rec["status"] = "pending_service_budget_exhausted"
+        from collections import Counter as _Counter
+        self._emit("pending_service_finalized",
+                   data={"budget_remaining": budget_remaining,
+                         "service_status_counts": dict(_Counter(
+                             p.service_status
+                             for p in self.pending_read_judgments.values()))})
+
     def _open_pending_for(self, candidate_id, source_url):
         host = _host(source_url or "")
         out = []
         for p in self.pending_read_judgments.values():
-            if not p.open:
+            # 5t-6: an obligation with a scheduled bounded re-read is routable again even
+            # though its first rejudgment recorded a non-open resolution.
+            if not p.open and not p.reread_pending:
                 continue
             if candidate_id and p.candidate_id == candidate_id:
                 out.append(p)
@@ -1909,7 +2266,11 @@ class CandidateFrontier:
             return 0
         resolved = 0
         for p in pend:
+            was_reread = bool(p.reread_pending)
+            p.reread_pending = False
             p.read_selected = True
+            if read_text:
+                p.body_available = True
             self._emit("read_selected_for_pending_judgment", candidate_id=p.candidate_id,
                        slot_id=p.slot_id, data={"pending_read_judgment_id": p.pending_read_judgment_id})
             con = self._con(p.constraint_id)
@@ -1920,9 +2281,11 @@ class CandidateFrontier:
                                          aliases=(cand.aliases if cand else []))
             scan = extract_passages(read_text, anchors, config=self.read_config,
                                     extra_terms=p.target_terms)
+            p.passage_relevance = self._live_passage_relevance(scan, p, cand)
             self._emit("read_completed_for_pending_judgment", candidate_id=p.candidate_id,
                        slot_id=p.slot_id, data={"pending_read_judgment_id": p.pending_read_judgment_id,
-                                                "passage_scan": scan.to_dict()})
+                                                "passage_scan": scan.to_dict(),
+                                                "passage_relevance": p.passage_relevance})
             if scan.hit:
                 self.read_passage_hits_count += 1
                 if slot is not None and slot.slot_id in [
@@ -1932,7 +2295,10 @@ class CandidateFrontier:
                 self.read_passage_no_hits_count += 1
             if not scan.passages:
                 p.resolution, p.resolved_step = "no_relevant_passage", self._clock()
+                p.closure_state = "no_relevant_passage"
                 self.requires_read_unresolved_after_read_count += 1
+                if was_reread:
+                    self.predicate_reread_still_open_count += 1
                 self._emit("read_judgment_still_unresolved", candidate_id=p.candidate_id,
                            slot_id=p.slot_id,
                            data={"pending_read_judgment_id": p.pending_read_judgment_id,
@@ -1947,6 +2313,25 @@ class CandidateFrontier:
             # re-judge the SAME triple on the passage (not the snippet, not the head).
             status = self._judge_passage(p, con, slot, cand, passage, judge, scan)
             self.read_passage_judged_count += 1
+            # 5t-4: the targeted rejudgment ran IN THE LIVE RUN — persist its verdict under
+            # the strict replay namespace so default replay validation finds it offline.
+            p.rejudgment_attempted = True
+            self.pending_read_targeted_rejudgment_attempted_count += 1
+            self._persist_strict_rejudgment(p, status, read_text, passage, judge)
+            p.closure_state = {
+                "full_support": "resolved_full_support",
+                "contradiction": "resolved_contradiction",
+                "partial_support": "partial_support_after_read",
+                "irrelevant": "irrelevant_after_read"}.get(status, "requires_read_still_open")
+            if status in ("full_support", "contradiction"):
+                self.pending_read_targeted_rejudgment_closed_count += 1
+            elif p.closure_state == "requires_read_still_open":
+                self.pending_read_targeted_rejudgment_still_open_count += 1
+            if was_reread:
+                if status in ("full_support", "contradiction"):
+                    self.predicate_reread_resolved_pending_judgment_count += 1
+                else:
+                    self.predicate_reread_still_open_count += 1
             self._emit("read_judged_after_read", candidate_id=p.candidate_id, slot_id=p.slot_id,
                        data={"pending_read_judgment_id": p.pending_read_judgment_id,
                              "resolution": status})
@@ -1997,6 +2382,61 @@ class CandidateFrontier:
                            data={"pending_read_judgment_id": p.pending_read_judgment_id,
                                  "reason": status})
         return resolved
+
+    @staticmethod
+    def _live_passage_relevance(scan, p, cand) -> str:
+        """5t-4: lightweight LIVE passage relevance — a matched anchor that is neither a
+        subject alias nor a generic relation cue is a predicate anchor. Fail-closed:
+        subject-only stays subject-only (the strict validator recomputes its own)."""
+        from regimes_probe.agent.read_judgment import _GENERIC_RELATION_CUES
+        subj = set()
+        if cand is not None:
+            subj.add((cand.candidate_text or "").lower())
+            subj.update(a.lower() for a in cand.aliases)
+        if p.source_subject:
+            subj.add(p.source_subject.lower())
+        subj_tokens = {w for t in subj for w in re.findall(r"[a-z0-9]+", t)}
+        pred = [m for m in scan.matched_anchors
+                if m.lower() not in subj and m.lower() not in subj_tokens
+                and m.lower() not in _GENERIC_RELATION_CUES]
+        if pred:
+            return "predicate_relevant"
+        return "subject_only" if scan.matched_anchors else "no_relevant_anchor"
+
+    def _persist_strict_rejudgment(self, p, verdict, body, passage, judge) -> bool:
+        """5t-4: persist a LIVE targeted rejudgment under the STRICT replay namespace, keyed
+        and hashed exactly as replay validation reads it (same body bytes required), so the
+        next default replay finds the verdict offline instead of
+        ``rejudgment_prompt_not_in_cache``. Never gold; the passage/body are run artifacts."""
+        judge = judge or (getattr(self.interpreter, "judge", None) if self.interpreter else None)
+        cache = getattr(judge, "cache", None)
+        if cache is None:
+            return False
+        from regimes_probe.agent.read_judgment import (
+            LIVE_RUN_BODY_SOURCE, STRICT_REJUDGE_VERSION, body_hash, strict_rejudgment_key)
+        cand = self.candidates_by_id.get(p.candidate_id)
+        rec = {"version": STRICT_REJUDGE_VERSION, "verdict": verdict,
+               "body_source": LIVE_RUN_BODY_SOURCE, "body_provider": p.read_tool or "",
+               "body_hash": body_hash(body), "passage_hash": body_hash(passage),
+               "source_url": (p.source_url or "")[:300], "candidate_id": p.candidate_id,
+               "candidate_text": ((cand.candidate_text if cand else p.source_subject)
+                                  or "")[:120],
+               "slot_id": p.slot_id, "constraint_id": p.constraint_id,
+               "contaminated": False, "recorded_during": "live_run",
+               "judge_mode": ("llm" if (judge is not None and getattr(judge, "enabled", False))
+                              else "deterministic_fallback")}
+        try:
+            cache.put(strict_rejudgment_key(p.pending_read_judgment_id), rec)
+        except Exception:
+            return False
+        p.rejudgment_recorded = True
+        self.pending_read_targeted_rejudgment_recorded_count += 1
+        self._emit("pending_read_targeted_rejudgment_recorded",
+                   candidate_id=p.candidate_id, slot_id=p.slot_id,
+                   data={"pending_read_judgment_id": p.pending_read_judgment_id,
+                         "verdict": verdict, "body_hash": rec["body_hash"],
+                         "judge_mode": rec["judge_mode"]})
+        return True
 
     def _judge_passage(self, p, con, slot, cand, passage, judge, scan) -> str:
         """Judge one pending triple on a retrieved passage. Prefer the narrow LLM judge when
@@ -2057,13 +2497,17 @@ class CandidateFrontier:
         only subject/no-anchor evidence, schedule AT MOST ONE bounded re-read at the higher
         configured cap. Never unbounded; never raises all reads."""
         p = self.pending_read_judgments.get(pending_read_judgment_id)
-        if p is None or not p.open or not _is_clean_url(p.source_url):
+        # 5t-6: an obligation judged still-open / no-relevant-passage on a truncated body is
+        # re-readable once; resolved/contradicted/suppressed obligations never are.
+        if p is None or p.suppressed_reason or not _is_clean_url(p.source_url) \
+                or p.resolution not in ("open", "still_unresolved", "no_relevant_passage"):
             return None
         if not (body_truncated_for_storage or raw_unavailable):
             return None
         if passage_relevance == "predicate_relevant":
             return None
         if getattr(p, "_predicate_reread_done", False):
+            self.predicate_reread_blocked_count += 1
             self._emit("predicate_reread_blocked",
                        data={"pending_read_judgment_id": pending_read_judgment_id,
                              "predicate_reread_blocked_reason": "already_reread_once"})
@@ -2199,6 +2643,9 @@ class CandidateFrontier:
             # future-run replay validates without structured-legacy reconstruction.
             "pending_read_judgments": [p.to_dict()
                                        for p in self.pending_read_judgments.values()][:40],
+            # 5t-1: URL-level pending-service registry (attempt/outcome/fallback per URL).
+            "pending_service_urls": [dict(r) for r in
+                                     self.pending_service_urls.values()][:40],
             "metrics": self.metrics(),
         }
 
@@ -2256,6 +2703,64 @@ class CandidateFrontier:
                 if c.status == "rejected" and c.status_reason == "repeated_no_progress"
                 and c.constraints_supported),
             **self._metrics_5h(),
+            **self._metrics_5t(),
+        }
+
+    def _metrics_5t(self) -> dict[str, Any]:
+        """5t: URL-level pending-service, same-URL fallback, targeted-rejudgment persistence,
+        and bounded predicate re-read accounting. All counts are mechanism-backed."""
+        from collections import Counter
+        self._sync_service_registry()
+        svc = list(self.pending_service_urls.values())
+        clean = [p for p in self.pending_read_judgments.values()
+                 if _is_clean_url(p.source_url) and not p.suppressed_reason]
+        attempted = sum(1 for r in svc if r.get("attempted") or r.get("fallback_attempted"))
+        success = sum(1 for r in svc if r.get("success"))
+        served = sum(1 for p in clean if p.body_available)
+        return {
+            "pending_service_url_count": len(svc),
+            "pending_service_url_attempted_count": attempted,
+            "pending_service_url_success_count": success,
+            "pending_service_url_blocked_count": sum(
+                1 for r in svc if r.get("blocked_reason")),
+            "pending_service_url_budget_exhausted_count": sum(
+                1 for r in svc if r.get("status") == "pending_service_budget_exhausted"),
+            "pending_service_obligation_count": len(clean),
+            "pending_service_obligations_served_by_successful_read_count": served,
+            "pending_service_url_success_rate": (round(success / len(svc), 3) if svc else 0.0),
+            "pending_service_obligation_success_rate": (round(served / len(clean), 3)
+                                                        if clean else 0.0),
+            # pinned 0 after finalize_pending_service: no ambiguous end-of-item state (5t-2).
+            "pending_obligation_without_service_reason_count": sum(
+                1 for p in clean if p.open and not p.service_status),
+            "pending_service_status_counts": dict(Counter(
+                p.service_status for p in self.pending_read_judgments.values()
+                if p.service_status)),
+            # 5t-5 fallback/zero-chars accounting.
+            "pending_read_primary_failed_count": self.pending_read_primary_failed_count,
+            "pending_read_fallback_attempted_count": self.pending_read_fallback_attempted_count,
+            "pending_read_fallback_success_count": self.pending_read_fallback_success_count,
+            "pending_read_fallback_failed_count": self.pending_read_fallback_failed_count,
+            "pending_read_zero_chars_count": self.pending_read_zero_chars_count,
+            # 5t-4 live targeted-rejudgment persistence.
+            "pending_read_targeted_rejudgment_attempted_count":
+                self.pending_read_targeted_rejudgment_attempted_count,
+            "pending_read_targeted_rejudgment_recorded_count":
+                self.pending_read_targeted_rejudgment_recorded_count,
+            "pending_read_targeted_rejudgment_closed_count":
+                self.pending_read_targeted_rejudgment_closed_count,
+            "pending_read_targeted_rejudgment_still_open_count":
+                self.pending_read_targeted_rejudgment_still_open_count,
+            # 5t-6 bounded predicate re-read outcomes.
+            "predicate_reread_scheduled_count": self.predicate_reread_scheduled_count,
+            "predicate_reread_attempted_count": self.predicate_reread_attempted_count,
+            "predicate_reread_success_count": self.predicate_reread_success_count,
+            "predicate_reread_saw_beyond_original_cap_count":
+                self.predicate_reread_saw_beyond_original_cap_count,
+            "predicate_reread_resolved_pending_judgment_count":
+                self.predicate_reread_resolved_pending_judgment_count,
+            "predicate_reread_still_open_count": self.predicate_reread_still_open_count,
+            "predicate_reread_blocked_count": self.predicate_reread_blocked_count,
         }
 
     def _metrics_5h(self) -> dict[str, Any]:

@@ -719,3 +719,33 @@ fetches). Strict rejudgment semantics unchanged: requires_read_still_open is nev
 snippets and subject-only passages are never judged, and success on real artifacts is measured
 by diagnostic resolution and predicate-passage coverage — never accuracy. Zero live calls in
 default validation; no benchmark/accuracy/memory/generalization claim.
+
+## Level 5t: first-class pending-read servicing + persisted targeted rejudgment
+
+The 5s live smoke (diagnostic only) showed the pending queue was visible but not governing
+action selection (1 of 58 snippet-only pendings attempted) and the live rejudgment was
+invisible to replay (all 11 actual bodies at `rejudgment_prompt_not_in_cache`). 5t makes
+servicing and post-read judgment first-class, budget-aware, and auditable. A top-level
+pending-service step runs before frontier/EIG selection and before the LLM planner: when
+clean executable pending obligations exist and budget remains, the next action is a concrete
+pending-URL read — never a search translation — with URL-level dedupe (one read serves every
+obligation sharing a normalized URL) and URL-level metrics alongside the legacy
+obligation-level ones. Every pending ends the item with exactly one explicit service reason
+(budget exhausted / no read tool / URL disallowed / suppressed / duplicate URL / attempted
+failed / zero chars / body not persisted / success); the no-reason count is pinned 0.
+A failed or zero-chars pending read retries once with the other enabled read tool on the
+same URL (never a different URL, never a search). A successful pending read immediately
+routes bounded passages (question/frame/constraint/candidate/judge-hint anchors — never
+gold) into a targeted same-triple judge call, and the verdict is persisted under the strict
+replay namespace (`read_judge_replay_strict_body_v2::<id>`) with body hash/provenance; the
+validator accepts a live-recorded entry only when it independently locates the same actual
+read body (hash-checked, so a snippet-judged verdict can never match). Closure states are
+explicit (resolved_full_support / resolved_contradiction / requires_read_still_open /
+irrelevant_after_read / partial_support_after_read / no_relevant_passage /
+body_truncated_before_relevant_passage(raw_unavailable)); partial support never resolves a
+blocking constraint, requires_read_still_open is never closed, and the answer gate is
+unchanged. The bounded predicate re-read from 5s is now wired and outcome-recorded (live
+runs only, at most one per obligation, higher per-call cap; replay never fetches — it only
+reports recorded outcomes). Validator statuses are service-aware for runs that recorded a
+service event; `pending_source_has_search_snippet_only` is reserved for old runs with none.
+Zero live calls in default validation; no benchmark/accuracy/memory/generalization claim.

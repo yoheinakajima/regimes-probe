@@ -602,3 +602,18 @@ set — and the risk surface. Keep the experiment honest:
   (never re-fetches tools), is hard-capped and fail-closed, and records verdicts so the next
   replay is free — and it is off by default, exercised by no test. The default path makes zero
   live calls and the whole pass adds no benchmark/accuracy/memory/generalization claim.
+
+- **Level 5t risks.** (1) *A live-recorded "strict" verdict that was not judged on the real
+  body*: the validator accepts a `live_run_read_body` entry only when its body hash matches an
+  actual read body the validator located independently (the stored cap'd body or its raw
+  superset of the same fetch) and the (constraint, slot) triple matches — a hash over a search
+  snippet or a different page can never match, so strictness is not loosened. (2) *Service
+  pressure starving terminal actions*: the service step consumes read budget before EIG
+  actions; it is bounded (each clean URL at most once plus one same-URL fallback plus one
+  bounded re-read) and suppressed/contaminated/definition pendings never enter the queue, but
+  a run with many clean pendings will spend more of its budget on reads — that is the intended
+  trade, recorded per URL, and it is a mechanism property, not an accuracy claim. (3) *Reason
+  inflation*: end-of-item service reasons are assigned from the recorded URL registry, not
+  inferred; a selected-but-never-executed read is reported as budget exhausted rather than a
+  fake failure. (4) *Re-read loops*: predicate re-reads are once-per-obligation by a persistent
+  flag, executed only live; replay only reports recorded outcomes and never fetches.

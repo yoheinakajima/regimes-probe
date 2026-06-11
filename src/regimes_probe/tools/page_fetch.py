@@ -77,6 +77,9 @@ class PageFetch(SearchProvider):
                 provider=self.name, query=query, results=(), cost=Decimal("0"),
                 latency_s=0.0, error=meta["message"], error_meta=meta)
         t0 = time.monotonic()
+        # 5t-6: a per-call cap override (bounded predicate re-read) — mirrors the existing
+        # firecrawl_scrape opt; the default stays the conservative adapter cap.
+        cap = int(opts.get("max_chars", self.max_chars))
         try:
             req = urllib.request.Request(query, headers={"User-Agent": "regimes-probe/0.1"})
             with urllib.request.urlopen(req, timeout=30) as resp:  # noqa: S310
@@ -85,7 +88,7 @@ class PageFetch(SearchProvider):
             parser = _TextExtractor()
             parser.feed(raw)
             full = parser.text
-            text = full[: self.max_chars]
+            text = full[:cap]
             results = (
                 SearchResult(title=query, url=query, snippet=text, rank=0),
             )
@@ -97,8 +100,8 @@ class PageFetch(SearchProvider):
             fetch_meta = {
                 "fetched_chars": len(full),
                 "stored_body_chars": len(text),
-                "adapter_max_chars": self.max_chars,
-                "body_truncated_for_storage": len(full) > self.max_chars,
+                "adapter_max_chars": cap,
+                "body_truncated_for_storage": len(full) > cap,
                 "truncation_origin": "page_fetch_adapter_max_chars",
             }
             if self.raw_chars > 0:

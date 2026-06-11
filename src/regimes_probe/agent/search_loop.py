@@ -535,7 +535,21 @@ class SearchLoop:
             # step's tool/action (every executed call links to a frontier_action id).
             controller_handled = False
             step_plan = None
-            if frontier is not None:
+            service_plan = None
+            if frontier is not None and frontier_controller and reading_tools:
+                # 5t-1: TOP-LEVEL pending-service step — runs BEFORE frontier/EIG action
+                # selection and before the LLM planner, so an open clean pending obligation
+                # governs the next action regardless of which recommender is active. It only
+                # ever yields a concrete pending-URL read (never a search translation).
+                service_plan = frontier.propose_pending_service_read(
+                    budget_remaining=config.budget - len(calls), scraped_urls=scraped_urls,
+                    page_fetch_available=page_fetch_available,
+                    scrape_available=scrape_available,
+                    allow_social=config.allow_social_scrape,
+                    force_page_fetch=force_page_fetch)
+            if service_plan is not None:
+                step_plan = service_plan
+            elif frontier is not None:
                 step_plan = frontier.propose_step_action(
                     observations=observations, budget_remaining=config.budget - len(calls),
                     reading_tools=bool(reading_tools), scraped_urls=scraped_urls,
@@ -586,7 +600,9 @@ class SearchLoop:
                     controller_handled = True
                 elif step_plan.kind == "read":
                     o, rd = step_plan.read_obs, step_plan.read_decision
-                    tool, query, query_arm, opts = rd.tool, o.url, rd.query_arm, {}
+                    # 5t-6: a bounded predicate re-read carries a higher per-call max_chars.
+                    tool, query, query_arm = rd.tool, o.url, rd.query_arm
+                    opts = dict(getattr(step_plan, "read_opts", {}) or {})
                     read_target_obs = o
                     force_page_fetch = False
                     scrape_info = {"read_tool": tool, "scrape_url": query, "scrape_provider": tool,
@@ -838,7 +854,32 @@ class SearchLoop:
                            else "read_failed_after_fallback_count")
                     read_acct[key] = read_acct.get(key, 0) + 1
                     read_fallback_pending = False
-                if call_failed and scrape_info.get("is_scrape") and \
+                # 5t-2/5/6: a pending-SERVICE read records its outcome on the frontier's
+                # URL registry, which manages its own bounded same-URL fallback — the loop's
+                # generic fallback must not double-retry, and a failed service URL must stay
+                # retryable (not added to scraped/no-progress sets).
+                service_reason = (step_plan.reason if (
+                    controller_handled and step_plan is not None and step_plan.reason in (
+                        "pending_obligation_service", "pending_obligation_service_fallback",
+                        "predicate_reread")) else "")
+                if service_reason and frontier is not None:
+                    fm = response.fetch_meta or {}
+                    if service_reason == "predicate_reread":
+                        frontier.record_predicate_reread_outcome(
+                            url=query, failed=call_failed, zero_chars=read_zero,
+                            body_chars=read_chars,
+                            saw_beyond_original_cap=(
+                                read_chars
+                                > frontier.read_config.page_fetch_default_max_chars))
+                    else:
+                        frontier.record_pending_service_outcome(
+                            url=query, tool=tool, failed=call_failed, zero_chars=read_zero,
+                            body_chars=read_chars,
+                            page_fetch_available=page_fetch_available,
+                            scrape_available=scrape_available)
+                    if not (call_failed or read_zero):
+                        scraped_urls.add(normalize_url(query))
+                elif call_failed and scrape_info.get("is_scrape") and \
                         config.scrape_fallback_to_page_fetch and page_fetch_available:
                     # fail closed: retry the SAME url with the basic fetch next step.
                     pending_read = read_target_obs
@@ -908,6 +949,20 @@ class SearchLoop:
                     if not progressed:
                         for s in frontier.slates:
                             frontier.note_no_progress_for_slate(s)
+                    # 5t-6 (LIVE only): after a successful SERVICE read whose body was
+                    # truncated with raw unavailable and still has no predicate-relevant
+                    # passage, queue at most ONE bounded higher-cap re-read of the same URL.
+                    if scrape_info and not call_failed \
+                            and not scrape_info.get("read_zero_chars") \
+                            and controller_handled and step_plan is not None \
+                            and step_plan.reason in ("pending_obligation_service",
+                                                     "pending_obligation_service_fallback"):
+                        _fm = response.fetch_meta or {}
+                        frontier.schedule_predicate_rereads_after_read(
+                            url=query,
+                            body_truncated_for_storage=bool(
+                                _fm.get("body_truncated_for_storage")),
+                            raw_unavailable=not bool(_fm.get("raw_text")))
                     # When the controller drove this call, record its execution outcome.
                     # For an LLM-frontier action, success requires progress on the SELECTED
                     # slot/constraint — NOT an arbitrary unrelated candidate (req 7).
@@ -998,6 +1053,14 @@ class SearchLoop:
                 if target is not None:
                     pending_read = target
             step += 1
+
+        # 5t-2: end-of-item — every pending obligation records exactly one explicit service
+        # reason (budget exhausted / no tool / disallowed / suppressed / attempted-failed /
+        # success), so replay validation never sees an ambiguous snippet-only pending.
+        if frontier is not None and frontier_controller:
+            frontier.finalize_pending_service(
+                budget_remaining=config.budget - len(calls),
+                reading_tools_enabled=bool(reading_tools))
 
         # Recompute once after the loop so a zero-budget (closed-book) attempt,
         # which never entered the loop body, still produces a candidate.

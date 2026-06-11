@@ -157,6 +157,35 @@ def main() -> int:
               f"{pm.get('pending_obligations_search_snippet_only_count')} "
               f"read_attempted={pm.get('pending_search_snippet_only_read_attempted_count')} "
               f"suppressed={pm.get('pending_search_snippet_only_suppressed_count')}")
+        print(f"   pending service (5t): urls={pm.get('pending_service_url_count')} "
+              f"attempted={pm.get('pending_service_url_attempted_count')} "
+              f"success={pm.get('pending_service_url_success_count')} "
+              f"blocked={pm.get('pending_service_url_blocked_count')} "
+              f"budget_exhausted={pm.get('pending_service_url_budget_exhausted_count')}; "
+              f"obligations={pm.get('pending_service_obligation_count')} "
+              f"served={pm.get('pending_service_obligations_served_by_successful_read_count')} "
+              f"url_rate={pm.get('pending_service_url_success_rate')} "
+              f"obligation_rate={pm.get('pending_service_obligation_success_rate')} "
+              f"no_reason={pm.get('pending_obligation_without_service_reason_count')}")
+        print(f"   service statuses: {json.dumps(pm.get('pending_service_status_counts', {}))}")
+        print(f"   targeted rejudgment (5t): body_available="
+              f"{pm.get('pending_read_body_available_count')} "
+              f"passages={pm.get('pending_read_body_passage_extracted_count')} "
+              f"predicate_relevant={pm.get('pending_read_body_predicate_relevant_count')} "
+              f"attempted={pm.get('pending_read_targeted_rejudgment_attempted_count')} "
+              f"recorded={pm.get('pending_read_targeted_rejudgment_recorded_count')} "
+              f"closed={pm.get('pending_read_targeted_rejudgment_closed_count')} "
+              f"still_open={pm.get('pending_read_targeted_rejudgment_still_open_count')} "
+              f"missing={pm.get('pending_read_targeted_rejudgment_missing_count')}")
+        print(f"   fallback/reread (5t): primary_failed="
+              f"{pm.get('pending_read_primary_failed_count')} "
+              f"fallback_attempted={pm.get('pending_read_fallback_attempted_count')} "
+              f"fallback_success={pm.get('pending_read_fallback_success_count')} "
+              f"zero_chars={pm.get('pending_read_zero_chars_count')}; "
+              f"reread scheduled={pm.get('predicate_reread_scheduled_count')} "
+              f"attempted={pm.get('predicate_reread_attempted_count')} "
+              f"blocked={pm.get('predicate_reread_blocked_count')} "
+              f"outcomes={pm.get('predicate_reread_outcome_recorded_count')}")
         from regimes_probe.eval.replay_validation import consistency_violations
         viol = consistency_violations(pm)
         print(f"   internal consistency: {'OK' if not viol else 'VIOLATIONS: ' + '; '.join(viol)}")

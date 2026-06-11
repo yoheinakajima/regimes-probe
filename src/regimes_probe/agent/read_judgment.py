@@ -32,6 +32,27 @@ _STOP = frozenset({
     "the", "a", "an", "of", "in", "on", "at", "to", "and", "or", "for", "with", "by",
     "is", "are", "was", "were", "be", "as", "that", "this", "it", "from", "which",
     "who", "what", "where", "when", "how", "their", "his", "her", "its"})
+#: 5t-4: relation-cue words too generic to establish PREDICATE relevance on their own (a
+#: matched "from"/"year" says nothing about the constraint's predicate). The specific verbs
+#: in ``_RELATION_CUES`` (born/founded/studied/...) still count as predicate anchors.
+_GENERIC_RELATION_CUES = frozenset({"from", "until", "since", "between", "year", "years"})
+
+#: 5t-4: strict rejudgment namespace SHARED between the live run and replay validation, so
+#: a live targeted rejudgment is persisted under exactly the key/format the validator reads
+#: (the 5s smoke showed live rejudgments invisible to replay: rejudgment_prompt_not_in_cache).
+STRICT_REJUDGE_VERSION = "read_judge_replay_strict_body_v2"
+#: body_source marker for entries recorded BY THE LIVE RUN (the validator accepts them only
+#: when it independently locates the same actual read body — hash-checked, never snippets).
+LIVE_RUN_BODY_SOURCE = "live_run_read_body"
+
+
+def strict_rejudgment_key(pending_read_judgment_id: str) -> str:
+    return f"{STRICT_REJUDGE_VERSION}::{pending_read_judgment_id}"
+
+
+def body_hash(text: str) -> str:
+    import hashlib
+    return hashlib.sha256((text or "").encode("utf-8")).hexdigest()[:16]
 
 
 @dataclass(frozen=True)
@@ -205,6 +226,23 @@ class PendingReadJudgment:
     suppressed_reason: str = ""
     selected_read_url: str = ""
     read_tool: str = ""
+    # 5t: pending-service + targeted-rejudgment state (persisted for replay validation).
+    #: end-of-item service reason — one of the pending_service_* vocabulary; never ambiguous.
+    service_status: str = ""
+    #: closure-state vocabulary after a targeted rejudgment (resolved_full_support /
+    #: resolved_contradiction / requires_read_still_open / irrelevant_after_read /
+    #: partial_support_after_read / no_relevant_passage /
+    #: body_truncated_before_relevant_passage(raw_unavailable)).
+    closure_state: str = ""
+    #: lightweight LIVE passage relevance (predicate_relevant|subject_only|no_relevant_anchor)
+    passage_relevance: str = ""
+    #: an actual read body for this obligation's URL was acquired during the run.
+    body_available: bool = False
+    #: the targeted rejudgment ran / was persisted under the strict replay namespace.
+    rejudgment_attempted: bool = False
+    rejudgment_recorded: bool = False
+    #: a bounded predicate re-read is scheduled for this obligation (consumed by the route).
+    reread_pending: bool = False
 
     @property
     def open(self) -> bool:
@@ -227,7 +265,13 @@ class PendingReadJudgment:
                 "source_role": self.source_role,
                 "suppressed_reason": self.suppressed_reason,
                 "selected_read_url": (self.selected_read_url or "")[:300],
-                "read_tool": self.read_tool}
+                "read_tool": self.read_tool,
+                "service_status": self.service_status,
+                "closure_state": self.closure_state,
+                "passage_relevance": self.passage_relevance,
+                "body_available": self.body_available,
+                "rejudgment_attempted": self.rejudgment_attempted,
+                "rejudgment_recorded": self.rejudgment_recorded}
 
 
 def _host(url: str) -> str:

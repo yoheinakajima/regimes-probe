@@ -144,6 +144,17 @@ class Events:
     READ_BLOCKED_GENERIC_SOURCE = "read_blocked_generic_source"
     PREDICATE_REREAD_SCHEDULED = "predicate_reread_scheduled"
     PREDICATE_REREAD_BLOCKED = "predicate_reread_blocked"
+    # Level 5t first-class pending service + targeted-rejudgment persistence
+    PENDING_SERVICE_READ_SUCCEEDED = "pending_service_read_succeeded"
+    PENDING_SERVICE_FINALIZED = "pending_service_finalized"
+    PENDING_READ_PRIMARY_FAILED = "pending_read_primary_failed"
+    PENDING_READ_FALLBACK_ATTEMPTED = "pending_read_fallback_attempted"
+    PENDING_READ_FALLBACK_SUCCESS = "pending_read_fallback_success"
+    PENDING_READ_FALLBACK_FAILED = "pending_read_fallback_failed"
+    PENDING_READ_ZERO_CHARS = "pending_read_zero_chars"
+    PENDING_READ_TARGETED_REJUDGMENT_RECORDED = "pending_read_targeted_rejudgment_recorded"
+    PREDICATE_REREAD_ATTEMPTED = "predicate_reread_attempted"
+    PREDICATE_REREAD_OUTCOME_RECORDED = "predicate_reread_outcome_recorded"
     # Level 5k adaptive bounded re-read for truncation (live runs only)
     READ_REREAD_DUE_TO_TRUNCATION = "read_reread_due_to_truncation"
     # Level 5f LLM evidence judge
@@ -217,6 +228,11 @@ EVIDENCE_INTERPRETATION_EVENTS: tuple[str, ...] = (
     Events.PENDING_READ_SUPPRESSED_CONTAMINATED_OR_NOISE_SOURCE,
     Events.READ_BLOCKED_GENERIC_SOURCE,
     Events.PREDICATE_REREAD_SCHEDULED, Events.PREDICATE_REREAD_BLOCKED,
+    Events.PENDING_SERVICE_READ_SUCCEEDED, Events.PENDING_SERVICE_FINALIZED,
+    Events.PENDING_READ_PRIMARY_FAILED, Events.PENDING_READ_FALLBACK_ATTEMPTED,
+    Events.PENDING_READ_FALLBACK_SUCCESS, Events.PENDING_READ_FALLBACK_FAILED,
+    Events.PENDING_READ_ZERO_CHARS, Events.PENDING_READ_TARGETED_REJUDGMENT_RECORDED,
+    Events.PREDICATE_REREAD_ATTEMPTED, Events.PREDICATE_REREAD_OUTCOME_RECORDED,
     Events.SOURCE_SUBJECT_EXTRACTED, Events.SOURCE_SUBJECT_PROMOTED,
     Events.SOURCE_SUBJECT_REJECTED, Events.SOURCE_SUBJECT_USED_FOR_CANDIDATE,
     Events.SOURCE_SUBJECT_USED_FOR_RELATION_SUPPORT,

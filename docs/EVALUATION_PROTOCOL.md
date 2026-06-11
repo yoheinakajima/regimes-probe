@@ -699,3 +699,23 @@ definition/reference source is blocked for concrete entity tasks
 (executed count pinned 0), and blocked reads are never silently converted to searches.
 `page_fetch` now records `fetch_meta.final_url` on redirects. Zero live calls in default
 validation; no live smoke in this increment; no benchmark/accuracy/memory/generalization claim.
+
+**Level 5s — predicate-passage acquisition + pending-source service.** The replay-after-
+livejudge output showed the strict gate behaving correctly (2 predicate-relevant passages
+judged, both honestly requires_read_still_open) with the bottleneck now in passage ACQUISITION:
+11 snippet-only pendings, 7 bodies with no relevant anchor, 1 subject-only. 5s adds: bounded
+per-obligation `predicate_passage_diagnostics` (≤20, state-derived, no gold, with
+`diagnostic_reason` such as predicate_terms_absent / predicate_present_but_far_from_subject /
+body_truncated_raw_unavailable / rejudgment_still_requires_read); a `judge_hint` anchor
+category from the prior judge's requires_read_reason/rationale and frontier expected_evidence
+(trace-safe, boilerplate-stopworded, counts as a target anchor); a predicate-window rescue that
+re-checks bounded windows around every subject occurrence (first occurrences can sit in nav
+headers; fail-closed); a pending-source SERVICE policy that reads open clean pendings before
+any EIG-selected search/verify (suppressed/contaminated never served); derived usefulness
+metrics (`predicate_passage_relevance_rate`, snippet-only pending service counts,
+`strict_rejudgment_still_open/resolved_count`); and a LIVE-only bounded predicate re-read
+planner (at most one, only truncated/raw-unavailable subject-only bodies; replay never
+fetches). Strict rejudgment semantics unchanged: requires_read_still_open is never closed,
+snippets and subject-only passages are never judged, and success on real artifacts is measured
+by diagnostic resolution and predicate-passage coverage — never accuracy. Zero live calls in
+default validation; no benchmark/accuracy/memory/generalization claim.

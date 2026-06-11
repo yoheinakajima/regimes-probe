@@ -142,6 +142,8 @@ class Events:
     PENDING_READ_SUPPRESSED_CONTAMINATED_OR_NOISE_SOURCE = \
         "pending_read_suppressed_contaminated_or_noise_source"
     READ_BLOCKED_GENERIC_SOURCE = "read_blocked_generic_source"
+    PREDICATE_REREAD_SCHEDULED = "predicate_reread_scheduled"
+    PREDICATE_REREAD_BLOCKED = "predicate_reread_blocked"
     # Level 5k adaptive bounded re-read for truncation (live runs only)
     READ_REREAD_DUE_TO_TRUNCATION = "read_reread_due_to_truncation"
     # Level 5f LLM evidence judge
@@ -214,6 +216,7 @@ EVIDENCE_INTERPRETATION_EVENTS: tuple[str, ...] = (
     Events.READ_BLOCKED_UNRELATED_TO_PENDING_OBLIGATION,
     Events.PENDING_READ_SUPPRESSED_CONTAMINATED_OR_NOISE_SOURCE,
     Events.READ_BLOCKED_GENERIC_SOURCE,
+    Events.PREDICATE_REREAD_SCHEDULED, Events.PREDICATE_REREAD_BLOCKED,
     Events.SOURCE_SUBJECT_EXTRACTED, Events.SOURCE_SUBJECT_PROMOTED,
     Events.SOURCE_SUBJECT_REJECTED, Events.SOURCE_SUBJECT_USED_FOR_CANDIDATE,
     Events.SOURCE_SUBJECT_USED_FOR_RELATION_SUPPORT,

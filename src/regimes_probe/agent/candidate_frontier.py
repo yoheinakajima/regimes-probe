@@ -384,6 +384,8 @@ class CandidateFrontier:
         self.pending_read_suppressed_contaminated_or_noise_count = 0
         #: 5r-4: generic/reference-source reads blocked when no pending obligations exist.
         self.read_blocked_generic_source_count = 0
+        #: 5s-4: pending obligations served by the priority read policy.
+        self.pending_snippet_read_attempted_count = 0
         #: Level 5h-A/B pending read->judge loop + targeted passage retrieval.
         from regimes_probe.agent.read_judgment import DEFAULT_READ_CONFIG
         self.read_config = DEFAULT_READ_CONFIG
@@ -1461,6 +1463,30 @@ class CandidateFrontier:
         terminal. If a selected action cannot be executed it returns kind
         ``unexecutable`` so the loop falls back to the old planner."""
         self.generate_frontier_actions()
+        # 5s-4: SERVICE POLICY — open clean pending obligations are read FIRST, before any
+        # EIG-selected search/verify of already-supported constraints. Concrete URL reads
+        # only; suppressed/contaminated pendings never enter the queue (5q-4).
+        if reading_tools and budget_remaining > 0 and self.select_pending_read_obligation_url():
+            chosen = self._read_pending_obligation_url(
+                None, scraped_urls, no_progress_domains, page_fetch_available,
+                scrape_available, allow_social, force_page_fetch)
+            if chosen is not None:
+                o, rd, tested = chosen
+                self.read_desired_count += 1
+                self.read_selected_count += 1
+                self.pending_snippet_read_attempted_count += 1
+                self._emit("read_desired", data={"reason": "pending_obligation_service"})
+                self._emit("read_selected", data={"url_host": _host(getattr(o, "url", "")),
+                                                  "reason": "pending_obligation_service"})
+                self._ac += 1
+                fa = FrontierAction(action_id=f"fa{self._ac}",
+                                    action_type="read_candidate_source",
+                                    constraint_ids=list(tested), selected=True,
+                                    selected_reason="pending_obligation_service")
+                self.frontier_actions.append(fa)
+                return StepPlan(fa.action_id, "read_candidate_source", "read", read_obs=o,
+                                read_decision=rd, constraint_ids=tested,
+                                reason="pending_obligation_service")
         sel = self.select_frontier_action(budget_remaining=budget_remaining,
                                           reading_available=reading_tools)
         if sel is None:
@@ -2024,6 +2050,34 @@ class CandidateFrontier:
                 "reason": "pending_judgment_unresolved_after_truncated_read",
                 "pending_read_judgment_ids": [p.pending_read_judgment_id for p in fresh]}
 
+    def plan_predicate_reread(self, *, pending_read_judgment_id, body_truncated_for_storage,
+                              raw_unavailable, passage_relevance):
+        """5s-6 (LIVE runs only; replay validation never fetches): when an actual read body
+        is linked to an OPEN pending obligation but is truncated/raw-unavailable AND yielded
+        only subject/no-anchor evidence, schedule AT MOST ONE bounded re-read at the higher
+        configured cap. Never unbounded; never raises all reads."""
+        p = self.pending_read_judgments.get(pending_read_judgment_id)
+        if p is None or not p.open or not _is_clean_url(p.source_url):
+            return None
+        if not (body_truncated_for_storage or raw_unavailable):
+            return None
+        if passage_relevance == "predicate_relevant":
+            return None
+        if getattr(p, "_predicate_reread_done", False):
+            self._emit("predicate_reread_blocked",
+                       data={"pending_read_judgment_id": pending_read_judgment_id,
+                             "predicate_reread_blocked_reason": "already_reread_once"})
+            return None
+        p._predicate_reread_done = True
+        cap = self.read_config.reread_max_chars
+        self._emit("predicate_reread_scheduled",
+                   data={"pending_read_judgment_id": pending_read_judgment_id,
+                         "predicate_reread_max_chars": cap,
+                         "url_host": _host(p.source_url)})
+        return {"url": p.source_url, "pending_read_judgment_id": pending_read_judgment_id,
+                "predicate_reread_max_chars": cap,
+                "reason": "subject_only_or_no_anchor_in_truncated_body"}
+
     def _head_noun(self, descriptor: str, slot) -> str:
         from regimes_probe.agent.task_frame import _ROLE_TRIGGERS
         toks = re.findall(r"[A-Za-z][A-Za-z'&]+", descriptor or "")
@@ -2280,6 +2334,8 @@ class CandidateFrontier:
             # construction); generic-source reads are blocked even with no pendings.
             "unrelated_read_executed_while_pending_count": 0,
             "read_blocked_generic_source_count": self.read_blocked_generic_source_count,
+            "pending_search_snippet_only_read_attempted_count":
+                self.pending_snippet_read_attempted_count,
             # B — targeted passage retrieval.
             "read_passage_hits_count": self.read_passage_hits_count,
             "read_passage_no_hits_count": self.read_passage_no_hits_count,

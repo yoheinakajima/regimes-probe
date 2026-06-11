@@ -147,6 +147,16 @@ def main() -> int:
               f"after_pending={pm.get('unlinked_read_body_after_pending_count')}"
               + (f"; note: {pm.get('body_match_explanation')}"
                  if pm.get('body_match_explanation') else ""))
+        print(f"   predicate passages: relevant={pm.get('actual_body_predicate_relevant_count')} "
+              f"subject_only={pm.get('actual_body_subject_only_count')} "
+              f"no_anchor={pm.get('actual_body_no_relevant_anchor_count')} "
+              f"rate={pm.get('predicate_passage_relevance_rate')} "
+              f"rescued={pm.get('passage_rescue_used_count')}; "
+              f"diag_reasons={json.dumps(pm.get('predicate_passage_diagnostic_reason_counts', {}))}")
+        print(f"   snippet-only pendings: total="
+              f"{pm.get('pending_obligations_search_snippet_only_count')} "
+              f"read_attempted={pm.get('pending_search_snippet_only_read_attempted_count')} "
+              f"suppressed={pm.get('pending_search_snippet_only_suppressed_count')}")
         from regimes_probe.eval.replay_validation import consistency_violations
         viol = consistency_violations(pm)
         print(f"   internal consistency: {'OK' if not viol else 'VIOLATIONS: ' + '; '.join(viol)}")

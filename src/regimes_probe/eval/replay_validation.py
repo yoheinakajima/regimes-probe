@@ -124,6 +124,9 @@ class ObligationOutcome:
     matched_pending_read_judgment_id_from_body: str = ""
     #: pending_id | exact_url | prefix_url | host_only | none
     read_body_link_source: str = "none"
+    # Level 5s predicate-passage diagnostics (bounded; event/state-derived).
+    judge_rationale: str = ""
+    passage_diag: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {k: getattr(self, k) for k in (
@@ -685,7 +688,8 @@ def _anchor_terms_for_constraint(record: dict, constraint_id: str, slot_id: str,
 #: anchor categories that establish PREDICATE relevance (5n-4). Subject categories
 #: (candidate_alias / source_title) alone are NOT sufficient to judge a passage.
 _PREDICATE_CATEGORIES = ("constraint_label", "constraint_facet", "target_descriptor",
-                         "relation_predicate", "numeric_or_year", "quoted_phrase")
+                         "relation_predicate", "numeric_or_year", "quoted_phrase",
+                         "judge_hint")
 _SUBJECT_CATEGORIES = ("candidate_alias", "source_title")
 #: SPECIFIC relation/predicate verbs only (generic glue like "from"/"is"/"year" would make
 #: every page predicate-relevant, defeating strictness). Generic verbs, not domain phrases.
@@ -696,13 +700,21 @@ _PREDICATE_VERBS = frozenset({
 _GENERIC_ANCHOR_WORDS = frozenset({
     "the", "this", "that", "with", "from", "have", "been", "were", "their", "about",
     "which", "what", "when", "where", "year", "years", "name", "also"})
+#: judge-hint boilerplate words that say nothing about the PREDICATE (5s-2).
+_JUDGE_HINT_STOP = frozenset({
+    "snippet", "insufficient", "body", "support", "read", "page", "source", "evidence",
+    "candidate", "constraint", "verify", "confirm", "details", "information", "specific",
+    "mention", "mentions", "needs", "would", "could", "should", "deterministic"})
 
 
 def _categorized_anchors(record: dict, constraint_id: str, slot_id: str,
                          *, candidate_text: str = "",
-                         source_title: str = "") -> dict[str, list[str]]:
-    """Anchors per CATEGORY (5n-4), derived ONLY from question text, task-frame constraints,
-    target descriptors, and trace candidate aliases/titles — never gold answers."""
+                         source_title: str = "",
+                         judge_hints=()) -> dict[str, list[str]]:
+    """Anchors per CATEGORY (5n-4/5s-2), derived ONLY from question text, task-frame
+    constraints, target descriptors, trace candidate aliases/titles, and TRACE-SAFE judge
+    fields (requires_read_reason / prior judge rationale / frontier expected_evidence) —
+    never gold answers, never benchmark metadata."""
     cats: dict[str, list[str]] = {c: [] for c in _SUBJECT_CATEGORIES + _PREDICATE_CATEGORIES}
 
     def _add(cat: str, s: str) -> None:
@@ -741,25 +753,87 @@ def _categorized_anchors(record: dict, constraint_id: str, slot_id: str,
         _add("relation_predicate", v)
     for q in re.findall(r'"([^"]{6,80})"', question):
         _add("quoted_phrase", q)
+    # 5s-2: judge-hint anchors — content tokens from the prior judge's requires_read_reason /
+    # rationale and the frontier proposal's expected_evidence (all recorded trace fields).
+    for hint in judge_hints:
+        for w in re.findall(r"[A-Za-z]{5,}", str(hint or "")):
+            wl = w.lower()
+            if wl not in cand_l and wl not in _GENERIC_ANCHOR_WORDS \
+                    and wl not in _JUDGE_HINT_STOP:
+                _add("judge_hint", w)
+    cats["judge_hint"] = cats["judge_hint"][:8]
     return cats
 
 
+#: max char distance for the predicate-window rescue (subject hit -> nearby predicate term).
+_RESCUE_WINDOW_CHARS = 600
+
+
 def _scan_with_relevance(body: str, cats: dict[str, list[str]],
-                         *, config=None) -> tuple[Any, dict[str, int], str]:
-    """Scan a body with categorized anchors (5n-4). Returns ``(scan, category_counts,
-    passage_relevance)`` where relevance is ``predicate_relevant`` (≥1 non-subject category
-    hit) / ``subject_only`` / ``no_relevant_anchor``. Deterministic, zero model calls."""
+                         *, config=None) -> tuple[Any, dict[str, int], str, dict]:
+    """Scan a body with categorized anchors (5n-4/5s-3). Returns ``(scan, category_counts,
+    passage_relevance, diag)``. When the first-occurrence scan finds only subject evidence,
+    a PREDICATE-AWARE FALLBACK re-checks bounded windows around EVERY subject occurrence for
+    a nearby predicate term (the first occurrence of an anchor may sit in a nav header while
+    subject+predicate co-occur later). Fail-closed: subject-only stays subject-only.
+    ``diag`` carries first_subject/predicate offsets + whether predicate terms exist anywhere
+    in the body (for the 5s-1 diagnostics). Deterministic, zero model calls."""
     from regimes_probe.agent.read_judgment import DEFAULT_READ_CONFIG
+    cfg = config or DEFAULT_READ_CONFIG
     all_anchors = [a for terms in cats.values() for a in terms]
-    scan = extract_passages(body, all_anchors[:64], config=config or DEFAULT_READ_CONFIG)
+    scan = extract_passages(body, all_anchors[:64], config=cfg)
     matched = {m.lower() for m in scan.matched_anchors}
     counts = {cat: sum(1 for t in terms if t.lower() in matched)
               for cat, terms in cats.items()}
     predicate_hits = sum(counts.get(c, 0) for c in _PREDICATE_CATEGORIES)
     subject_hits = sum(counts.get(c, 0) for c in _SUBJECT_CATEGORIES)
+    low = " ".join((body or "").split())[: cfg.read_max_chars_total].lower()
+    subj_terms = [t.lower() for c in _SUBJECT_CATEGORIES for t in cats.get(c, []) if len(t) >= 4]
+    pred_terms = [t.lower() for c in _PREDICATE_CATEGORIES for t in cats.get(c, [])
+                  if len(t) >= 4]
+    diag = {
+        "first_subject_anchor_offset": min((low.find(t) for t in subj_terms
+                                            if low.find(t) >= 0), default=-1),
+        "first_predicate_anchor_offset": min((low.find(t) for t in pred_terms
+                                              if low.find(t) >= 0), default=-1),
+        "predicate_terms_in_body": any(low.find(t) >= 0 for t in pred_terms),
+        "rescue_used": False,
+    }
     relevance = ("predicate_relevant" if predicate_hits > 0
                  else ("subject_only" if subject_hits > 0 else "no_relevant_anchor"))
-    return scan, counts, relevance
+    # 5s-3: predicate-window rescue — subject present but no predicate-relevant passage from
+    # first occurrences: check bounded windows around EACH subject occurrence.
+    if relevance != "predicate_relevant" and subj_terms and pred_terms:
+        for st in subj_terms[:6]:
+            start = 0
+            for _ in range(8):                       # bounded occurrences per subject term
+                i = low.find(st, start)
+                if i < 0:
+                    break
+                w0 = max(0, i - _RESCUE_WINDOW_CHARS)
+                w1 = min(len(low), i + len(st) + _RESCUE_WINDOW_CHARS)
+                window = low[w0:w1]
+                hit_pred = next((pt for pt in pred_terms if pt in window), None)
+                if hit_pred:
+                    body_norm = " ".join((body or "").split())[: cfg.read_max_chars_total]
+                    passage = body_norm[w0:w1].strip()
+                    scan.passages = [passage] + list(scan.passages)
+                    scan.hit = True
+                    if st not in (m.lower() for m in scan.matched_anchors):
+                        scan.matched_anchors.append(st)
+                    scan.matched_anchors.append(hit_pred)
+                    # recount with the rescued window's terms credited.
+                    for cat, terms in cats.items():
+                        counts[cat] = max(counts[cat], sum(
+                            1 for t in terms if t.lower() in window))
+                    relevance = "predicate_relevant"
+                    diag["rescue_used"] = True
+                    diag["first_predicate_anchor_offset"] = w0 + window.find(hit_pred)
+                    break
+                start = i + len(st)
+            if relevance == "predicate_relevant":
+                break
+    return scan, counts, relevance, diag
 
 
 def _constraint_slots(record: dict, constraint_id: str) -> list[str]:
@@ -862,6 +936,7 @@ def _reconstruct_obligations(record: dict) -> tuple[list[dict], dict]:
                     "candidate_text": cand_text, "source_url": src_url,
                     "source_role": src_role, "source_domain": src_dom,
                     "requires_read_reason": j.get("requires_read_reason") or "",
+                    "judge_rationale": (j.get("rationale") or "")[:200],
                     "judgment_id": j.get("judgment_id") or "", "prompt_hash": j.get("prompt_hash") or "",
                     "reconstructed_from_legacy_trace": True, "native": False,
                     "reconstruction_method": "structured_interpretations",
@@ -1259,19 +1334,31 @@ def load_legacy_run(run_dir: str | Path, *, allow_live_judge: bool = False,
             o.pipeline_status = "actual_body_located"
             o.read_body_chars = o.stored_body_chars
             o.read_body_provider = o.body_provider
+            # 5s-2: trace-safe judge hints (requires_read_reason / prior rationale /
+            # frontier expected_evidence from recorded calls) expand the predicate anchors.
+            o.judge_rationale = ob.get("judge_rationale", "") or ""
+            hints = [o.requires_read_reason, o.judge_rationale]
+            for c in record.get("calls", []) or []:
+                ee = (c.get("task_action") or {}).get("expected_evidence", "")
+                if ee:
+                    hints.append(ee)
             cats = _categorized_anchors(record, o.constraint_id, o.slot_id,
                                         candidate_text=o.candidate_text,
                                         source_title=_candidate_text(record, o.candidate_id,
-                                                                     o.source_url))
-            scan, cat_counts, relevance = _scan_with_relevance(body, cats)
+                                                                     o.source_url),
+                                        judge_hints=hints[:6])
+            scan, cat_counts, relevance, pdiag = _scan_with_relevance(body, cats)
+            o.passage_diag = pdiag
             # 5o-3: TARGET-answer constraints need a TARGET anchor (target_descriptor /
             # numeric_or_year / relation_predicate / quoted_phrase) — candidate-alias plus a
             # generic constraint facet is only a WEAK candidate, not predicate evidence.
             o.is_target_constraint = _is_target_constraint(record, o.constraint_id, o.slot_id)
             if o.is_target_constraint and relevance == "predicate_relevant":
+                # judge_hint counts as a TARGET anchor: it is the predicate the prior
+                # judge explicitly asked to verify (requires_read_reason/rationale).
                 target_hits = sum(cat_counts.get(c, 0) for c in (
                     "target_descriptor", "numeric_or_year", "relation_predicate",
-                    "quoted_phrase"))
+                    "quoted_phrase", "judge_hint"))
                 if target_hits == 0:
                     relevance = ("weak_predicate_candidate_only"
                                  if cat_counts.get("candidate_alias", 0) > 0
@@ -1607,6 +1694,85 @@ def _summarize_legacy(res: ReplayValidationResult, n_items: int, live_calls: int
                                   "obligation_source_url_count": len(ob_urls)})
     else:
         res.metrics["read_body_unlinked_to_requires_read_obligation"] = False
+    # 5s-1: BOUNDED predicate-passage diagnostics for obligations stuck before the judge —
+    # derived from obligation state (events-backed), never inline counters, never gold.
+    diag_reasons = ("no_relevant_anchor_in_actual_body",
+                    "subject_only_passage_no_predicate_anchor",
+                    "judged_by_recorded_strict_rejudgment_still_open",
+                    "judged_by_live_rejudgment_still_open")
+    diags = []
+    for o in obs:
+        if o.stage_reason not in diag_reasons and not (
+                o.pipeline_status == "judged_unclosed"
+                and o.closure_code == "requires_read_still_open"):
+            continue
+        pd = o.passage_diag or {}
+        if o.pipeline_status == "judged_unclosed":
+            why = "rejudgment_still_requires_read"
+        elif o.body_truncated_before_relevant_passage:
+            why = "body_truncated_raw_unavailable"
+        elif pd.get("first_subject_anchor_offset", -1) < 0:
+            why = ("body_likely_wrong_source"
+                   if not pd.get("predicate_terms_in_body") else "no_subject_anchor")
+        elif not pd.get("predicate_terms_in_body"):
+            why = "predicate_terms_absent"
+        elif o.passage_relevance != "predicate_relevant":
+            why = "predicate_present_but_far_from_subject"
+        else:
+            why = "subject_without_predicate"
+        attempted = [c for c, terms in (o.anchor_category_counts or {}).items()]
+        missing = [c for c in _PREDICATE_CATEGORIES
+                   if (o.anchor_category_counts or {}).get(c, 0) == 0]
+        diags.append({
+            "pending_read_judgment_id": o.pending_read_judgment_id, "item_id": o.item_id,
+            "slot_id": o.slot_id, "constraint_id": o.constraint_id,
+            "candidate_text": (o.candidate_text or "")[:80],
+            "source_url": (o.source_url or "")[:120], "source_role": o.source_role,
+            "body_provider": o.body_provider, "body_chars": o.read_body_chars,
+            "body_truncated_for_storage": o.body_truncated_before_relevant_passage,
+            "raw_unavailable": o.raw_unavailable,
+            "passage_relevance": o.passage_relevance,
+            "anchor_category_counts": dict(o.anchor_category_counts or {}),
+            "attempted_anchor_categories": attempted[:10],
+            "missing_predicate_anchor_categories": missing,
+            "first_subject_anchor_offset": pd.get("first_subject_anchor_offset", -1),
+            "first_predicate_anchor_offset": pd.get("first_predicate_anchor_offset", -1),
+            "diagnostic_reason": why})
+    res.metrics["predicate_passage_diagnostics"] = diags[:20]
+    res.metrics["predicate_passage_diagnostic_reason_counts"] = dict(
+        Counter(d["diagnostic_reason"] for d in diags))
+    # 5s-4/5: pending search-snippet service + read-body usefulness (all derived).
+    snippet_only = [o for o in obs if o.stage_reason == "pending_source_has_search_snippet_only"
+                    or o.body_source == "cache_search_snippet_only"]
+    res.metrics.update({
+        "pending_obligations_search_snippet_only_count": len(snippet_only),
+        "pending_search_snippet_only_read_attempted_count": sum(
+            1 for o in snippet_only if o.read_targeted_pending_obligation),
+        "pending_search_snippet_only_read_blocked_count": 0,   # event-derived in future runs
+        "pending_search_snippet_only_read_success_count": sum(
+            1 for o in snippet_only if o.body_is_actual_read_body),
+        "pending_search_snippet_only_no_clean_url_count": sum(
+            1 for o in snippet_only if not (o.source_url or "").startswith("http")),
+        "pending_search_snippet_only_suppressed_count": sum(
+            1 for o in obs if "suppressed" in (o.stage_reason or "")),
+        "actual_body_no_relevant_anchor_count": sum(
+            1 for o in real_body if o.passage_relevance == "no_relevant_anchor"),
+        "actual_body_subject_only_count": sum(
+            1 for o in real_body if o.passage_relevance in (
+                "subject_only", "subject_only_no_target_anchor",
+                "weak_predicate_candidate_only")),
+        "actual_body_predicate_relevant_count": sum(
+            1 for o in real_body if o.passage_relevance == "predicate_relevant"),
+        "predicate_passage_relevance_rate": round(
+            sum(1 for o in real_body if o.passage_relevance == "predicate_relevant")
+            / len(real_body), 3) if real_body else 0.0,
+        "pending_obligation_body_service_rate": res.metrics.get(
+            "pending_read_body_link_rate", 0.0),
+        "strict_rejudgment_still_open_count": judged_unclosed,
+        "strict_rejudgment_resolved_count": closed,
+        "passage_rescue_used_count": sum(
+            1 for o in obs if (o.passage_diag or {}).get("rescue_used")),
+    })
     # 5r-3: explain a body located WITHOUT a persisted read-event backlink (legacy runs).
     if res.metrics["body_located_count"] > 0 and res.metrics["matched_read_call_count"] == 0:
         res.metrics["body_match_explanation"] = (

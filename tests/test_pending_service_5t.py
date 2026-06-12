@@ -173,7 +173,7 @@ def test_failed_pending_read_falls_back_once_to_alternate_tool_same_url():
     assert fr.propose_pending_service_read(budget_remaining=4, page_fetch_available=True,
                                            scrape_available=True) is None
     rec = fr._service_rec(_URL_A)
-    assert rec["status"] == "pending_service_attempted_zero_chars"
+    assert rec["status"] == "service_attempted_failed" and rec["zero_chars"]
 
 
 # ------------------------------------------------ 5: successful read -> persisted rejudgment
@@ -265,13 +265,13 @@ def test_end_of_item_every_pending_has_explicit_service_reason():
     suppressed = _add_pending(fr, constraint_id="c2", candidate_id="cand2",
                               source_role="generic_definition_page")
     fr.finalize_pending_service(budget_remaining=0, reading_tools_enabled=True)
-    assert clean.service_status == "pending_service_budget_exhausted"
-    assert suppressed.service_status == "pending_service_suppressed_source"
+    assert clean.service_status == "service_budget_exhausted"
+    assert suppressed.service_status == "service_suppressed_non_executable"
     m = fr.metrics()
     assert m["pending_obligation_without_service_reason_count"] == 0
-    assert m["pending_service_status_counts"]["pending_service_budget_exhausted"] == 1
+    assert m["pending_service_status_counts"]["service_budget_exhausted"] == 1
     rec = fr._service_rec(_URL_A)
-    assert rec["status"] == "pending_service_budget_exhausted"
+    assert rec["status"] == "service_budget_exhausted"
 
 
 # ------------------------------------------------ 10/12: live-run -> replay roundtrip
@@ -358,7 +358,7 @@ def test_suppressed_pendings_not_executable_and_not_service_failures():
     assert m["pending_read_primary_failed_count"] == 0
     assert m["pending_read_fallback_failed_count"] == 0
     assert m["pending_service_status_counts"] == {
-        "pending_service_suppressed_source": 1}
+        "service_suppressed_non_executable": 1}
 
 
 # ------------------------------------------------ 12: default validation zero live calls

@@ -55,6 +55,40 @@ def body_hash(text: str) -> str:
     return hashlib.sha256((text or "").encode("utf-8")).hexdigest()[:16]
 
 
+def normalize_service_url(url: str) -> str:
+    """5u-1: the URL-group normalization shared by the service registry and validation."""
+    return (url or "").strip().lower().rstrip("/")
+
+
+#: 5u-1: terminal per-obligation service statuses. Every pending obligation must end the
+#: item in exactly one of these (event-derived, never ambiguous control flow).
+#: ``service_not_attempted_invariant_violation`` is reserved for true bugs (an open, clean,
+#: unserved obligation while budget remained) and is pinned 0 in normal mechanics.
+SERVICE_TERMINAL_STATUSES = (
+    "service_attempted_success", "service_attempted_failed",
+    "service_blocked_contaminated_or_noise", "service_blocked_disallowed_tool",
+    "service_blocked_no_clean_url", "service_blocked_source_not_readable",
+    "service_already_satisfied_by_same_url_read", "service_deduped_to_url_group",
+    "service_budget_exhausted", "service_suppressed_non_executable",
+    "service_not_attempted_invariant_violation")
+
+#: 5u-3: explicit targeted-rejudgment lifecycle statuses. Every ATTEMPTED rejudgment lands
+#: in exactly one bucket; ``rejudgment_missing_invariant_violation`` is reserved for a
+#: claimed-recorded verdict whose strict cache entry is entirely absent (a true bug).
+REJUDGMENT_STATUSES = (
+    "rejudgment_not_needed_no_predicate_passage", "rejudgment_attempted_recorded",
+    "rejudgment_attempted_model_error", "rejudgment_attempted_cache_write_failed",
+    "rejudgment_attempted_invalid_response_recorded_fail_closed",
+    "rejudgment_skipped_budget_exhausted", "rejudgment_skipped_body_hash_mismatch",
+    "rejudgment_skipped_contaminated_or_noise", "rejudgment_missing_invariant_violation")
+
+#: judge verdicts the route recognizes; anything else is recorded FAIL-CLOSED as
+#: requires_read (5u-3: invalid_response_recorded_fail_closed, never silently dropped).
+KNOWN_REJUDGE_VERDICTS = frozenset({
+    "full_support", "partial_support", "contradiction", "irrelevant",
+    "requires_read", "still_unresolved", "insufficient"})
+
+
 @dataclass(frozen=True)
 class ReadJudgmentConfig:
     """Cheap, deterministic defaults — do NOT raise the cap as the only fix (5h-B).
@@ -243,6 +277,18 @@ class PendingReadJudgment:
     rejudgment_recorded: bool = False
     #: a bounded predicate re-read is scheduled for this obligation (consumed by the route).
     reread_pending: bool = False
+    # 5u-1/3: explicit service + rejudgment lifecycle (persisted; never ambiguous).
+    #: detail behind service_status (block reason / outcome detail / dedupe marker).
+    service_stage_reason: str = ""
+    #: URL-group id when several obligations share one normalized URL.
+    service_group_id: str = ""
+    #: concrete block reason when blocked/suppressed (reading-policy reason or suppression).
+    service_block_reason: str = ""
+    #: read tool + outcome of the service attempt for this obligation's URL group.
+    service_read_success: Optional[bool] = None
+    service_budget_remaining_when_decided: Optional[int] = None
+    #: one of REJUDGMENT_STATUSES once a body was routed for this obligation.
+    rejudgment_status: str = ""
 
     @property
     def open(self) -> bool:
@@ -271,7 +317,18 @@ class PendingReadJudgment:
                 "passage_relevance": self.passage_relevance,
                 "body_available": self.body_available,
                 "rejudgment_attempted": self.rejudgment_attempted,
-                "rejudgment_recorded": self.rejudgment_recorded}
+                "rejudgment_recorded": self.rejudgment_recorded,
+                "service_stage_reason": self.service_stage_reason,
+                "service_url": (self.source_url or "")[:300],
+                "normalized_service_url": normalize_service_url(self.source_url)[:300],
+                "service_group_id": self.service_group_id,
+                "service_block_reason": self.service_block_reason,
+                "service_attempted_read_tool": self.read_tool,
+                "service_read_success": self.service_read_success,
+                "service_read_body_linked": self.body_available,
+                "service_budget_remaining_when_decided":
+                    self.service_budget_remaining_when_decided,
+                "rejudgment_status": self.rejudgment_status}
 
 
 def _host(url: str) -> str:

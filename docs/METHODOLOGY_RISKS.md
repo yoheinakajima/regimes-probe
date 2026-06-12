@@ -617,3 +617,19 @@ set — and the risk surface. Keep the experiment honest:
   inferred; a selected-but-never-executed read is reported as budget exhausted rather than a
   fake failure. (4) *Re-read loops*: predicate re-reads are once-per-obligation by a persistent
   flag, executed only live; replay only reports recorded outcomes and never fetches.
+
+- **Level 5u risks.** (1) *Reclassification laundering*: canonicalizing old 5t statuses could
+  hide real failures behind friendlier names — mitigated by keeping the mapping one-to-one to
+  CONCRETE categories (a blocked URL maps to its recorded reading-policy refusal, never to
+  success) and by pinning `pending_service_not_attempted_policy_error_count` to invariant
+  violations only, with bounded samples whenever it is non-zero. (2) *Fail-closed inflation*:
+  recording invalid model responses as `requires_read` could be gamed into "judged" counts —
+  it cannot close anything (still_open is never closed) and carries its own lifecycle bucket,
+  so it is visible, not laundered. (3) *Hash-mismatch as a dumping ground*: an entry that
+  exists but cannot be verified is bucketed `rejudgment_skipped_body_hash_mismatch` rather
+  than a violation; this is deliberate fail-closed honesty (the verdict is ignored for
+  closure), and a fully absent claimed-recorded entry still hard-fails as an invariant
+  violation with samples. (4) *Equation gaming*: all reconciliation rules are computed from
+  persisted obligation/registry state and validator-side verification — never from inline
+  counters that could drift — and are enforced by `consistency_violations`, which is part of
+  the report output itself and pinned to [] in tests.

@@ -167,7 +167,34 @@ def main() -> int:
               f"url_rate={pm.get('pending_service_url_success_rate')} "
               f"obligation_rate={pm.get('pending_service_obligation_success_rate')} "
               f"no_reason={pm.get('pending_obligation_without_service_reason_count')}")
-        print(f"   service statuses: {json.dumps(pm.get('pending_service_status_counts', {}))}")
+        print(f"   service statuses (5u): {json.dumps(pm.get('service_status_counts', {}))}")
+        print(f"   service blocks (5u): "
+              f"reasons={json.dumps(pm.get('service_block_reason_counts', {}))} "
+              f"urls(suppressed={pm.get('pending_service_url_suppressed_count')} "
+              f"already_satisfied={pm.get('pending_service_url_already_satisfied_count')} "
+              f"invariant={pm.get('pending_service_url_invariant_violation_count')}); "
+              f"service_invariant_violations={pm.get('service_invariant_violation_count')} "
+              f"policy_error={pm.get('pending_service_not_attempted_policy_error_count')}")
+        if pm.get("blocked_service_urls_sample"):
+            print(f"   blocked service urls: "
+                  f"{json.dumps(pm['blocked_service_urls_sample'])}")
+        if pm.get("service_invariant_violation_samples"):
+            print(f"   service invariant violations: "
+                  f"{json.dumps(pm['service_invariant_violation_samples'])}")
+        print(f"   rejudgment lifecycle (5u): "
+              f"{json.dumps(pm.get('rejudgment_status_counts', {}))} "
+              f"invariant_violations={pm.get('rejudgment_invariant_violation_count')}")
+        if pm.get("rejudgment_invariant_violation_samples"):
+            print(f"   rejudgment invariant violations: "
+                  f"{json.dumps(pm['rejudgment_invariant_violation_samples'])}")
+        if pm.get("rejudgment_cache_write_failed_samples"):
+            print(f"   rejudgment cache-write failures: "
+                  f"{json.dumps(pm['rejudgment_cache_write_failed_samples'])}")
+        print(f"   pinned (5u): unrelated_read_executed_while_pending="
+              f"{pm.get('unrelated_read_executed_while_pending_count')} "
+              f"debug_snippet_judged={pm.get('debug_snippet_judged_count')} "
+              f"still_open_counted_closed="
+              f"{pm.get('requires_read_still_open_counted_closed_count')}")
         print(f"   targeted rejudgment (5t): body_available="
               f"{pm.get('pending_read_body_available_count')} "
               f"passages={pm.get('pending_read_body_passage_extracted_count')} "

@@ -1897,7 +1897,8 @@ class CandidateFrontier:
     # ---------- 5t-1/2/5/6: first-class, URL-deduped pending-service step ----------
     @staticmethod
     def _service_norm(url: str) -> str:
-        return (url or "").strip().lower().rstrip("/")
+        from regimes_probe.agent.read_judgment import normalize_service_url
+        return normalize_service_url(url)
 
     def _service_rec(self, url: str) -> dict:
         """The URL-level service record (created lazily). Many obligations share one URL;
@@ -1905,12 +1906,16 @@ class CandidateFrontier:
         norm = self._service_norm(url)
         rec = self.pending_service_urls.get(norm)
         if rec is None:
-            rec = {"url": (url or "")[:300], "url_host": _host(url), "obligation_ids": [],
+            rec = {"url": (url or "")[:300], "url_host": _host(url),
+                   "normalized_service_url": norm[:300],
+                   "service_group_id": f"svcg{len(self.pending_service_urls) + 1}",
+                   "obligation_ids": [],
                    "attempted": False, "attempt_tool": "", "tools_tried": [],
                    "success": False, "failed": False, "zero_chars": False,
                    "fallback_scheduled": False, "fallback_attempted": False,
                    "fallback_success": False, "blocked_reason": "",
-                   "outcome_recorded": False, "status": ""}
+                   "outcome_recorded": False, "status": "",
+                   "budget_remaining_when_decided": None}
             self.pending_service_urls[norm] = rec
         return rec
 
@@ -1960,10 +1965,13 @@ class CandidateFrontier:
             scraped_urls=frozenset(), no_progress_domains=frozenset(),
             allow_social=allow_social, prefer_page_fetch=force_page_fetch, force_read=True)
         if not rd.tool:
-            rec["blocked_reason"] = rec["blocked_reason"] or "url_disallowed"
+            # 5u-1: persist the CONCRETE reading-policy refusal (social_media /
+            # contaminated_url / no_reading_tool / ...), not a generic "disallowed".
+            rec["blocked_reason"] = rec["blocked_reason"] or (rd.reason or "url_disallowed")
             self._emit("read_blocked_disallowed_tool", candidate_id=lead.candidate_id,
                        data={"pending_read_judgment_id": lead.pending_read_judgment_id,
                              "reason": "pending_obligation_url_disallowed",
+                             "block_reason": rec["blocked_reason"],
                              "url_host": rec["url_host"]})
             return None
         tested: list[str] = []
@@ -2038,18 +2046,21 @@ class CandidateFrontier:
                 continue
             if normalize_url(pend.source_url) in scraped_urls:
                 # the URL was already read outside the service path; never re-read it here.
-                rec["status"] = "pending_service_duplicate_url_already_attempted"
+                rec["status"] = "service_already_satisfied_by_same_url_read"
+                rec["budget_remaining_when_decided"] = budget_remaining
                 continue
             sp = self._build_service_read_plan(
                 rec, page_fetch_available=page_fetch_available,
                 scrape_available=scrape_available, allow_social=allow_social,
                 force_page_fetch=force_page_fetch)
             if sp is None:
-                continue                       # URL disallowed (recorded); try the next URL
+                rec["budget_remaining_when_decided"] = budget_remaining
+                continue                       # URL blocked (reason recorded); try next URL
             rec["attempted"] = True
             rec["attempt_tool"] = sp.read_decision.tool
             rec["tools_tried"].append(sp.read_decision.tool)
             rec["outcome_recorded"] = False
+            rec["budget_remaining_when_decided"] = budget_remaining
             self.read_desired_count += 1
             self.read_selected_count += 1
             self.pending_snippet_read_attempted_count += 1
@@ -2095,7 +2106,7 @@ class CandidateFrontier:
         if ok:
             rec["success"], rec["failed"], rec["zero_chars"] = True, False, False
             rec["fallback_scheduled"] = False
-            rec["status"] = "pending_service_success"
+            rec["status"] = "service_attempted_success"
             if is_fallback:
                 rec["fallback_success"] = True
                 self.pending_read_fallback_success_count += 1
@@ -2105,6 +2116,7 @@ class CandidateFrontier:
             for p in self._pendings_for_url(url):
                 if not p.suppressed_reason:
                     p.body_available = True
+                    p.service_read_success = True
                     served += 1
             self._emit("pending_service_read_succeeded",
                        data={"url_host": rec["url_host"], "read_tool": tool,
@@ -2114,8 +2126,7 @@ class CandidateFrontier:
         rec["zero_chars"] = rec["zero_chars"] or zero_chars
         if is_fallback:
             rec["fallback_scheduled"] = False
-            rec["status"] = ("pending_service_attempted_zero_chars" if zero_chars
-                             else "pending_service_attempted_failed")
+            rec["status"] = "service_attempted_failed"
             self.pending_read_fallback_failed_count += 1
             self._emit("pending_read_fallback_failed",
                        data={"url_host": rec["url_host"], "read_tool": tool})
@@ -2129,8 +2140,7 @@ class CandidateFrontier:
         if any(t not in rec["tools_tried"] for t in enabled):
             rec["fallback_scheduled"] = True
         else:
-            rec["status"] = ("pending_service_attempted_zero_chars" if zero_chars
-                             else "pending_service_attempted_failed")
+            rec["status"] = "service_attempted_failed"
 
     def schedule_predicate_rereads_after_read(self, *, url: str,
                                               body_truncated_for_storage: bool,
@@ -2175,59 +2185,107 @@ class CandidateFrontier:
                     p.reread_pending = False
                     self.predicate_reread_still_open_count += 1
 
+    @staticmethod
+    def _blocked_status_for(reason: str) -> str:
+        """Map a concrete reading-policy refusal to its terminal blocked category (5u-1)."""
+        if reason == "contaminated_url":
+            return "service_blocked_contaminated_or_noise"
+        if reason == "social_media":
+            return "service_blocked_source_not_readable"
+        return "service_blocked_disallowed_tool"
+
     def finalize_pending_service(self, *, budget_remaining: int = 0,
                                  reading_tools_enabled: bool = True) -> None:
-        """5t-2: end-of-item — every pending obligation records exactly one explicit service
-        reason (never an ambiguous 'snippet-only with no reason'). URL records get a
-        terminal status too. Suppressed pendings are diagnostics, never service failures."""
+        """5t-2/5u-1/2: end-of-item — every pending obligation records exactly one terminal
+        service status from SERVICE_TERMINAL_STATUSES, with the URL-group terminal state
+        propagated to ALL obligations sharing the URL (block reasons included).
+        ``service_not_attempted_invariant_violation`` fires only for the true bug case (an
+        open clean unserved obligation while budget remained) — never ordinary control flow.
+        Suppressed pendings are diagnostics, never service failures."""
         self._sync_service_registry()
-        for p in self.pending_read_judgments.values():
-            if p.service_status:
-                continue
-            if p.suppressed_reason:
-                p.service_status = "pending_service_suppressed_source"
-                continue
-            if not _is_clean_url(p.source_url):
-                p.service_status = "pending_service_url_disallowed"
-                continue
-            rec = self.pending_service_urls.get(self._service_norm(p.source_url)) or {}
-            if rec.get("success"):
-                p.service_status = ("pending_service_success" if p.body_available
-                                    else "pending_service_attempted_body_not_persisted")
-            elif rec.get("attempted") or rec.get("fallback_attempted"):
-                if not rec.get("outcome_recorded"):
-                    # selected but the loop ended before the call executed.
-                    p.service_status = "pending_service_budget_exhausted"
-                elif rec.get("zero_chars"):
-                    p.service_status = "pending_service_attempted_zero_chars"
-                else:
-                    p.service_status = "pending_service_attempted_failed"
-            elif rec.get("blocked_reason"):
-                p.service_status = "pending_service_url_disallowed"
-            elif rec.get("status") == "pending_service_duplicate_url_already_attempted":
-                p.service_status = "pending_service_duplicate_url_already_attempted"
-            elif not reading_tools_enabled:
-                p.service_status = "pending_service_no_read_tool_enabled"
-            else:
-                p.service_status = "pending_service_budget_exhausted"
+        # URL-level terminal states first (obligation states derive from them).
         for rec in self.pending_service_urls.values():
             if rec.get("status"):
                 continue
             if rec.get("success"):
-                rec["status"] = "pending_service_success"
-            elif rec.get("attempted"):
-                if not rec.get("outcome_recorded"):
-                    rec["status"] = "pending_service_budget_exhausted"
-                elif rec.get("zero_chars"):
-                    rec["status"] = "pending_service_attempted_zero_chars"
-                else:
-                    rec["status"] = "pending_service_attempted_failed"
+                rec["status"] = "service_attempted_success"
+            elif rec.get("attempted") or rec.get("fallback_attempted"):
+                rec["status"] = ("service_budget_exhausted"
+                                 if not rec.get("outcome_recorded")
+                                 else "service_attempted_failed")
             elif rec.get("blocked_reason"):
-                rec["status"] = "pending_service_url_disallowed"
+                rec["status"] = self._blocked_status_for(rec["blocked_reason"])
             elif not reading_tools_enabled:
-                rec["status"] = "pending_service_no_read_tool_enabled"
+                rec["status"] = "service_blocked_disallowed_tool"
+                rec["blocked_reason"] = rec["blocked_reason"] or "no_read_tool_enabled"
+            elif budget_remaining <= 0:
+                rec["status"] = "service_budget_exhausted"
             else:
-                rec["status"] = "pending_service_budget_exhausted"
+                # open clean URL, never decided, with budget remaining: a true bug.
+                rec["status"] = "service_not_attempted_invariant_violation"
+            if rec.get("budget_remaining_when_decided") is None:
+                rec["budget_remaining_when_decided"] = budget_remaining
+        # obligation-level terminal states (group state propagated; dedupe marked).
+        group_lead_seen: set[str] = set()
+        for p in self.pending_read_judgments.values():
+            if p.service_budget_remaining_when_decided is None:
+                p.service_budget_remaining_when_decided = budget_remaining
+            if p.service_status:
+                continue
+            if p.suppressed_reason:
+                p.service_status = "service_suppressed_non_executable"
+                p.service_stage_reason = p.suppressed_reason
+                p.service_block_reason = p.suppressed_reason
+                continue
+            if not _is_clean_url(p.source_url):
+                p.service_status = "service_blocked_no_clean_url"
+                p.service_stage_reason = "source_url_not_concrete_http_url"
+                p.service_block_reason = "no_clean_url"
+                continue
+            rec = self._service_rec(p.source_url)
+            p.service_group_id = rec["service_group_id"]
+            p.service_block_reason = rec.get("blocked_reason", "")
+            p.service_budget_remaining_when_decided = \
+                rec.get("budget_remaining_when_decided", budget_remaining)
+            if rec.get("attempted") or rec.get("fallback_attempted"):
+                p.service_read_success = bool(rec.get("success"))
+            st = rec.get("status", "")
+            if p.body_available:
+                # a body for this obligation was actually acquired and routed.
+                if st == "service_attempted_success":
+                    p.service_status = "service_attempted_success"
+                    p.service_stage_reason = "service_read_succeeded"
+                else:
+                    # served by a same-host/non-service read rather than its own URL read.
+                    p.service_status = "service_already_satisfied_by_same_url_read"
+                    p.service_stage_reason = "body_linked_by_non_service_read"
+            elif st == "service_attempted_success":
+                p.service_status = "service_attempted_failed"
+                p.service_stage_reason = "read_succeeded_but_body_not_linked"
+            elif st == "service_attempted_failed":
+                p.service_status = "service_attempted_failed"
+                p.service_stage_reason = ("read_failed_zero_chars" if rec.get("zero_chars")
+                                          else "read_failed_all_enabled_tools")
+            elif st == "service_already_satisfied_by_same_url_read":
+                p.service_status = "service_already_satisfied_by_same_url_read"
+                p.service_stage_reason = "url_already_read_outside_service"
+            elif st.startswith("service_blocked"):
+                p.service_status = st
+                p.service_stage_reason = rec.get("blocked_reason", "") or st
+            elif st == "service_budget_exhausted":
+                p.service_status = "service_budget_exhausted"
+                p.service_stage_reason = ("selected_but_loop_ended_before_execution"
+                                          if (rec.get("attempted")
+                                              and not rec.get("outcome_recorded"))
+                                          else "budget_exhausted_before_selection")
+            else:
+                p.service_status = "service_not_attempted_invariant_violation"
+                p.service_stage_reason = "open_clean_unserved_with_budget_remaining"
+            # mark non-lead members of a shared-URL group (the category stays propagated).
+            if rec["service_group_id"] in group_lead_seen:
+                p.service_stage_reason = "service_deduped_to_url_group"
+            else:
+                group_lead_seen.add(rec["service_group_id"])
         from collections import Counter as _Counter
         self._emit("pending_service_finalized",
                    data={"budget_remaining": budget_remaining,
@@ -2296,6 +2354,7 @@ class CandidateFrontier:
             if not scan.passages:
                 p.resolution, p.resolved_step = "no_relevant_passage", self._clock()
                 p.closure_state = "no_relevant_passage"
+                p.rejudgment_status = "rejudgment_not_needed_no_predicate_passage"
                 self.requires_read_unresolved_after_read_count += 1
                 if was_reread:
                     self.predicate_reread_still_open_count += 1
@@ -2311,13 +2370,35 @@ class CandidateFrontier:
                              "matched_anchors": list(scan.matched_anchors)[:8],
                              "head_only": scan.head_only})
             # re-judge the SAME triple on the passage (not the snippet, not the head).
-            status = self._judge_passage(p, con, slot, cand, passage, judge, scan)
-            self.read_passage_judged_count += 1
-            # 5t-4: the targeted rejudgment ran IN THE LIVE RUN — persist its verdict under
-            # the strict replay namespace so default replay validation finds it offline.
+            # 5u-3: every attempted rejudgment lands in exactly one explicit lifecycle
+            # bucket — a model error fails closed (still open, never persisted as a verdict),
+            # an out-of-vocabulary verdict is recorded fail-closed as requires_read, and a
+            # cache-write failure is surfaced instead of silently dropping the verdict.
+            from regimes_probe.agent.read_judgment import KNOWN_REJUDGE_VERDICTS
             p.rejudgment_attempted = True
             self.pending_read_targeted_rejudgment_attempted_count += 1
-            self._persist_strict_rejudgment(p, status, read_text, passage, judge)
+            judge_error = False
+            try:
+                status = self._judge_passage(p, con, slot, cand, passage, judge, scan)
+            except Exception:
+                judge_error = True
+                status = "still_unresolved"
+            self.read_passage_judged_count += 1
+            invalid_verdict = status not in KNOWN_REJUDGE_VERDICTS
+            if invalid_verdict:
+                status = "requires_read"                       # fail closed
+            if judge_error:
+                p.rejudgment_status = "rejudgment_attempted_model_error"
+            else:
+                persisted = self._persist_strict_rejudgment(p, status, read_text,
+                                                            passage, judge)
+                if not persisted:
+                    p.rejudgment_status = "rejudgment_attempted_cache_write_failed"
+                elif invalid_verdict:
+                    p.rejudgment_status = \
+                        "rejudgment_attempted_invalid_response_recorded_fail_closed"
+                else:
+                    p.rejudgment_status = "rejudgment_attempted_recorded"
             p.closure_state = {
                 "full_support": "resolved_full_support",
                 "contradiction": "resolved_contradiction",
@@ -2724,7 +2805,13 @@ class CandidateFrontier:
             "pending_service_url_blocked_count": sum(
                 1 for r in svc if r.get("blocked_reason")),
             "pending_service_url_budget_exhausted_count": sum(
-                1 for r in svc if r.get("status") == "pending_service_budget_exhausted"),
+                1 for r in svc if r.get("status") == "service_budget_exhausted"),
+            "pending_service_url_already_satisfied_count": sum(
+                1 for r in svc
+                if r.get("status") == "service_already_satisfied_by_same_url_read"),
+            "pending_service_url_invariant_violation_count": sum(
+                1 for r in svc
+                if r.get("status") == "service_not_attempted_invariant_violation"),
             "pending_service_obligation_count": len(clean),
             "pending_service_obligations_served_by_successful_read_count": served,
             "pending_service_url_success_rate": (round(success / len(svc), 3) if svc else 0.0),
@@ -2736,6 +2823,22 @@ class CandidateFrontier:
             "pending_service_status_counts": dict(Counter(
                 p.service_status for p in self.pending_read_judgments.values()
                 if p.service_status)),
+            # 5u-1/6: concrete block reasons + invariant-violation counts (pinned 0).
+            "service_block_reason_counts": dict(Counter(
+                x for x in ([r.get("blocked_reason") for r in svc]
+                            + [p.service_block_reason
+                               for p in self.pending_read_judgments.values()
+                               if p.suppressed_reason]) if x)),
+            "service_invariant_violation_count": sum(
+                1 for p in self.pending_read_judgments.values()
+                if p.service_status == "service_not_attempted_invariant_violation"),
+            # 5u-3: explicit rejudgment lifecycle counts (every attempt lands somewhere).
+            "rejudgment_status_counts": dict(Counter(
+                p.rejudgment_status for p in self.pending_read_judgments.values()
+                if p.rejudgment_status)),
+            "rejudgment_invariant_violation_count": sum(
+                1 for p in self.pending_read_judgments.values()
+                if p.rejudgment_status == "rejudgment_missing_invariant_violation"),
             # 5t-5 fallback/zero-chars accounting.
             "pending_read_primary_failed_count": self.pending_read_primary_failed_count,
             "pending_read_fallback_attempted_count": self.pending_read_fallback_attempted_count,

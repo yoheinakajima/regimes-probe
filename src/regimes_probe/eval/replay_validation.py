@@ -134,6 +134,13 @@ class ObligationOutcome:
     live_closure_state: str = ""
     live_passage_relevance: str = ""
     body_available_recorded: bool = False
+    # Level 5u explicit lifecycle accounting.
+    service_block_reason: str = ""
+    service_group_id: str = ""
+    #: FINAL rejudgment lifecycle bucket (run-persisted, validator-adjusted).
+    rejudgment_status: str = ""
+    #: the strict verdict was verified against an independently located actual body.
+    rejudgment_verified: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {k: getattr(self, k) for k in (
@@ -155,7 +162,9 @@ class ObligationOutcome:
             "read_targeted_pending_obligation", "pending_read_judgment_id_on_read_event",
             "matched_pending_read_judgment_id_from_body", "read_body_link_source",
             "service_status", "live_rejudgment_attempted", "live_rejudgment_recorded",
-            "live_closure_state", "live_passage_relevance", "body_available_recorded")}
+            "live_closure_state", "live_passage_relevance", "body_available_recorded",
+            "service_block_reason", "service_group_id", "rejudgment_status",
+            "rejudgment_verified")}
 
 
 @dataclass
@@ -425,27 +434,58 @@ STAGE_REASONS = (
     "pending_service_body_acquired_rejudgment_missing",
     "pending_service_body_acquired_rejudgment_still_open",
     "pending_service_body_acquired_rejudgment_closed",
-    "pending_service_suppressed_source", "other")
+    "pending_service_suppressed_source",
+    # 5u-1: concrete blocked/already-satisfied stage reasons (policy_error remains ONLY
+    # as the invariant-violation name, pinned 0 in normal mechanics).
+    "service_blocked_disallowed_tool", "service_blocked_source_not_readable",
+    "service_blocked_contaminated_or_noise", "service_blocked_no_clean_url",
+    "service_already_satisfied_by_same_url_read", "other")
+
+
+#: 5u-2: canonicalize OLD 5t-era persisted service statuses into the 5u terminal vocabulary
+#: (so existing 5t artifacts revalidate with concrete reasons, not policy errors).
+_CANONICAL_SERVICE_STATUS = {
+    "pending_service_success": "service_attempted_success",
+    "pending_service_attempted_failed": "service_attempted_failed",
+    "pending_service_attempted_zero_chars": "service_attempted_failed",
+    "pending_service_attempted_body_not_persisted": "service_attempted_failed",
+    "pending_service_suppressed_source": "service_suppressed_non_executable",
+    "pending_service_url_disallowed": "service_blocked_disallowed_tool",
+    "pending_service_no_read_tool_enabled": "service_blocked_disallowed_tool",
+    "pending_service_duplicate_url_already_attempted":
+        "service_already_satisfied_by_same_url_read",
+    "pending_service_budget_exhausted": "service_budget_exhausted",
+}
+
+
+def _canonical_service_status(raw: str) -> str:
+    if not raw:
+        return ""
+    return _CANONICAL_SERVICE_STATUS.get(raw, raw)
 
 
 def _service_stage_reason(service_status: str) -> str:
-    """5t-7: map a run-recorded per-obligation service status to the validator's
-    service-aware stage-reason vocabulary (empty for OLD runs with no service event)."""
-    if not service_status:
+    """5t-7/5u-1: map a run-recorded per-obligation service status to a CONCRETE
+    service-aware stage reason (empty for OLD runs with no service event).
+    ``pending_service_not_attempted_policy_error`` survives ONLY as the
+    invariant-violation name — never ordinary blocked/budget/suppressed control flow."""
+    s = _canonical_service_status(service_status)
+    if not s:
         return ""
     return {
-        "pending_service_budget_exhausted": "pending_service_not_attempted_budget_exhausted",
-        "pending_service_no_read_tool_enabled": "pending_service_not_attempted_policy_error",
-        "pending_service_url_disallowed": "pending_service_not_attempted_policy_error",
-        "pending_service_duplicate_url_already_attempted":
-            "pending_service_not_attempted_policy_error",
-        "pending_service_suppressed_source": "pending_service_suppressed_source",
-        "pending_service_attempted_failed": "pending_service_attempted_failed",
-        "pending_service_attempted_zero_chars": "pending_service_attempted_failed",
-        "pending_service_attempted_body_not_persisted": "pending_service_attempted_no_body",
+        "service_budget_exhausted": "pending_service_not_attempted_budget_exhausted",
+        "service_attempted_failed": "pending_service_attempted_failed",
         # a recorded success whose body the validator could NOT locate = no persisted body.
-        "pending_service_success": "pending_service_attempted_no_body",
-    }.get(service_status, "pending_service_not_attempted_policy_error")
+        "service_attempted_success": "pending_service_attempted_no_body",
+        "service_suppressed_non_executable": "pending_service_suppressed_source",
+        "service_blocked_disallowed_tool": "service_blocked_disallowed_tool",
+        "service_blocked_source_not_readable": "service_blocked_source_not_readable",
+        "service_blocked_contaminated_or_noise": "service_blocked_contaminated_or_noise",
+        "service_blocked_no_clean_url": "service_blocked_no_clean_url",
+        "service_already_satisfied_by_same_url_read":
+            "service_already_satisfied_by_same_url_read",
+        "service_deduped_to_url_group": "service_already_satisfied_by_same_url_read",
+    }.get(s, "pending_service_not_attempted_policy_error")
 
 _ADAPTER_CAP_DEFAULT = 4000
 #: a call-embedded "body" shorter than this is a bounded preview, not a real page body (5m-2).
@@ -801,6 +841,19 @@ def _categorized_anchors(record: dict, constraint_id: str, slot_id: str,
                 _add("judge_hint", w)
     cats["judge_hint"] = cats["judge_hint"][:8]
     return cats
+
+
+def _raw_rejudgment_status(ob: dict) -> str:
+    """5u-3: the run-persisted rejudgment lifecycle claim. 5t-era runs persisted only the
+    attempted/recorded booleans — derive the equivalent claim (the validator then verifies
+    'recorded' claims against the strict cache and located bodies)."""
+    raw = ob.get("rejudgment_status", "") or ""
+    if raw:
+        return raw
+    if ob.get("rejudgment_attempted"):
+        return ("rejudgment_attempted_recorded" if ob.get("rejudgment_recorded")
+                else "rejudgment_attempted_cache_write_failed")
+    return ""
 
 
 #: max char distance for the predicate-window rescue (subject hit -> nearby predicate term).
@@ -1170,6 +1223,16 @@ def load_legacy_run(run_dir: str | Path, *, allow_live_judge: bool = False,
     bodies, cache_report = _load_provider_bodies(run_dir)
     export_bodies = _load_replay_export_bodies(run_dir)
     judge_cache_path = run_dir / "llm_evidence_judge_cache.json"
+    # 5u-3: entry-PRESENCE check (an entry that exists but cannot be hash-verified is a
+    # body-hash mismatch, not a missing-record invariant violation).
+    try:
+        _judge_store = (json.loads(judge_cache_path.read_text(encoding="utf-8"))
+                        if judge_cache_path.exists() else {})
+    except Exception:
+        _judge_store = {}
+
+    def _strict_entry_present(oid: str) -> bool:
+        return isinstance((_judge_store or {}).get(f"{STRICT_REJUDGE_VERSION}::{oid}"), dict)
     live_judge = None
     live_calls = 0
     rejudge_version_mismatches = 0
@@ -1186,6 +1249,10 @@ def load_legacy_run(run_dir: str | Path, *, allow_live_judge: bool = False,
     # persisted by the run (replay only REPORTS them; it never fetches).
     service_urls_all: list[dict] = []
     run_event_counts: Counter = Counter()
+    # 5u-4: pinned safety metrics aggregated from per-record frontier metrics — emitted as
+    # explicit integers (never None/absent).
+    unrelated_read_executed_total = 0
+    frontier_metrics_seen = False
     for line in dqf.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line:
@@ -1206,6 +1273,11 @@ def load_legacy_run(run_dir: str | Path, *, allow_live_judge: bool = False,
             not_targeted_events_total += 1
         _cf = record.get("candidate_frontier") or {}
         service_urls_all.extend(_cf.get("pending_service_urls") or [])
+        _cfm = _cf.get("metrics") or {}
+        if _cfm:
+            frontier_metrics_seen = True
+            unrelated_read_executed_total += int(
+                _cfm.get("unrelated_read_executed_while_pending_count", 0) or 0)
         for e in (_cf.get("events") or []):
             et = e.get("event_type", "") or ""
             if et.startswith(("predicate_reread", "pending_read_", "pending_service_")):
@@ -1234,12 +1306,15 @@ def load_legacy_run(run_dir: str | Path, *, allow_live_judge: bool = False,
                 judgment_id=ob.get("judgment_id", ""), prompt_hash=ob.get("prompt_hash", ""),
                 reconstruction_method=ob.get("reconstruction_method", ""),
                 reconstruction_missing_fields=list(ob.get("reconstruction_missing_fields", [])),
-                service_status=ob.get("service_status", "") or "",
+                service_status=_canonical_service_status(ob.get("service_status", "") or ""),
                 live_rejudgment_attempted=bool(ob.get("rejudgment_attempted")),
                 live_rejudgment_recorded=bool(ob.get("rejudgment_recorded")),
                 live_closure_state=ob.get("closure_state", "") or "",
                 live_passage_relevance=ob.get("passage_relevance", "") or "",
-                body_available_recorded=bool(ob.get("body_available")))
+                body_available_recorded=bool(ob.get("body_available")),
+                service_block_reason=ob.get("service_block_reason", "") or "",
+                service_group_id=ob.get("service_group_id", "") or "",
+                rejudgment_status=_raw_rejudgment_status(ob))
             # never DROP an obligation for missing ids — keep it with a precise reason.
             if not o.constraint_id or (not o.candidate_id and not o.candidate_text):
                 o.stage_reason = "legacy_missing_candidate_slot_or_constraint"
@@ -1433,6 +1508,16 @@ def load_legacy_run(run_dir: str | Path, *, allow_live_judge: bool = False,
             near_cap = (abs(o.stored_body_chars - _ADAPTER_CAP_DEFAULT) <= 16
                         or bool(fm.get("body_truncated_for_storage")))
             if relevance != "predicate_relevant":
+                # 5u-3: a live rejudgment may have run on this body even though the
+                # validator's stricter relevance says subject-only. VERIFY the recorded
+                # entry (hash/triple) for lifecycle accounting — but never use its verdict
+                # for closure (subject-only passages are not judgeable; strict gate intact).
+                if o.rejudgment_status:
+                    _ver, _mm = _recorded_rejudgment(
+                        judge_cache_path, o, body,
+                        stored_body=(body_rec.get("read_body", "") if body_rec else ""))
+                    if _ver:
+                        o.rejudgment_verified = True
                 # 5n-4/5o-3: subject/title/weak hits alone are NOT judgeable passages. If the
                 # actual body is capped with no raw, the predicate may lie beyond the cap.
                 if o.raw_unavailable and near_cap:
@@ -1463,6 +1548,7 @@ def load_legacy_run(run_dir: str | Path, *, allow_live_judge: bool = False,
                 closure = _RESOLUTION_TO_CLOSURE.get(recorded, "requires_read_still_open")
                 o.closure_code = closure
                 o.live_rejudgment_source = "recorded_rejudgment_cache"
+                o.rejudgment_verified = True
                 # 5o-1: "closed" only when the verdict RESOLVES support; a judged-but-open
                 # verdict never carries a closed_by_* stage reason. 5t-7: a run that recorded
                 # the pending-service event gets the service-aware status name.
@@ -1509,12 +1595,37 @@ def load_legacy_run(run_dir: str | Path, *, allow_live_judge: bool = False,
                     else "rejudgment_prompt_not_in_cache")
             res.obligations.append(o)
 
+    # 5u-3: FINAL rejudgment lifecycle pass — every run-claimed 'recorded' verdict the
+    # validator could not verify is either a body-hash mismatch (the strict entry exists
+    # but cannot be matched to an independently located body) or, when the entry is
+    # entirely absent, a true invariant violation. Never silently unaccounted.
+    _terminal_raw = ("", "rejudgment_not_needed_no_predicate_passage",
+                     "rejudgment_attempted_model_error",
+                     "rejudgment_attempted_cache_write_failed",
+                     "rejudgment_skipped_budget_exhausted",
+                     "rejudgment_skipped_contaminated_or_noise",
+                     "rejudgment_skipped_body_hash_mismatch",
+                     "rejudgment_missing_invariant_violation")
+    for o in res.obligations:
+        raw = o.rejudgment_status
+        if o.rejudgment_verified:
+            if raw != "rejudgment_attempted_invalid_response_recorded_fail_closed":
+                o.rejudgment_status = "rejudgment_attempted_recorded"
+            continue
+        if raw in _terminal_raw:
+            continue
+        o.rejudgment_status = (
+            "rejudgment_skipped_body_hash_mismatch"
+            if _strict_entry_present(o.pending_read_judgment_id)
+            else "rejudgment_missing_invariant_violation")
+
     _summarize_legacy(res, n_items, live_calls, coverage_bounded=coverage_bounded,
                       allow_live_judge=allow_live_judge, cache_report=cache_report,
                       rejudge_version_mismatches=rejudge_version_mismatches,
                       bodies=bodies, recon_sources=recon_sources,
                       not_targeted_events_total=not_targeted_events_total,
-                      service_urls=service_urls_all, run_event_counts=run_event_counts)
+                      service_urls=service_urls_all, run_event_counts=run_event_counts,
+                      unrelated_read_executed_total=unrelated_read_executed_total)
     return res
 
 
@@ -1636,6 +1747,33 @@ _BODY_STAGES = ("actual_body_located", "passages_scanned", "rejudgment_pending",
                 "judged_unclosed", "closed")
 
 
+def _url_category(rec: dict) -> str:
+    """5u-2: the terminal partition category of one service-URL record. Old 5t-era
+    statuses are canonicalized first so existing artifacts reconcile."""
+    st = _canonical_service_status(rec.get("status", "") or "")
+    if rec.get("attempted") or rec.get("fallback_attempted") \
+            or st in ("service_attempted_success", "service_attempted_failed"):
+        return "attempted"
+    if st == "service_already_satisfied_by_same_url_read":
+        return "already_satisfied"
+    if rec.get("blocked_reason") or st.startswith("service_blocked"):
+        return "blocked"
+    if st == "service_budget_exhausted":
+        return "budget_exhausted"
+    if st == "service_suppressed_non_executable":
+        return "suppressed"
+    return "invariant_violation"
+
+
+#: 5u-3: rejudgment lifecycle buckets that account for an ATTEMPTED targeted rejudgment.
+_REJUDGE_ATTEMPT_BUCKETS = (
+    "rejudgment_attempted_recorded", "rejudgment_attempted_model_error",
+    "rejudgment_attempted_cache_write_failed",
+    "rejudgment_attempted_invalid_response_recorded_fail_closed",
+    "rejudgment_skipped_budget_exhausted", "rejudgment_skipped_body_hash_mismatch",
+    "rejudgment_skipped_contaminated_or_noise", "rejudgment_missing_invariant_violation")
+
+
 def _summarize_legacy(res: ReplayValidationResult, n_items: int, live_calls: int, *,
                       coverage_bounded: bool = False, allow_live_judge: bool = False,
                       cache_report: Optional[dict] = None,
@@ -1644,7 +1782,8 @@ def _summarize_legacy(res: ReplayValidationResult, n_items: int, live_calls: int
                       recon_sources: Optional[list] = None,
                       not_targeted_events_total: int = 0,
                       service_urls: Optional[list] = None,
-                      run_event_counts: Optional[Counter] = None) -> None:
+                      run_event_counts: Optional[Counter] = None,
+                      unrelated_read_executed_total: int = 0) -> None:
     obs = res.obligations
     stage = Counter(o.pipeline_status for o in obs)
     reasons = Counter(o.stage_reason for o in obs if o.stage_reason)
@@ -1862,27 +2001,53 @@ def _summarize_legacy(res: ReplayValidationResult, n_items: int, live_calls: int
         "passage_rescue_used_count": sum(
             1 for o in obs if (o.passage_diag or {}).get("rescue_used")),
     })
-    # 5t-1: URL-level pending-service metrics (run-recorded registry; replay only reports).
+    # 5t-1/5u-2: URL-level pending-service metrics (run-recorded registry; replay only
+    # reports). URL terminal states PARTITION into attempted / blocked / budget_exhausted /
+    # suppressed / already_satisfied / invariant_violation (machine-checked below).
     svc = list(service_urls or [])
     ev = run_event_counts or Counter()
-    svc_attempted = sum(1 for r in svc if r.get("attempted") or r.get("fallback_attempted"))
+    url_cats = Counter(_url_category(r) for r in svc)
+    svc_attempted = url_cats.get("attempted", 0)
     svc_success = sum(1 for r in svc if r.get("success"))
     svc_obligations = sum(len(r.get("obligation_ids") or []) for r in svc)
     served = sum(1 for o in obs if o.body_available_recorded)
+    service_status_counts = Counter(o.service_status for o in obs if o.service_status)
+    #: obligations OUTSIDE the clean-URL registry partition (suppressed / unclean URL).
+    _non_registry = (service_status_counts.get("service_suppressed_non_executable", 0)
+                     + service_status_counts.get("service_blocked_no_clean_url", 0))
     res.metrics.update({
         "pending_service_url_count": len(svc),
         "pending_service_url_attempted_count": svc_attempted,
         "pending_service_url_success_count": svc_success,
-        "pending_service_url_blocked_count": sum(1 for r in svc if r.get("blocked_reason")),
-        "pending_service_url_budget_exhausted_count": sum(
-            1 for r in svc if r.get("status") == "pending_service_budget_exhausted"),
+        "pending_service_url_blocked_count": url_cats.get("blocked", 0),
+        "pending_service_url_budget_exhausted_count": url_cats.get("budget_exhausted", 0),
+        "pending_service_url_suppressed_count": url_cats.get("suppressed", 0),
+        "pending_service_url_already_satisfied_count": url_cats.get("already_satisfied", 0),
+        "pending_service_url_invariant_violation_count": url_cats.get(
+            "invariant_violation", 0),
         "pending_service_obligation_count": svc_obligations,
+        "pending_service_obligation_terminal_status_total": (
+            sum(service_status_counts.values()) - _non_registry),
         "pending_service_obligations_served_by_successful_read_count": served,
         "pending_service_url_success_rate": (round(svc_success / len(svc), 3) if svc else 0.0),
         "pending_service_obligation_success_rate": (
             round(served / svc_obligations, 3) if svc_obligations else 0.0),
-        "pending_service_status_counts": dict(Counter(
-            o.service_status for o in obs if o.service_status)),
+        "pending_service_status_counts": dict(service_status_counts),
+        "service_status_counts": dict(service_status_counts),
+        # one count per blocked URL (registry) + per suppressed/unclean obligation (the
+        # only block reasons living outside the URL registry) — never double-counted.
+        "service_block_reason_counts": dict(Counter(
+            x for x in ([r.get("blocked_reason") for r in svc]
+                        + [o.service_block_reason for o in obs
+                           if o.service_block_reason and o.service_status in (
+                               "service_suppressed_non_executable",
+                               "service_blocked_no_clean_url")])
+            if x)),
+        "service_invariant_violation_count": service_status_counts.get(
+            "service_not_attempted_invariant_violation", 0),
+        # 5u-1: policy_error survives ONLY as the invariant-violation alias (pinned 0).
+        "pending_service_not_attempted_policy_error_count": service_status_counts.get(
+            "service_not_attempted_invariant_violation", 0),
         # 5t-2: pinned 0 for runs that finalize service reasons (old runs report n/a as 0
         # too — their obligations have no service vocabulary at all).
         "pending_obligation_without_service_reason_count": sum(
@@ -1901,7 +2066,12 @@ def _summarize_legacy(res: ReplayValidationResult, n_items: int, live_calls: int
             1 for o in obs if o.live_rejudgment_source == "recorded_rejudgment_cache"),
         "pending_read_targeted_rejudgment_closed_count": closed,
         "pending_read_targeted_rejudgment_still_open_count": judged_unclosed,
+        # 5u-3: "missing" now means a TRUE invariant violation (a claimed-recorded verdict
+        # whose strict entry is entirely absent) — never the ordinary lifecycle buckets.
         "pending_read_targeted_rejudgment_missing_count": sum(
+            1 for o in obs
+            if o.rejudgment_status == "rejudgment_missing_invariant_violation"),
+        "pending_read_rejudgment_pending_count": sum(
             1 for o in real_body if o.pipeline_status == "rejudgment_pending"),
         # 5t-5/6: fallback + bounded-reread outcomes, REPORTED from recorded events only
         # (replay never fetches; a reread is a live-run action).
@@ -1916,6 +2086,51 @@ def _summarize_legacy(res: ReplayValidationResult, n_items: int, live_calls: int
         "predicate_reread_outcome_recorded_count": ev.get(
             "predicate_reread_outcome_recorded", 0),
     })
+    # 5u-3/6: explicit rejudgment lifecycle counts + invariant-violation samples.
+    rejudgment_status_counts = Counter(o.rejudgment_status for o in obs
+                                       if o.rejudgment_status)
+    res.metrics["rejudgment_status_counts"] = dict(rejudgment_status_counts)
+    res.metrics["rejudgment_invariant_violation_count"] = rejudgment_status_counts.get(
+        "rejudgment_missing_invariant_violation", 0)
+
+    def _rj_sample(o: "ObligationOutcome") -> dict:
+        return {"pending_read_judgment_id": o.pending_read_judgment_id,
+                "item_id": o.item_id, "source_url": (o.source_url or "")[:120],
+                "rejudgment_status": o.rejudgment_status,
+                "live_rejudgment_attempted": o.live_rejudgment_attempted,
+                "live_rejudgment_recorded": o.live_rejudgment_recorded,
+                "body_source": o.body_source,
+                "passage_relevance": o.passage_relevance or o.live_passage_relevance}
+
+    res.metrics["rejudgment_invariant_violation_samples"] = [
+        _rj_sample(o) for o in obs
+        if o.rejudgment_status == "rejudgment_missing_invariant_violation"][:5]
+    res.metrics["rejudgment_cache_write_failed_samples"] = [
+        _rj_sample(o) for o in obs
+        if o.rejudgment_status == "rejudgment_attempted_cache_write_failed"][:5]
+    # 5u-2/6: blocked-URL + service invariant-violation samples (bounded, sanitized).
+    res.metrics["blocked_service_urls_sample"] = [
+        {"url": (r.get("url") or "")[:120], "url_host": r.get("url_host", ""),
+         "block_reason": r.get("blocked_reason", ""),
+         "service_group_id": r.get("service_group_id", ""),
+         "obligation_count": len(r.get("obligation_ids") or [])}
+        for r in svc if _url_category(r) == "blocked"][:5]
+    res.metrics["service_invariant_violation_samples"] = [
+        {"pending_read_judgment_id": o.pending_read_judgment_id, "item_id": o.item_id,
+         "source_url": (o.source_url or "")[:120], "service_status": o.service_status,
+         "service_block_reason": o.service_block_reason,
+         "service_group_id": o.service_group_id}
+        for o in obs
+        if o.service_status == "service_not_attempted_invariant_violation"][:5]
+    # 5u-4: pinned safety metrics — ALWAYS explicit integers, never None/absent.
+    res.metrics["unrelated_read_executed_while_pending_count"] = int(
+        unrelated_read_executed_total)
+    res.metrics["debug_snippet_judged_count"] = sum(
+        1 for o in obs if o.body_match_source == "debug_record"
+        and o.pipeline_status in ("judged_unclosed", "closed"))
+    res.metrics["requires_read_still_open_counted_closed_count"] = sum(
+        1 for o in obs if o.closure_code == "requires_read_still_open"
+        and o.pipeline_status == "closed")
     # 5r-3: explain a body located WITHOUT a persisted read-event backlink (legacy runs).
     if res.metrics["body_located_count"] > 0 and res.metrics["matched_read_call_count"] == 0:
         res.metrics["body_match_explanation"] = (
@@ -1980,6 +2195,9 @@ def _summarize_legacy(res: ReplayValidationResult, n_items: int, live_calls: int
         res.overall_status = "reconstructed_debug_only"
     else:
         res.overall_status = "reconstructed_body_missing"
+    # 5u-4: the consistency check is part of the report itself — ALWAYS an explicit list
+    # (preferably []), never None/absent. Computed last so it sees every metric above.
+    res.metrics["consistency_violations"] = consistency_violations(res.metrics)
 
 
 def inspect_run_schema(run_dir: str | Path) -> dict[str, Any]:
@@ -2063,6 +2281,39 @@ def consistency_violations(metrics: dict) -> list[str]:
     if metrics.get("pending_service_url_count", 0) == 0 \
             and metrics.get("pending_service_obligations_served_by_successful_read_count", 0):
         v.append("obligations served by service but no service urls registered")
+    # 5u-2: URL terminal states PARTITION the registry.
+    url_total = metrics.get("pending_service_url_count", 0)
+    url_parts = sum(metrics.get(k, 0) for k in (
+        "pending_service_url_attempted_count", "pending_service_url_blocked_count",
+        "pending_service_url_budget_exhausted_count", "pending_service_url_suppressed_count",
+        "pending_service_url_already_satisfied_count",
+        "pending_service_url_invariant_violation_count"))
+    if url_total != url_parts:
+        v.append("service URL terminal categories do not partition the registry")
+    # 5u-2: every registry obligation carries exactly one terminal service status.
+    if "pending_service_obligation_terminal_status_total" in metrics \
+            and metrics.get("pending_service_url_count", 0) > 0 \
+            and metrics.get("pending_service_obligation_count", 0) != \
+            metrics.get("pending_service_obligation_terminal_status_total", 0):
+        v.append("service obligation terminal statuses do not reconcile with "
+                 "obligation count")
+    if metrics.get("pending_obligation_without_service_reason_count", 0):
+        v.append("pending obligation without a terminal service reason")
+    # 5u-3: every attempted targeted rejudgment lands in exactly one lifecycle bucket.
+    rj = metrics.get("rejudgment_status_counts", {}) or {}
+    rj_attempted = metrics.get("pending_read_targeted_rejudgment_attempted_count", 0)
+    rj_buckets = sum(n for k, n in rj.items() if k in _REJUDGE_ATTEMPT_BUCKETS)
+    if rj_attempted != rj_buckets:
+        v.append("rejudgment attempts do not reconcile with lifecycle buckets")
+    # 5u-4: pinned safety invariants — explicit and zero.
+    if not isinstance(metrics.get("unrelated_read_executed_while_pending_count", 0), int):
+        v.append("unrelated_read_executed_while_pending_count is not an integer")
+    elif metrics.get("unrelated_read_executed_while_pending_count", 0) > 0:
+        v.append("unrelated read executed while clean pendings were open")
+    if metrics.get("debug_snippet_judged_count", 0):
+        v.append("debug snippet was judged")
+    if metrics.get("requires_read_still_open_counted_closed_count", 0):
+        v.append("requires_read_still_open counted as closed")
     return v
 
 
@@ -2092,5 +2343,14 @@ def _absent_or_unknown(p: Path, res: ReplayValidationResult) -> ReplayValidation
         res.notes.append(f"no_replay_fixture_or_debug_questions_in:{p}; present={present}")
     res.metrics = {"replay_pending_read_judgment_count": 0,
                    "replay_pending_read_unvalidated_cache_miss_count": 0,
-                   "live_provider_calls": 0, "live_model_calls": 0}
+                   "live_provider_calls": 0, "live_model_calls": 0,
+                   # 5u-4: pinned metrics are explicit even when nothing is inspectable.
+                   "unrelated_read_executed_while_pending_count": 0,
+                   "debug_snippet_judged_count": 0,
+                   "requires_read_still_open_counted_closed_count": 0,
+                   "service_status_counts": {}, "service_block_reason_counts": {},
+                   "service_invariant_violation_count": 0,
+                   "rejudgment_status_counts": {},
+                   "rejudgment_invariant_violation_count": 0,
+                   "consistency_violations": []}
     return res

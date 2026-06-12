@@ -749,3 +749,36 @@ runs only, at most one per obligation, higher per-call cap; replay never fetches
 reports recorded outcomes). Validator statuses are service-aware for runs that recorded a
 service event; `pending_source_has_search_snippet_only` is reserved for old runs with none.
 Zero live calls in default validation; no benchmark/accuracy/memory/generalization claim.
+
+## Level 5u: deterministic service completion + rejudgment persistence accounting
+
+The 5t live smoke was a real partial pass (3/3 attempted service URLs succeeded; 6 strict
+verdicts found offline) that exposed two accounting seams: blocked-URL reasons did not
+propagate to the obligations sharing those URLs (11 obligations ended at the ambiguous
+`pending_service_not_attempted_policy_error`), and the targeted-rejudgment trace did not
+reconcile (attempted=14, recorded=6, missing=7, one unaccounted). 5u closes the lifecycle
+without adding planner features. Every pending obligation now terminates in exactly one
+concrete, event-derived service status (attempted success/failed; blocked with the concrete
+reading-policy refusal — contaminated/noise, disallowed tool, no clean URL, source not
+readable; already satisfied by a same-URL read; deduped to a URL group; budget exhausted;
+suppressed non-executable), with the URL-group terminal state propagated to all obligations
+on that URL and per-obligation persistence of the status, stage reason, normalized URL,
+group id, block reason, attempted tool, read success/body linkage, and the budget remaining
+when decided. `pending_service_not_attempted_policy_error` survives only as the
+invariant-violation name (an open, clean, unserved obligation while budget remained) and is
+pinned 0 in normal mechanics. URL terminal categories partition the registry and are
+machine-checked (url_count == attempted + blocked + budget_exhausted + suppressed +
+already_satisfied + invariant_violation; obligation terminal statuses reconcile with the
+registry obligation count). Every attempted targeted rejudgment lands in exactly one
+explicit bucket — recorded (validator-verified strict-body-v2 entry), model error (fails
+closed, never persisted as a verdict), cache-write failed (surfaced with bounded samples),
+invalid response recorded fail-closed as requires_read, body-hash mismatch (an entry exists
+but cannot be verified against an independently located actual body), not needed (no
+passage), or a true missing-record invariant violation — and the equation attempted ==
+sum(buckets) is machine-checked. A verdict verified on a subject-only body is
+lifecycle-accounted but never used for closure; `requires_read_still_open` is never counted
+closed. Pinned safety metrics are always explicit integers and `consistency_violations` is
+always an explicit list inside the report itself. Old 5t-era persisted statuses are
+canonicalized so existing 5t artifacts revalidate with concrete reasons and no contradictory
+accounting. Zero live calls in default validation; no benchmark/accuracy/memory/
+generalization claim.

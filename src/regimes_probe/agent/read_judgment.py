@@ -117,6 +117,50 @@ def make_read_body_id(bhash: str, normalized_url: str, provider: str) -> str:
     return "rb_" + hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
 
 
+# --------------------------------------------------------------------------- 5v.1 canonical
+#: 5v.1: ONE canonical body-hash basis, shared between live writing and replay validation, so
+#: the writer and the validator can never disagree on WHICH text was hashed or HOW.
+BODY_HASH_ALGO_VERSION = "sha256-16-v1"
+BODY_HASH_TEXT_ENCODING = "utf-8"
+#: bump if the canonicalization (currently a no-op) ever changes; persisted on every record.
+BODY_HASH_TEXT_NORMALIZATION_VERSION = "none"
+
+
+class BodyHashBasis:
+    """Which body text a hash was computed over (recorded, never silently assumed)."""
+    STORED_READ_BODY = "stored_read_body"      # the cap'd body actually stored + judged
+    RAW_READ_BODY = "raw_read_body"            # the larger raw payload, when persisted
+    PASSAGE_SOURCE_BODY = "passage_source_body"  # the body passages were extracted from
+
+
+BODY_HASH_BASES = (BodyHashBasis.STORED_READ_BODY, BodyHashBasis.RAW_READ_BODY,
+                   BodyHashBasis.PASSAGE_SOURCE_BODY)
+
+
+def canonical_read_body_hash(body_text: str, *,
+                             basis: str = BodyHashBasis.STORED_READ_BODY) -> str:
+    """5v.1: THE canonical read-body hash. ``basis`` selects which body string the caller
+    passes (it is recorded, never transformed here — normalization is currently 'none'); the
+    hash itself is the shared ``sha256[:16]`` over the utf-8 bytes. Using this one function on
+    both the live writer and the replay validator removes any stored-vs-raw / encoding /
+    URL-inclusion drift between them."""
+    if basis not in BODY_HASH_BASES:
+        basis = BodyHashBasis.STORED_READ_BODY
+    return body_hash(body_text or "")
+
+
+#: 5v.1: finite read-body-level mismatch taxonomy — every unverifiable strict rejudgment is
+#: classified into exactly one of these (no generic body_hash_mismatch without a class).
+READ_BODY_MISMATCH_CLASSES = (
+    "strict_entry_hash_differs_from_manifest_same_read_body_id",
+    "cache_body_hash_differs_from_manifest", "stored_vs_raw_hash_basis_mismatch",
+    "passage_source_hash_differs_from_read_body_hash", "passage_window_hash_mismatch",
+    "passage_window_hash_unavailable_old_entry", "strict_entry_missing_body_hash",
+    "manifest_missing_body_hash", "read_body_id_not_found_in_manifest",
+    "multiple_manifest_entries_same_read_body_id", "cache_body_not_rehydratable",
+    "strict_version_mismatch", "unknown")
+
+
 @dataclass(frozen=True)
 class ReadJudgmentConfig:
     """Cheap, deterministic defaults — do NOT raise the cap as the only fix (5h-B).

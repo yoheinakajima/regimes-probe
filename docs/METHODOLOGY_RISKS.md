@@ -650,3 +650,20 @@ set — and the risk surface. Keep the experiment honest:
   verified-by-body-id or verified-by-url-fallback or unverifiable, and a consistency rule
   requires those to cover the recorded count, so a future change that quietly stops verifying
   by body id would trip the check rather than pass silently.
+
+- **Level 5v.1 risks.** (1) *Identity-vs-rehydration conflation*: the prior validator could
+  let a cache-body divergence read as a body hash mismatch; 5v.1 separates the two — body
+  identity is strict-entry-hash vs manifest-hash, and cache rehydration is a distinct,
+  non-fatal reproducibility check — so a verdict whose provenance is sound is no longer marked
+  unverifiable for a reproduction quirk. (2) *Hash-basis drift*: writer and validator now share
+  one canonical hash function with an explicit, persisted basis/encoding/normalization version,
+  so a stored-vs-raw or encoding difference is detected and classified
+  (stored_vs_raw_hash_basis_mismatch) rather than silently failing. (3) *Generic unverifiable
+  buckets*: every unverifiable obligation must carry a finite mismatch class — a consistency
+  rule pins unverifiable_without_mismatch_class_count to 0, so a future divergence can never
+  hide in an unnamed bucket. (4) *Dedup masking scale*: the report shows BOTH obligation-level
+  and read-body-level mismatch counts, so collapsing four obligations to one body never hides
+  that four obligations were affected. (5) *Self-certified manifest*: identity still requires
+  the manifest body to be a genuine read body (never a snippet) and not contaminated, and a
+  present read_body_id that cannot be resolved is an explicit failure
+  (read_body_id_not_found_in_manifest), never a silent URL-fallback pass.

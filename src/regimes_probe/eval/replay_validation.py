@@ -153,6 +153,18 @@ class ObligationOutcome:
     rejudgment_outcome: str = ""
     #: a generic evidence gap was recorded for this obligation (terminal/unreadable source).
     evidence_gap_reason: str = ""
+    # Level 5v.1 body-hash / canonicalization reconciliation.
+    #: finite mismatch class (READ_BODY_MISMATCH_CLASSES) when a recorded rejudgment cannot
+    #: be verified — never a generic unverifiable bucket.
+    read_body_mismatch_class: str = ""
+    strict_entry_body_hash: str = ""
+    manifest_body_hash: str = ""
+    located_cache_body_hash: str = ""
+    body_hash_basis: str = ""
+    #: cache rehydration is SEPARATE from body identity: matches | differs | not_rehydratable.
+    cache_body_repro_status: str = ""
+    #: passage-window reproduction: verified | mismatch | unavailable_old_entry | "".
+    passage_window_status: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {k: getattr(self, k) for k in (
@@ -177,7 +189,10 @@ class ObligationOutcome:
             "live_closure_state", "live_passage_relevance", "body_available_recorded",
             "service_block_reason", "service_group_id", "rejudgment_status",
             "rejudgment_verified", "read_body_id", "rejudgment_verify_method",
-            "rejudgment_unverifiable_reason", "rejudgment_outcome", "evidence_gap_reason")}
+            "rejudgment_unverifiable_reason", "rejudgment_outcome", "evidence_gap_reason",
+            "read_body_mismatch_class", "strict_entry_body_hash", "manifest_body_hash",
+            "located_cache_body_hash", "body_hash_basis", "cache_body_repro_status",
+            "passage_window_status")}
 
 
 @dataclass
@@ -1579,6 +1594,18 @@ def load_legacy_run(run_dir: str | Path, *, allow_live_judge: bool = False,
                 o.closure_code = closure
                 o.live_rejudgment_source = "recorded_rejudgment_cache"
                 o.rejudgment_verified = True
+                # 5v.1 req-4: body identity is proven; INDEPENDENTLY reproduce the passage
+                # windows from the verified body. A window failure is its OWN classification,
+                # never body_hash_mismatch, and never un-verifies the strict verdict.
+                _strict = _strict_entry_for(judge_cache_path, o.pending_read_judgment_id)
+                if _strict is not None and o.rejudgment_verify_method == "body_id":
+                    o.passage_window_status = _validate_passage_windows(
+                        _strict, body_rec.get("read_body", "") if body_rec else body)
+                    if o.passage_window_status == "mismatch":
+                        o.read_body_mismatch_class = "passage_window_hash_mismatch"
+                    elif o.passage_window_status == "unavailable_old_entry":
+                        o.read_body_mismatch_class = o.read_body_mismatch_class \
+                            or "passage_window_hash_unavailable_old_entry"
                 # 5v-2: split closure semantics — constraint_resolving CLOSES; source-terminal
                 # non-support (irrelevant/partial) is DONE for this source but not still-open
                 # and not answer-supporting (records an evidence gap); requires_read_still_open
@@ -1704,7 +1731,8 @@ def load_legacy_run(run_dir: str | Path, *, allow_live_judge: bool = False,
                       service_urls=service_urls_all, run_event_counts=run_event_counts,
                       unrelated_read_executed_total=unrelated_read_executed_total,
                       read_body_manifest=read_body_manifest,
-                      evidence_gaps=evidence_gaps_all)
+                      evidence_gaps=evidence_gaps_all,
+                      judge_cache_path=judge_cache_path)
     return res
 
 
@@ -1729,64 +1757,146 @@ _VERIFIABLE_BODY_SOURCES = frozenset({
     _LIVE_BODY_SOURCE, "cache_read_body", "call_embedded_read_body", "replay_export_body"})
 
 
+def _strict_entry_hash(strict: dict) -> str:
+    """5v.1: the strict entry's body-identity hash, newest field first."""
+    return (strict.get("strict_entry_body_hash") or strict.get("judged_body_hash")
+            or strict.get("body_hash") or "")
+
+
+def _strict_entry_for(judge_cache_path: Path, oid: str) -> Optional[dict]:
+    """Load the strict entry for one obligation (or None). Bounded, read-only."""
+    if not judge_cache_path.exists():
+        return None
+    try:
+        store = json.loads(judge_cache_path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    e = (store or {}).get(f"{STRICT_REJUDGE_VERSION}::{oid}")
+    return e if isinstance(e, dict) else None
+
+
+def _validate_passage_windows(strict: dict, body_text: str) -> str:
+    """5v.1 req-4: INDEPENDENTLY reproduce the recorded passage windows from the verified
+    body. Returns ``verified`` | ``mismatch`` | ``unavailable_old_entry``. Body identity is
+    already proven by the caller; a window failure is classified separately as
+    ``passage_window_hash_mismatch`` (never body_hash_mismatch)."""
+    offsets = strict.get("passage_window_offsets") or []
+    lengths = strict.get("passage_window_lengths") or []
+    hashes = strict.get("passage_window_hashes") or (
+        [strict.get("passage_window_hash")] if strict.get("passage_window_hash") else [])
+    if not hashes or not offsets or not lengths or any(o is None or o < 0 for o in offsets):
+        return "unavailable_old_entry"
+    norm = " ".join((body_text or "").split())
+    for off, ln, h in zip(offsets, lengths, hashes):
+        window = norm[off:off + ln]
+        if _body_hash(window) != h:
+            return "mismatch"
+    return "verified"
+
+
+def _manifest_body_hash(mani: dict) -> str:
+    return mani.get("manifest_body_hash") or mani.get("body_hash") or ""
+
+
 def _recorded_rejudgment(judge_cache_path: Path, o: "ObligationOutcome",
                          body: str = "", stored_body: str = "",
                          read_body_manifest: Optional[dict] = None
                          ) -> tuple[Optional[str], str, str]:
-    """Per-obligation strict-cache lookup. Returns ``(verdict, verify_method, reason)``.
+    """Per-obligation strict-cache lookup. Returns ``(verdict, verify_method, mismatch_class)``
+    and ALSO records the read-body-level provenance fields on ``o`` (strict/manifest/cache
+    hashes, basis, cache-rehydration status, passage-window status).
 
-    5v-1: verification is PRIMARILY by ``read_body_id`` + ``judged_body_hash`` against the
-    run's persisted read-body manifest — NOT by re-locating + re-hashing a body via URL
-    heuristics. The chain is: strict entry (pending_read_judgment_id keyed) -> read_body_id ->
-    manifest provenance object whose ``body_hash`` must equal the entry's ``judged_body_hash``
-    and whose ``body_source`` must be a genuine read body (never a snippet) and not
-    contaminated. ``verify_method`` is ``body_id`` for that path. When the entry has no
-    read_body_id (legacy 5u/earlier), fall back to hashing against the located body
-    (``url_fallback``). On failure ``reason`` is one of body_hash_mismatch / body_not_found /
-    judge_cache_missing (a version/legacy mismatch is judge_cache_missing-class)."""
+    5v.1 verification is BODY-ID-FIRST and MANIFEST-AUTHORITATIVE:
+      A. find the strict entry's ``read_body_id`` in the manifest;
+      B. compare ``strict_entry_body_hash`` to ``manifest_body_hash`` UNDER THE DECLARED BASIS;
+      C. if equal -> verified by body_id (identity proven);
+      D. ONLY THEN, separately, compare the rehydrated cache body to the manifest body for
+         passage reproducibility — a cache divergence is ``cache_body_hash_differs_from_manifest``
+         (or ``cache_body_not_rehydratable``), it does NOT un-verify the strict verdict.
+    URL fallback is used ONLY when the entry has no read_body_id (old artifacts). Every
+    failure carries a finite ``mismatch_class`` (never a generic unverifiable bucket)."""
     if not judge_cache_path.exists():
+        o.read_body_mismatch_class = "strict_version_mismatch"
         return None, "none", "judge_cache_missing"
     try:
         store = json.loads(judge_cache_path.read_text(encoding="utf-8"))
     except Exception:
+        o.read_body_mismatch_class = "strict_version_mismatch"
         return None, "none", "judge_cache_missing"
     oid = o.pending_read_judgment_id
     strict = (store or {}).get(f"{STRICT_REJUDGE_VERSION}::{oid}")
     if not isinstance(strict, dict):
         if (store or {}).get(f"rejudgment::{oid}"):
-            return None, "none", "judge_cache_missing"   # legacy pre-strict entry: ignored
-        return None, "none", "judge_cache_missing"
-    triple_ok = (strict.get("version") == STRICT_REJUDGE_VERSION
-                 and strict.get("constraint_id") == o.constraint_id
-                 and strict.get("slot_id") == o.slot_id)
-    if not triple_ok:
-        return None, "none", "body_hash_mismatch"        # wrong triple/version
-    # PRIMARY: verify by read_body_id against the persisted manifest (no URL heuristic).
+            o.read_body_mismatch_class = "strict_version_mismatch"
+        return None, "none", "judge_cache_missing"   # legacy/absent: ignored, never judged
+    if (strict.get("version") != STRICT_REJUDGE_VERSION
+            or strict.get("constraint_id") != o.constraint_id
+            or strict.get("slot_id") != o.slot_id):
+        o.read_body_mismatch_class = "strict_version_mismatch"
+        return None, "none", "body_hash_mismatch"
+    strict_hash = _strict_entry_hash(strict)
+    s_basis = strict.get("body_hash_basis") or "stored_read_body"
+    o.strict_entry_body_hash = strict_hash
+    o.body_hash_basis = s_basis
     rbid = strict.get("read_body_id") or ""
     if rbid:
+        o.read_body_id = rbid
         mani = (read_body_manifest or {}).get(rbid)
         if mani is None:
+            # read_body_id is present but the manifest has no such body — never URL fallback.
+            o.read_body_mismatch_class = "read_body_id_not_found_in_manifest"
             return None, "none", "body_not_found"
-        judged = strict.get("judged_body_hash") or strict.get("body_hash")
-        if judged and mani.get("body_hash") and judged != mani.get("body_hash"):
-            return None, "none", "body_hash_mismatch"    # genuine body replacement/corruption
-        # strict gate: the body must be a real read body and never contaminated.
-        if mani.get("contaminated") or mani.get("body_source") not in _VERIFIABLE_BODY_SOURCES:
+        mani_hash = _manifest_body_hash(mani)
+        m_basis = mani.get("body_hash_basis") or "stored_read_body"
+        o.manifest_body_hash = mani_hash
+        if not strict_hash:
+            o.read_body_mismatch_class = "strict_entry_missing_body_hash"
             return None, "none", "body_hash_mismatch"
+        if not mani_hash:
+            o.read_body_mismatch_class = "manifest_missing_body_hash"
+            return None, "none", "body_hash_mismatch"
+        # strict gate: the manifest body must be a genuine read body, never contaminated.
+        if mani.get("contaminated") or mani.get("body_source") not in _VERIFIABLE_BODY_SOURCES:
+            o.read_body_mismatch_class = "read_body_id_not_found_in_manifest"
+            return None, "none", "body_hash_mismatch"
+        if s_basis != m_basis:
+            o.read_body_mismatch_class = "stored_vs_raw_hash_basis_mismatch"
+            return None, "none", "body_hash_mismatch"
+        if strict_hash != mani_hash:
+            o.read_body_mismatch_class = \
+                "strict_entry_hash_differs_from_manifest_same_read_body_id"
+            return None, "none", "body_hash_mismatch"
+        # (C) IDENTITY VERIFIED by body_id. (D) cache rehydration is a SEPARATE, non-fatal
+        # check: a divergence means passages can't be reproduced from the cache, NOT that the
+        # strict verdict provenance is wrong.
+        cache_basis_text = stored_body if stored_body else body
+        if cache_basis_text:
+            ch = _body_hash(cache_basis_text)
+            o.located_cache_body_hash = ch
+            o.cache_body_repro_status = ("matches" if ch == mani_hash
+                                         else "cache_body_hash_differs_from_manifest")
+        else:
+            o.cache_body_repro_status = "cache_body_not_rehydratable"
+        # passage-source identity (separate from body identity).
+        pss = strict.get("passage_source_body_hash")
+        if pss and pss != mani_hash:
+            o.passage_window_status = o.passage_window_status or "mismatch"
         return str(strict.get("verdict") or "") or None, "body_id", ""
     # FALLBACK (legacy entries without a read_body_id): hash against the located body.
     if strict.get("body_source") == _LIVE_BODY_SOURCE:
         hashes = {_body_hash(body)} | ({_body_hash(stored_body)} if stored_body else set())
         prov_ok = (not strict.get("body_provider") or not o.body_provider
                    or strict.get("body_provider") == o.body_provider)
-        if prov_ok and strict.get("body_hash") in hashes:
+        if prov_ok and strict_hash in hashes:
             return str(strict.get("verdict") or "") or None, "url_fallback", ""
+        o.read_body_mismatch_class = "cache_body_hash_differs_from_manifest"
         return None, "none", "body_hash_mismatch"
     ok = (strict.get("body_source") == o.body_source
           and strict.get("body_provider") == o.body_provider
-          and strict.get("body_hash") == _body_hash(body))
+          and strict_hash == _body_hash(body))
     if ok:
         return str(strict.get("verdict") or "") or None, "url_fallback", ""
+    o.read_body_mismatch_class = "cache_body_hash_differs_from_manifest"
     return None, "none", "body_hash_mismatch"
 
 
@@ -1892,7 +2002,8 @@ def _summarize_legacy(res: ReplayValidationResult, n_items: int, live_calls: int
                       run_event_counts: Optional[Counter] = None,
                       unrelated_read_executed_total: int = 0,
                       read_body_manifest: Optional[dict] = None,
-                      evidence_gaps: Optional[list] = None) -> None:
+                      evidence_gaps: Optional[list] = None,
+                      judge_cache_path: Optional[Path] = None) -> None:
     obs = res.obligations
     stage = Counter(o.pipeline_status for o in obs)
     reasons = Counter(o.stage_reason for o in obs if o.stage_reason)
@@ -2215,6 +2326,30 @@ def _summarize_legacy(res: ReplayValidationResult, n_items: int, live_calls: int
             1 for o in obs if o.rejudgment_unverifiable_reason == "body_not_found"),
         "recorded_rejudgment_unverifiable_count": sum(
             1 for o in obs if o.rejudgment_unverifiable_reason),
+        # 5v.1: obligation-level vs read-body-level mismatch dedup (4 obligations on one bad
+        # body == 4 obligation mismatches but 1 read-body mismatch).
+        "recorded_rejudgment_body_hash_mismatch_obligation_count": sum(
+            1 for o in obs if o.rejudgment_unverifiable_reason == "body_hash_mismatch"),
+        "recorded_rejudgment_body_hash_mismatch_read_body_count": len({
+            o.read_body_id for o in obs
+            if o.rejudgment_unverifiable_reason == "body_hash_mismatch" and o.read_body_id}),
+        "read_body_id_verification_success_count": sum(
+            1 for o in obs if o.rejudgment_verify_method == "body_id"),
+        "read_body_id_verification_failure_count": sum(
+            1 for o in obs if o.read_body_id and o.read_body_mismatch_class),
+        "read_body_id_verification_failure_class_counts": dict(Counter(
+            o.read_body_mismatch_class for o in obs
+            if o.read_body_id and o.read_body_mismatch_class)),
+        "read_body_mismatch_class_counts": dict(Counter(
+            o.read_body_mismatch_class for o in obs if o.read_body_mismatch_class)),
+        # 5v.1: cache-rehydration is SEPARATE from body identity (passage reproducibility).
+        "cache_body_differs_from_manifest_count": sum(
+            1 for o in obs
+            if o.cache_body_repro_status == "cache_body_hash_differs_from_manifest"),
+        "cache_body_not_rehydratable_count": sum(
+            1 for o in obs if o.cache_body_repro_status == "cache_body_not_rehydratable"),
+        "passage_window_status_counts": dict(Counter(
+            o.passage_window_status for o in obs if o.passage_window_status)),
         # 5v-1: read-body manifest size (the offline-verification key set).
         "read_body_manifest_count": len(read_body_manifest or {}),
         # 5t-5/6: fallback + bounded-reread outcomes, REPORTED from recorded events only
@@ -2267,6 +2402,51 @@ def _summarize_legacy(res: ReplayValidationResult, n_items: int, live_calls: int
     res.metrics["recorded_rejudgment_body_mismatch_samples"] = [
         _bid_sample(o) for o in obs
         if o.rejudgment_unverifiable_reason in ("body_hash_mismatch", "body_not_found")][:5]
+    # 5v.1 req-1: READ-BODY-LEVEL mismatch diagnostics keyed by read_body_id (bounded). One
+    # record per affected read_body_id, aggregating its obligations + the finite mismatch
+    # class — so N obligations on one bad body collapse to one read-body diagnostic.
+    mismatch_obs = [o for o in obs if o.read_body_mismatch_class
+                    and o.rejudgment_unverifiable_reason in
+                    ("body_hash_mismatch", "body_not_found")]
+    by_rb: dict[str, list] = {}
+    for o in mismatch_obs:
+        by_rb.setdefault(o.read_body_id or f"no_rbid::{o.pending_read_judgment_id}",
+                         []).append(o)
+    rb_diags = []
+    for rbid, group in list(by_rb.items())[:20]:
+        mani = (read_body_manifest or {}).get(rbid, {})
+        lead = group[0]
+        strict = ((_strict_entry_for(judge_cache_path, lead.pending_read_judgment_id) or {})
+                  if judge_cache_path is not None else {})
+        verified_for_body = sum(1 for o in obs if o.read_body_id == rbid
+                                and o.rejudgment_verify_method == "body_id")
+        rb_diags.append({
+            "read_body_id": rbid,
+            "normalized_url": mani.get("normalized_url", "")[:120],
+            "provider": mani.get("body_provider", ""),
+            "source_url": (mani.get("source_url") or lead.source_url or "")[:120],
+            "final_url": (mani.get("final_url") or "")[:120],
+            "pending_read_judgment_ids": [o.pending_read_judgment_id for o in group][:12],
+            "strict_entry_count": len(group),
+            "verified_entry_count": verified_for_body,
+            "mismatch_entry_count": len(group),
+            "strict_entry_body_hashes": sorted({o.strict_entry_body_hash for o in group
+                                                if o.strict_entry_body_hash}),
+            "manifest_body_hash": mani.get("manifest_body_hash") or mani.get("body_hash", ""),
+            "manifest_body_hash_basis": mani.get("body_hash_basis", ""),
+            "manifest_body_source": mani.get("body_source", ""),
+            "located_cache_body_hash": lead.located_cache_body_hash,
+            "located_cache_body_hash_basis": "stored_read_body",
+            "located_cache_body_source": lead.body_source,
+            "stored_body_chars": mani.get("stored_body_chars"),
+            "cached_payload_chars": mani.get("cached_payload_chars"),
+            "raw_payload_available": bool(mani.get("raw_available")),
+            "passage_source_body_hashes": sorted({strict.get("passage_source_body_hash", "")}
+                                                 - {""}),
+            "passage_window_hashes_present": bool(strict.get("passage_window_hashes")),
+            "mismatch_class": lead.read_body_mismatch_class,
+        })
+    res.metrics["recorded_rejudgment_read_body_mismatch_diagnostics"] = rb_diags
     # 5v-3: evidence-gap aggregation (generic, replayable; no retrieval policy implemented).
     egaps = list(evidence_gaps or [])
     res.metrics["evidence_gap_count"] = len(egaps)
@@ -2305,6 +2485,10 @@ def _summarize_legacy(res: ReplayValidationResult, n_items: int, live_calls: int
     res.metrics["requires_read_still_open_counted_closed_count"] = sum(
         1 for o in obs if o.closure_code == "requires_read_still_open"
         and o.pipeline_status == "closed")
+    # 5v.1: no UNVERIFIABLE obligation may lack a finite read-body mismatch class.
+    res.metrics["unverifiable_without_mismatch_class_count"] = sum(
+        1 for o in obs if o.pipeline_status == "rejudgment_unverifiable"
+        and not o.read_body_mismatch_class)
     # 5v-2: source-terminal non-support must be its OWN bucket — never still-open, never closed.
     res.metrics["source_terminal_counted_still_open_count"] = sum(
         1 for o in obs if o.pipeline_status == "source_terminal"
@@ -2523,6 +2707,19 @@ def consistency_violations(metrics: dict) -> list[str]:
                  + metrics.get("recorded_rejudgment_unverifiable_count", 0)) \
             < metrics.get("pending_read_targeted_rejudgment_recorded_count", 0):
         v.append("recorded rejudgment verification methods do not cover recorded count")
+    # 5v.1: every UNVERIFIABLE obligation must carry a finite read-body mismatch class.
+    if metrics.get("unverifiable_without_mismatch_class_count", 0):
+        v.append("unverifiable obligation without a finite read-body mismatch class")
+    # 5v.1: the read-body-level mismatch count must never exceed the obligation-level count
+    # (dedup collapses obligations to bodies, it cannot inflate them).
+    if metrics.get("recorded_rejudgment_body_hash_mismatch_read_body_count", 0) > \
+            metrics.get("recorded_rejudgment_body_hash_mismatch_obligation_count", 0):
+        v.append("read-body mismatch count exceeds obligation mismatch count")
+    # 5v.1: every read-body-level failure class is a member of the finite taxonomy.
+    from regimes_probe.agent.read_judgment import READ_BODY_MISMATCH_CLASSES
+    for cls in (metrics.get("read_body_mismatch_class_counts", {}) or {}):
+        if cls not in READ_BODY_MISMATCH_CLASSES:
+            v.append(f"read-body mismatch class not in taxonomy: {cls}")
     return v
 
 
@@ -2573,6 +2770,18 @@ def _absent_or_unknown(p: Path, res: ReplayValidationResult) -> ReplayValidation
                    "recorded_rejudgment_body_hash_mismatch_count": 0,
                    "recorded_rejudgment_body_not_found_count": 0,
                    "recorded_rejudgment_unverifiable_count": 0,
+                   # 5v.1 pinned dedup/verification metrics.
+                   "recorded_rejudgment_body_hash_mismatch_obligation_count": 0,
+                   "recorded_rejudgment_body_hash_mismatch_read_body_count": 0,
+                   "read_body_id_verification_success_count": 0,
+                   "read_body_id_verification_failure_count": 0,
+                   "read_body_id_verification_failure_class_counts": {},
+                   "read_body_mismatch_class_counts": {},
+                   "unverifiable_without_mismatch_class_count": 0,
+                   "cache_body_differs_from_manifest_count": 0,
+                   "passage_window_status_counts": {},
+                   "read_body_manifest_count": 0,
+                   "recorded_rejudgment_read_body_mismatch_diagnostics": [],
                    "evidence_gap_count": 0, "evidence_gap_reason_counts": {},
                    "consistency_violations": []}
     return res

@@ -2552,11 +2552,16 @@ class CandidateFrontier:
         a recorded rejudgment by id + hash without any URL-matching heuristic. Idempotent: a
         re-read at a higher cap yields a new id (different body bytes)."""
         from regimes_probe.agent.read_judgment import (
-            body_hash, make_read_body_id, normalize_service_url)
+            BODY_HASH_ALGO_VERSION, BODY_HASH_TEXT_ENCODING,
+            BODY_HASH_TEXT_NORMALIZATION_VERSION, BodyHashBasis,
+            canonical_read_body_hash, make_read_body_id, normalize_service_url)
         rm = dict(read_meta or {})
         provider = rm.get("body_provider") or rm.get("tool") or ""
         norm = normalize_service_url(source_url)
-        bh = body_hash(read_text or "")
+        # 5v.1: the manifest body hash basis is ALWAYS the STORED read body (the cap'd text
+        # that was actually stored + judged), via the shared canonical function. read_body_id
+        # is derived from that same stored-body hash, so id and hash never diverge.
+        bh = canonical_read_body_hash(read_text or "", basis=BodyHashBasis.STORED_READ_BODY)
         rbid = make_read_body_id(bh, norm, provider)
         rec = self.read_bodies.get(rbid)
         raw_text = rm.get("raw_text") or ""
@@ -2567,18 +2572,25 @@ class CandidateFrontier:
                 "pending_read_judgment_ids": [],
                 "tool": rm.get("tool", ""), "body_provider": provider,
                 "requested_url": (rm.get("requested_url") or source_url or "")[:300],
+                "source_url": (source_url or "")[:300],
                 "final_url": (rm.get("final_url") or "")[:300],
                 "normalized_url": norm[:300],
                 "body_source": rm.get("body_source", "live_run_read_body"),
                 "stored_body_chars": len(read_text or ""),
                 "cached_payload_chars": len(raw_text),
-                "body_hash": bh,
-                "raw_body_hash": (body_hash(raw_text) if raw_text else ""),
+                "manifest_body_hash": bh, "body_hash": bh,           # body_hash kept (compat)
+                "body_hash_basis": BodyHashBasis.STORED_READ_BODY,
+                "raw_body_hash": (canonical_read_body_hash(
+                    raw_text, basis=BodyHashBasis.RAW_READ_BODY) if raw_text else ""),
+                "raw_body_chars": len(raw_text), "raw_available": bool(raw_text),
                 "max_chars": rm.get("max_chars"),
                 "body_truncated_for_storage": bool(rm.get("body_truncated_for_storage")),
                 "store_raw_was_enabled": rm.get("store_raw_was_enabled"),
                 "contaminated": bool(rm.get("contaminated")),
                 "noise_flag": bool(rm.get("noise_flag")),
+                "hash_algorithm": BODY_HASH_ALGO_VERSION,
+                "text_encoding": BODY_HASH_TEXT_ENCODING,
+                "text_normalization_version": BODY_HASH_TEXT_NORMALIZATION_VERSION,
             }
             self.read_bodies[rbid] = rec
         for pid in pending_ids:
@@ -2659,17 +2671,37 @@ class CandidateFrontier:
         if cache is None:
             return False
         from regimes_probe.agent.read_judgment import (
-            LIVE_RUN_BODY_SOURCE, STRICT_REJUDGE_VERSION, body_hash, strict_rejudgment_key)
+            BODY_HASH_ALGO_VERSION, BodyHashBasis, LIVE_RUN_BODY_SOURCE,
+            STRICT_REJUDGE_VERSION, canonical_read_body_hash, strict_rejudgment_key)
         cand = self.candidates_by_id.get(p.candidate_id)
-        bh = body_hash(body)
+        # 5v.1: the strict entry's body hash uses the SAME canonical basis (STORED read body)
+        # as the manifest, so read_body_id, manifest body_hash and the strict body_hash are
+        # ALWAYS computed over the same string under the same function — they cannot diverge.
+        bh = canonical_read_body_hash(body, basis=BodyHashBasis.STORED_READ_BODY)
+        # passage windows: recorded with offsets (into the normalized body) so the validator
+        # can reproduce them independently of body identity.
+        norm_body = " ".join((body or "").split())
+        offset = norm_body.find(passage) if passage else -1
+        passage_window_hash = canonical_read_body_hash(
+            passage, basis=BodyHashBasis.PASSAGE_SOURCE_BODY)
         rbrec = self.read_bodies.get(read_body_id, {}) if read_body_id else {}
-        rec = {"version": STRICT_REJUDGE_VERSION, "verdict": verdict,
-               "body_source": LIVE_RUN_BODY_SOURCE,
+        rec = {"version": STRICT_REJUDGE_VERSION, "strict_entry_version": STRICT_REJUDGE_VERSION,
+               "verdict": verdict, "body_source": LIVE_RUN_BODY_SOURCE,
                "body_provider": rbrec.get("body_provider", "") or p.read_tool or "",
-               "body_hash": bh, "passage_hash": body_hash(passage),
+               "body_hash": bh, "passage_hash": passage_window_hash,
                # 5v-1: the exact body identity is the PRIMARY proof for offline verification.
                "read_body_id": read_body_id, "judged_body_hash": bh,
-               "passage_window_hash": body_hash(passage),
+               "strict_entry_body_hash": bh,
+               "body_hash_basis": BodyHashBasis.STORED_READ_BODY,
+               "hash_algorithm": BODY_HASH_ALGO_VERSION,
+               # 5v.1: passage provenance is SEPARATE from body identity (reproducibility).
+               "passage_source_read_body_id": read_body_id,
+               "passage_source_body_hash": bh,
+               "passage_window_hash": passage_window_hash,
+               "passage_window_hashes": [passage_window_hash],
+               "passage_window_offsets": [offset],
+               "passage_window_lengths": [len(passage or "")],
+               "passage_count": 1,
                "source_url": (p.source_url or "")[:300], "candidate_id": p.candidate_id,
                "candidate_text": ((cand.candidate_text if cand else p.source_subject)
                                   or "")[:120],

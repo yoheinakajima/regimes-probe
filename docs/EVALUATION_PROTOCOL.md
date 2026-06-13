@@ -825,3 +825,45 @@ alternate-source retrieval policy is implemented in this increment — the gap i
 and available for the next planner increment so lifecycle repair is not conflated with query
 policy. Contamination, source-noise, chrome/snippet/debug rejection, the answer gate, and
 partial-support behavior are all unchanged; default validation makes zero live calls.
+
+## Level 5v.1: body-hash / canonicalization reconciliation
+
+The 5v provenance smoke narrowed the unverifiable rejudgments to a real seam: 26 verified by
+read_body_id but 7 reported body_hash_mismatch even though those obligations had a read_body_id
+AND a present manifest entry — collapsing to 3 read_body_ids, all with cache_read_body located
+bodies and live_run_read_body manifests. This is an identity-versus-rehydration / hash-basis
+confusion, not a missing id and not a genuine corruption. 5v.1 reconciles it as mechanism
+hardening only (no benchmark/accuracy/memory/generalization claim).
+
+There is now one canonical, shared body-hash basis. `canonical_read_body_hash(text, basis=...)`
+with an explicit `BodyHashBasis` enum (stored_read_body / raw_read_body / passage_source_body),
+plus a persisted hash algorithm, text encoding, and text-normalization version, is used by both
+the live writer and the replay validator, so they can never disagree on which text was hashed or
+how. The read-body manifest records the manifest body hash and its basis (and the raw hash when
+present); the strict rejudgment entry records the strict-entry body hash and basis, the
+passage-source body hash and read_body_id, and the passage window hashes, offsets, and lengths.
+
+Verification is body-id-first and manifest-authoritative. The validator locates the strict
+entry's read_body_id in the manifest and compares the strict-entry body hash to the manifest body
+hash under the declared basis; if they match, the strict verdict is verified by body id. Only
+then, separately, is the rehydrated cache body compared to the manifest for passage
+reproducibility — a cache divergence is classified as cache_body_hash_differs_from_manifest (or
+cache_body_not_rehydratable) and never misclassified as a body hash mismatch and never used to
+un-verify the verdict. A present read_body_id is never resolved by URL fallback; URL fallback
+exists only for old artifacts without a read_body_id. Every unverifiable obligation carries a
+finite mismatch class from a fixed taxonomy (strict_entry_hash_differs_from_manifest_same_read_body_id,
+cache_body_hash_differs_from_manifest, stored_vs_raw_hash_basis_mismatch,
+passage_source_hash_differs_from_read_body_hash, passage_window_hash_mismatch,
+passage_window_hash_unavailable_old_entry, strict_entry_missing_body_hash, manifest_missing_body_hash,
+read_body_id_not_found_in_manifest, multiple_manifest_entries_same_read_body_id,
+cache_body_not_rehydratable, strict_version_mismatch, unknown).
+
+Passage windows are validated independently: after body identity verifies, the validator
+recomputes the window hashes from the verified body at the persisted offsets and lengths; a
+failure is passage_window_hash_mismatch (never a body hash mismatch) and missing offsets are
+passage_window_hash_unavailable_old_entry — neither un-verifies the strict verdict. Lifecycle
+accounting dedupes by read_body_id, so N obligations sharing one bad body collapse to one
+read-body-level mismatch with a single bounded diagnostic record. The strict gate,
+contamination/noise/snippet/debug rejection, the answer gate, and the rule that
+requires_read_still_open never increments the closed count are all unchanged; default validation
+makes zero live calls.

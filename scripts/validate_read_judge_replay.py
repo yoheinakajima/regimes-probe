@@ -220,6 +220,18 @@ def main() -> int:
               f"body_hash_mismatch={pm.get('recorded_rejudgment_body_hash_mismatch_count')} "
               f"body_not_found={pm.get('recorded_rejudgment_body_not_found_count')} "
               f"unverifiable={pm.get('recorded_rejudgment_unverifiable_count')}")
+        print(f"   body-hash mismatch (5v.1): "
+              f"obligations={pm.get('recorded_rejudgment_body_hash_mismatch_obligation_count')} "
+              f"read_bodies={pm.get('recorded_rejudgment_body_hash_mismatch_read_body_count')} "
+              f"verify_success={pm.get('read_body_id_verification_success_count')} "
+              f"verify_failure={pm.get('read_body_id_verification_failure_count')} "
+              f"no_class={pm.get('unverifiable_without_mismatch_class_count')}; "
+              f"cache_differs={pm.get('cache_body_differs_from_manifest_count')} "
+              f"failure_classes="
+              f"{json.dumps(pm.get('read_body_id_verification_failure_class_counts', {}))}")
+        if pm.get("recorded_rejudgment_read_body_mismatch_diagnostics"):
+            print(f"   read-body mismatch diagnostics: "
+                  f"{json.dumps(pm['recorded_rejudgment_read_body_mismatch_diagnostics'])}")
         if pm.get("recorded_rejudgment_body_mismatch_samples"):
             print(f"   body-mismatch samples: "
                   f"{json.dumps(pm['recorded_rejudgment_body_mismatch_samples'])}")

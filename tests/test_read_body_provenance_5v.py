@@ -218,6 +218,7 @@ def test_body_hash_mismatch_is_unverifiable_not_missing(tmp_path):
         candidate_id="cand1", source_url=_URL_A, read_text=_BODY_SUPPORT, judge=judge,
         read_meta={"tool": "page_fetch", "body_provider": "page_fetch"})
     # CORRUPT the manifest body hash so id-verification fails (genuine replacement case).
+    fr.read_bodies[p.read_body_id]["manifest_body_hash"] = "deadbeefdeadbeef"
     fr.read_bodies[p.read_body_id]["body_hash"] = "deadbeefdeadbeef"
     fr.finalize_pending_service(budget_remaining=0, reading_tools_enabled=True)
     run = _persist(tmp_path, fr, _BODY_SUPPORT, p.slot_id)
@@ -226,12 +227,18 @@ def test_body_hash_mismatch_is_unverifiable_not_missing(tmp_path):
     assert o.pipeline_status == "rejudgment_unverifiable"
     assert o.rejudgment_unverifiable_reason == "body_hash_mismatch"
     assert o.rejudgment_status == "rejudgment_skipped_body_hash_mismatch"
+    # 5v.1: the finite mismatch class names the exact divergence.
+    assert o.read_body_mismatch_class == \
+        "strict_entry_hash_differs_from_manifest_same_read_body_id"
     pm = res.metrics
     assert pm["recorded_rejudgment_body_hash_mismatch_count"] == 1
+    assert pm["recorded_rejudgment_body_hash_mismatch_obligation_count"] == 1
+    assert pm["recorded_rejudgment_body_hash_mismatch_read_body_count"] == 1
     assert pm["recorded_rejudgment_unverifiable_count"] == 1
     assert pm["pending_read_targeted_rejudgment_missing_count"] == 0   # NOT "missing"
     assert pm["closed_count"] == 0
-    assert pm["recorded_rejudgment_body_mismatch_samples"]
+    assert pm["unverifiable_without_mismatch_class_count"] == 0
+    assert pm["recorded_rejudgment_read_body_mismatch_diagnostics"]
     assert consistency_violations(pm) == []
 
 

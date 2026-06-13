@@ -86,10 +86,16 @@ def test_closure_counts_and_judged_unclosed_derived_from_closure_code(tmp_path):
     r2 = load_legacy_run(run)
     assert r2.metrics["live_model_calls"] == 0
     for o in r2.obligations:
+        # 5v-2: precise rejudgment-outcome stage reasons (still-open is requires_read only).
         if o.pipeline_status == "judged_unclosed":
-            assert o.stage_reason == "judged_by_recorded_strict_rejudgment_still_open"
+            assert o.stage_reason == "judged_requires_more_evidence"
+            assert o.closure_code == "requires_read_still_open"
         if o.pipeline_status == "closed":
-            assert o.stage_reason == "closed_by_recorded_strict_rejudgment"
+            assert o.stage_reason in ("judged_resolved_full_support",
+                                      "judged_resolved_contradiction")
+        if o.pipeline_status == "source_terminal":
+            assert o.stage_reason in ("judged_source_irrelevant_terminal",
+                                      "judged_partial_terminal_non_support")
 
 
 # ----------------------------------------------------------------- 2: call vs body split

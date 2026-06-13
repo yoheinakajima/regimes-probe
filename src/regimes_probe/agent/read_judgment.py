@@ -80,6 +80,7 @@ REJUDGMENT_STATUSES = (
     "rejudgment_attempted_model_error", "rejudgment_attempted_cache_write_failed",
     "rejudgment_attempted_invalid_response_recorded_fail_closed",
     "rejudgment_skipped_budget_exhausted", "rejudgment_skipped_body_hash_mismatch",
+    "rejudgment_skipped_body_not_found", "rejudgment_skipped_judge_cache_missing",
     "rejudgment_skipped_contaminated_or_noise", "rejudgment_missing_invariant_violation")
 
 #: judge verdicts the route recognizes; anything else is recorded FAIL-CLOSED as
@@ -87,6 +88,33 @@ REJUDGMENT_STATUSES = (
 KNOWN_REJUDGE_VERDICTS = frozenset({
     "full_support", "partial_support", "contradiction", "irrelevant",
     "requires_read", "still_unresolved", "insufficient"})
+
+#: 5v-2: rejudgment OUTCOME categories over the validator's closure-code vocabulary.
+#: A. constraint_resolving — may resolve/reject candidate-constraint support under the
+#:    existing strict gate (these are the ONLY verdicts counted as "closed").
+REJUDGE_CONSTRAINT_RESOLVING = frozenset({
+    "resolved_full_support", "resolved_contradiction"})
+#: B. source_terminal_non_support — the read obligation is DONE for THIS source/body, but
+#:    no blocking constraint is satisfied and no answer is supported. Records an evidence gap.
+REJUDGE_SOURCE_TERMINAL_NON_SUPPORT = frozenset({
+    "resolved_irrelevant", "resolved_partial_support",
+    "source_subject_mismatch", "source_lacks_required_predicate"})
+#: C. still_requires_more_evidence — the ONLY verdict that keeps the read obligation open.
+REJUDGE_STILL_OPEN = frozenset({"requires_read_still_open"})
+
+#: 5v-3: generic evidence-gap reasons (no benchmark/answer/domain specifics).
+EVIDENCE_GAP_REASONS = (
+    "source_irrelevant", "partial_only", "source_unreadable", "social_media_blocked",
+    "requires_more_evidence", "body_unverifiable")
+
+
+def make_read_body_id(bhash: str, normalized_url: str, provider: str) -> str:
+    """5v-1: a stable id for one read-class body, derived from the EXACT stored body hash +
+    normalized url + provider. Independent of any URL-matching heuristic — the validator
+    verifies a recorded rejudgment by this id + body hash, not by re-locating the body."""
+    import hashlib
+    raw = f"{bhash}|{(normalized_url or '').strip().lower()}|{(provider or '').strip().lower()}"
+    return "rb_" + hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
 
 
 @dataclass(frozen=True)
@@ -289,6 +317,14 @@ class PendingReadJudgment:
     service_budget_remaining_when_decided: Optional[int] = None
     #: one of REJUDGMENT_STATUSES once a body was routed for this obligation.
     rejudgment_status: str = ""
+    # 5v-1/2: exact read-body provenance + split rejudgment-outcome semantics.
+    #: stable id of the exact read body this obligation's rejudgment was run on.
+    read_body_id: str = ""
+    #: rejudgment OUTCOME category: constraint_resolving | source_terminal_non_support |
+    #: still_requires_more_evidence | "" (not yet judged).
+    rejudgment_outcome: str = ""
+    #: generic evidence-gap reason recorded for an alternate-source acquisition (5v-3).
+    evidence_gap_reason: str = ""
 
     @property
     def open(self) -> bool:
@@ -328,7 +364,10 @@ class PendingReadJudgment:
                 "service_read_body_linked": self.body_available,
                 "service_budget_remaining_when_decided":
                     self.service_budget_remaining_when_decided,
-                "rejudgment_status": self.rejudgment_status}
+                "rejudgment_status": self.rejudgment_status,
+                "read_body_id": self.read_body_id,
+                "rejudgment_outcome": self.rejudgment_outcome,
+                "evidence_gap_reason": self.evidence_gap_reason}
 
 
 def _host(url: str) -> str:

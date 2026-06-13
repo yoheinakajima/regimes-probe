@@ -213,6 +213,26 @@ def main() -> int:
               f"attempted={pm.get('predicate_reread_attempted_count')} "
               f"blocked={pm.get('predicate_reread_blocked_count')} "
               f"outcomes={pm.get('predicate_reread_outcome_recorded_count')}")
+        print(f"   read-body provenance (5v): manifest={pm.get('read_body_manifest_count')} "
+              f"verified_by_body_id={pm.get('recorded_rejudgment_verified_by_body_id_count')} "
+              f"verified_by_url_fallback="
+              f"{pm.get('recorded_rejudgment_verified_by_url_fallback_count')} "
+              f"body_hash_mismatch={pm.get('recorded_rejudgment_body_hash_mismatch_count')} "
+              f"body_not_found={pm.get('recorded_rejudgment_body_not_found_count')} "
+              f"unverifiable={pm.get('recorded_rejudgment_unverifiable_count')}")
+        if pm.get("recorded_rejudgment_body_mismatch_samples"):
+            print(f"   body-mismatch samples: "
+                  f"{json.dumps(pm['recorded_rejudgment_body_mismatch_samples'])}")
+        print(f"   rejudgment outcomes (5v): "
+              f"constraint_resolving={pm.get('rejudgment_constraint_resolved_count')} "
+              f"source_terminal_non_support={pm.get('rejudgment_terminal_non_support_count')} "
+              f"requires_read_still_open={pm.get('rejudgment_requires_read_still_open_count')} "
+              f"unverifiable={pm.get('rejudgment_unverifiable_count')}; "
+              f"closed(constraint_resolving)={pm.get('closed_count')} "
+              f"source_obligation_terminal={pm.get('source_obligation_terminal_count')}")
+        print(f"   evidence gaps (5v): count={pm.get('evidence_gap_count')} "
+              f"reasons={json.dumps(pm.get('evidence_gap_reason_counts', {}))} "
+              f"search_alternate={pm.get('evidence_gap_search_alternate_count')}")
         from regimes_probe.eval.replay_validation import consistency_violations
         viol = consistency_violations(pm)
         print(f"   internal consistency: {'OK' if not viol else 'VIOLATIONS: ' + '; '.join(viol)}")

@@ -633,3 +633,20 @@ set — and the risk surface. Keep the experiment honest:
   persisted obligation/registry state and validator-side verification — never from inline
   counters that could drift — and are enforced by `consistency_violations`, which is part of
   the report output itself and pinned to [] in tests.
+
+- **Level 5v risks.** (1) *Self-certifying provenance*: the read-body manifest is produced by
+  the live run, so the validator could be tempted to trust it blindly — instead it checks the
+  chain is internally consistent (the strict entry's `judged_body_hash` equals the manifest
+  `body_hash`) AND that the manifest body source is a genuine read body and not contaminated,
+  and it surfaces any body-hash mismatch as an explicit unverifiable outcome with samples. A
+  snippet can never enter the manifest because the route is only ever called with read-class
+  bodies. (2) *Terminal-non-support laundering*: marking resolved_irrelevant terminal could be
+  read as "resolved", so it is given its own pipeline status that is pinned out of both the
+  closed and still-open counts, and it never touches candidate support — the answer gate is
+  unchanged and a fixture proves it stays false when only terminal non-support exists. (3)
+  *Evidence-gap scope creep*: the gap object is deliberately inert (it records that a clean
+  alternate could be searched, but no retrieval runs), so this increment cannot silently
+  change query behavior. (4) *Verification-method drift*: a recorded rejudgment is counted as
+  verified-by-body-id or verified-by-url-fallback or unverifiable, and a consistency rule
+  requires those to cover the recorded count, so a future change that quietly stops verifying
+  by body id would trip the check rather than pass silently.

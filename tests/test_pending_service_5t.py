@@ -314,6 +314,8 @@ def _live_then_persist_run(tmp_path) -> Path:
             "events": dbg["events"], "events_truncated": 0, "interpretations": [],
             "pending_read_judgments": dbg["pending_read_judgments"],
             "pending_service_urls": dbg["pending_service_urls"],
+            "read_bodies": dbg.get("read_bodies", []),
+            "evidence_gaps": dbg.get("evidence_gaps", []),
             "slates": [{"slot_role": "person",
                         "top_candidates": [{"candidate_text_preview": "Avery Quinn"}]}]},
         "calls": [], "evidence": []}
@@ -336,10 +338,14 @@ def test_validator_reports_service_rates_and_finds_live_recorded_rejudgment(tmp_
     o = res.obligations[0]
     assert o.body_is_actual_read_body
     assert o.closure_code == "resolved_full_support"
-    assert o.stage_reason == "pending_service_body_acquired_rejudgment_closed"
+    # 5v-2: precise outcome stage reason; 5v-1: verified by exact read_body_id.
+    assert o.stage_reason == "judged_resolved_full_support"
+    assert o.rejudgment_verify_method == "body_id"
     assert pm["stage_reason_counts"].get("rejudgment_prompt_not_in_cache", 0) == 0
     assert pm["pending_read_targeted_rejudgment_recorded_count"] == 1
     assert pm["pending_read_targeted_rejudgment_missing_count"] == 0
+    assert pm["recorded_rejudgment_verified_by_body_id_count"] == 1
+    assert pm["recorded_rejudgment_body_hash_mismatch_count"] == 0
     assert pm["closed_count"] == 1
     assert res.overall_status == "validated_closed"
     assert consistency_violations(pm) == []

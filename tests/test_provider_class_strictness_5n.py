@@ -155,16 +155,16 @@ def test_requires_read_still_open_is_judged_unclosed(tmp_path):
 
 # ----------------------------------------------------------------- F/G: rejudgment cache version
 def test_legacy_rejudgment_cache_entry_is_ignored_with_version_mismatch(tmp_path):
+    # 5v: a legacy pre-strict ``rejudgment::`` entry has no strict-v2 record, so it is simply
+    # IGNORED — the obligation stays rejudgment_pending and is NEVER judged/closed.
     run = _copy(tmp_path)
     (run / "llm_evidence_judge_cache.json").write_text(json.dumps(
         {"rejudgment::recon_browsecomp-0000-shaped_0": "full_support"}))
     res = load_legacy_run(run)
     o = res.obligations[0]
     assert o.pipeline_status == "rejudgment_pending"            # NOT judged/closed
-    assert res.metrics["recorded_rejudgment_cache_version_mismatch_count"] >= 1
+    assert o.closure_code != "resolved_full_support"
     assert res.metrics["closed_count"] == 0
-    assert any(e["event_type"] == "recorded_rejudgment_cache_version_mismatch"
-               for e in res.replay_events)
 
 
 def test_strict_rejudgment_cache_entry_with_matching_hash_is_accepted(tmp_path):
@@ -188,6 +188,8 @@ def test_strict_rejudgment_cache_entry_with_matching_hash_is_accepted(tmp_path):
 
 
 def test_strict_entry_with_wrong_body_hash_is_version_mismatch(tmp_path):
+    # 5v-1: a strict entry whose body hash does not match the located body is UNVERIFIABLE
+    # (body_hash_mismatch) — precise, never judged/closed, never silently pending.
     run = _copy(tmp_path)
     oid = "recon_browsecomp-0000-shaped_0"
     (run / "llm_evidence_judge_cache.json").write_text(json.dumps({
@@ -197,8 +199,10 @@ def test_strict_entry_with_wrong_body_hash_is_version_mismatch(tmp_path):
             "body_hash": "deadbeefdeadbeef", "slot_id": "s0", "constraint_id": "c1"}}))
     res = load_legacy_run(run)
     o = next(x for x in res.obligations if x.pending_read_judgment_id == oid)
-    assert o.pipeline_status == "rejudgment_pending"
-    assert res.metrics["recorded_rejudgment_cache_version_mismatch_count"] >= 1
+    assert o.pipeline_status == "rejudgment_unverifiable"
+    assert o.rejudgment_unverifiable_reason == "body_hash_mismatch"
+    assert res.metrics["recorded_rejudgment_body_hash_mismatch_count"] >= 1
+    assert res.metrics["closed_count"] == 0
 
 
 # ----------------------------------------------------------------- 7: inspect-schema split

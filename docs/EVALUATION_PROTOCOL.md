@@ -782,3 +782,46 @@ always an explicit list inside the report itself. Old 5t-era persisted statuses 
 canonicalized so existing 5t artifacts revalidate with concrete reasons and no contradictory
 accounting. Zero live calls in default validation; no benchmark/accuracy/memory/
 generalization claim.
+
+## Level 5v: exact read-body provenance + terminal rejudgment semantics
+
+The 5u service smoke was a real partial pass — pending-read service worked, actual bodies
+were acquired, predicate-relevant passages were extracted, and strict verdicts were recorded
+— but it exposed two seams. First, half of attempted rejudgments were unverifiable
+(`rejudgment_skipped_body_hash_mismatch`) because the validator re-located and re-hashed a
+body through URL heuristics while the live run hashed a differently-capped body. Second, the
+resolved_irrelevant verdicts were counted as judged-unclosed/still-open, conflating
+source-terminal non-support with "needs more of the same source." 5v fixes both as mechanism
+hardening only (no benchmark/accuracy/memory/generalization claim).
+
+Every read-class body used in pending-read service now gets a stable `read_body_id` (a hash
+of the exact stored body plus normalized URL and provider) and a full provenance record in a
+persisted `read_bodies` manifest. The strict rejudgment entry references that `read_body_id`
+and the `judged_body_hash`, so the validator verifies a recorded rejudgment primarily by
+`pending_read_judgment_id + read_body_id + body_hash + strict version` against the manifest —
+the body source must be a genuine read body (never a snippet) and never contaminated. URL
+matching survives only as a fallback diagnostic for legacy entries without a `read_body_id`.
+A body-hash mismatch or a missing manifest body is an explicit unverifiable outcome
+(`body_hash_mismatch` / `body_not_found`), never a silent "missing"; a strict entry that is
+entirely absent remains the only missing-record invariant violation.
+
+Rejudgment outcomes are split into four non-overlapping categories. Constraint-resolving
+verdicts (full support, contradiction) are the only ones counted closed and the only ones
+that may touch candidate-constraint support, under the unchanged strict gate. Source-terminal
+non-support (irrelevant, partial) closes the read obligation for that source/body but
+satisfies no blocking constraint and supports no answer — it is its own pipeline status,
+never still-open and never closed, and it records a generic evidence gap.
+requires_read_still_open is the only verdict that keeps the obligation open. Unverifiable is
+its own bucket. Stage reasons are precise (judged_resolved_full_support /
+judged_resolved_contradiction / judged_source_irrelevant_terminal /
+judged_partial_terminal_non_support / judged_requires_more_evidence /
+judged_unverifiable_body_hash_mismatch / judged_unverifiable_body_missing /
+judged_unverifiable_cache_missing).
+
+Every terminal non-support or blocked-unreadable source records a generic, replayable
+evidence gap (candidate/slot/constraint, source URL, gap reason, candidate viability,
+constraint-blocking, and whether a clean alternate source should be searched later). No
+alternate-source retrieval policy is implemented in this increment — the gap is made explicit
+and available for the next planner increment so lifecycle repair is not conflated with query
+policy. Contamination, source-noise, chrome/snippet/debug rejection, the answer gate, and
+partial-support behavior are all unchanged; default validation makes zero live calls.

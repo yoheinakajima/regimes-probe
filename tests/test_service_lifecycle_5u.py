@@ -233,6 +233,8 @@ def _persist_run(tmp_path, fr, judge_unused, body, slot_id) -> Path:
     record = _record(dbg["pending_read_judgments"],
                      service_urls=dbg["pending_service_urls"], events=dbg["events"],
                      slot_id=slot_id)
+    record["candidate_frontier"]["read_bodies"] = dbg.get("read_bodies", [])
+    record["candidate_frontier"]["evidence_gaps"] = dbg.get("evidence_gaps", [])
     record["candidate_frontier"]["metrics"] = {
         "unrelated_read_executed_while_pending_count":
             dbg["metrics"]["unrelated_read_executed_while_pending_count"]}

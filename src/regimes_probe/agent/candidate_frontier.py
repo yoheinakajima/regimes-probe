@@ -413,6 +413,19 @@ class CandidateFrontier:
         self.pending_read_targeted_rejudgment_recorded_count = 0
         self.pending_read_targeted_rejudgment_closed_count = 0
         self.pending_read_targeted_rejudgment_still_open_count = 0
+        #: 5v-1: exact read-body provenance manifest (read_body_id -> provenance dict). The
+        #: validator verifies a recorded rejudgment by read_body_id + body_hash, NOT by
+        #: re-locating + re-hashing a body via URL heuristics.
+        self.read_bodies: dict[str, dict] = {}
+        #: 5v-2: split rejudgment-outcome accounting (terminal non-support is NOT still-open).
+        self.rejudgment_constraint_resolved_count = 0
+        self.rejudgment_terminal_non_support_count = 0
+        self.rejudgment_requires_read_still_open_count = 0
+        #: 5v-3: generic evidence gaps for terminal non-support / unreadable sources, made
+        #: explicit + replayable for a future alternate-source planner increment (no retrieval
+        #: policy is implemented here).
+        self.evidence_gaps: list[dict] = []
+        self._eg = 0
         #: Level 5h-A/B pending read->judge loop + targeted passage retrieval.
         from regimes_probe.agent.read_judgment import DEFAULT_READ_CONFIG
         self.read_config = DEFAULT_READ_CONFIG
@@ -518,7 +531,8 @@ class CandidateFrontier:
                         directed_slot_id: Optional[str] = None,
                         directed_constraint_ids: Optional[list[str]] = None,
                         proposal_id: Optional[str] = None,
-                        read_candidate_id: Optional[str] = None) -> EvidenceRecord:
+                        read_candidate_id: Optional[str] = None,
+                        read_meta: Optional[dict] = None) -> EvidenceRecord:
         """Fold a tool call's observations into the slates.
 
         When the call was driven by an LLM frontier proposal, ``directed_slot_id`` /
@@ -679,8 +693,14 @@ class CandidateFrontier:
             had_pending = bool(self._open_pending_for(read_candidate_id, read_url))
             resolved = 0
             if read_text and (read_candidate_id or read_url):
+                # 5v-1: pass the read body's provenance (fetch_meta + provider) so the route
+                # can register an exact read_body_id for offline rejudgment verification.
+                rm = dict(read_meta or {})
+                rm.setdefault("tool", source_tool)
+                rm.setdefault("body_provider", source_tool)
                 resolved = self.route_read_into_pending_judgments(
-                    candidate_id=read_candidate_id, source_url=read_url, read_text=read_text)
+                    candidate_id=read_candidate_id, source_url=read_url, read_text=read_text,
+                    read_meta=rm)
             # 5j-F: DISTINCT read outcomes — a read that only added candidates must NOT look
             # like it resolved support, and a read that closed a pending obligation is visible.
             read_added_candidates = bool(ev.newly_introduced_candidates)
@@ -2286,6 +2306,30 @@ class CandidateFrontier:
                 p.service_stage_reason = "service_deduped_to_url_group"
             else:
                 group_lead_seen.add(rec["service_group_id"])
+        # 5v-3: record a generic evidence gap for every BLOCKED-unreadable source that never
+        # acquired a body and has no gap yet (terminal non-support gaps are recorded by the
+        # route). Suppressed/contaminated sources want a CLEAN alternate; deduped members of a
+        # group inherit one gap (avoid N duplicate gaps for one URL).
+        _gap_by_status = {
+            "service_blocked_source_not_readable": "social_media_blocked",
+            "service_blocked_contaminated_or_noise": "source_unreadable",
+            "service_suppressed_non_executable": "source_unreadable",
+            "service_blocked_disallowed_tool": "source_unreadable",
+            "service_blocked_no_clean_url": "source_unreadable",
+        }
+        gap_groups_seen: set[str] = set()
+        for p in self.pending_read_judgments.values():
+            if p.body_available or p.evidence_gap_reason:
+                continue
+            gap_reason = _gap_by_status.get(p.service_status)
+            if gap_reason is None:
+                continue
+            grp = p.service_group_id or p.pending_read_judgment_id
+            if grp in gap_groups_seen:
+                p.evidence_gap_reason = gap_reason          # propagate to group member
+                continue
+            gap_groups_seen.add(grp)
+            self._record_evidence_gap(p, gap_reason)
         from collections import Counter as _Counter
         self._emit("pending_service_finalized",
                    data={"budget_remaining": budget_remaining,
@@ -2308,11 +2352,15 @@ class CandidateFrontier:
         return out
 
     def route_read_into_pending_judgments(self, *, candidate_id, source_url, read_text,
-                                          judge=None) -> int:
+                                          judge=None, read_meta=None) -> int:
         """Route a fetched page BODY back into the pending requires_read judgments for the
         same (candidate, slot, constraint) triples (5h-A) using targeted passage retrieval
         (5h-B). The judge (if any) sees PASSAGES, never the truncated snippet that created
-        the obligation and never only the document head. Returns #resolved this call."""
+        the obligation and never only the document head. Returns #resolved this call.
+
+        5v-1: registers EXACT read-body provenance (``read_body_id`` keyed by the stored-body
+        hash + normalized url + provider) so the recorded rejudgment can be verified offline
+        without any URL-matching heuristic."""
         from regimes_probe.agent.read_judgment import extract_passages
         pend = self._open_pending_for(candidate_id, source_url)
         if not pend:
@@ -2322,8 +2370,14 @@ class CandidateFrontier:
                 self._emit("read_completed_no_pending_judgment", candidate_id=candidate_id,
                            data={"url_host": _host(source_url)})
             return 0
+        # 5v-1: register the exact body ONCE for the whole URL group (all pendings served by
+        # this read share one read_body_id + body_hash).
+        read_body_id = self._register_read_body(
+            source_url=source_url, read_text=read_text,
+            pending_ids=[p.pending_read_judgment_id for p in pend], read_meta=read_meta)
         resolved = 0
         for p in pend:
+            p.read_body_id = read_body_id
             was_reread = bool(p.reread_pending)
             p.reread_pending = False
             p.read_selected = True
@@ -2390,8 +2444,8 @@ class CandidateFrontier:
             if judge_error:
                 p.rejudgment_status = "rejudgment_attempted_model_error"
             else:
-                persisted = self._persist_strict_rejudgment(p, status, read_text,
-                                                            passage, judge)
+                persisted = self._persist_strict_rejudgment(
+                    p, status, read_text, passage, judge, read_body_id=read_body_id)
                 if not persisted:
                     p.rejudgment_status = "rejudgment_attempted_cache_write_failed"
                 elif invalid_verdict:
@@ -2399,15 +2453,28 @@ class CandidateFrontier:
                         "rejudgment_attempted_invalid_response_recorded_fail_closed"
                 else:
                     p.rejudgment_status = "rejudgment_attempted_recorded"
+            # 5v-2: split closure semantics. resolved_irrelevant / partial are SOURCE-TERMINAL
+            # non-support (the read obligation is DONE for THIS source/body), NOT "still open";
+            # only requires_read keeps the obligation open. constraint_resolving verdicts may
+            # touch candidate support under the unchanged strict gate.
             p.closure_state = {
                 "full_support": "resolved_full_support",
                 "contradiction": "resolved_contradiction",
-                "partial_support": "partial_support_after_read",
-                "irrelevant": "irrelevant_after_read"}.get(status, "requires_read_still_open")
-            if status in ("full_support", "contradiction"):
+                "partial_support": "resolved_partial_support",
+                "irrelevant": "resolved_irrelevant"}.get(status, "requires_read_still_open")
+            from regimes_probe.agent.read_judgment import (
+                REJUDGE_CONSTRAINT_RESOLVING, REJUDGE_SOURCE_TERMINAL_NON_SUPPORT)
+            if p.closure_state in REJUDGE_CONSTRAINT_RESOLVING:
+                p.rejudgment_outcome = "constraint_resolving"
                 self.pending_read_targeted_rejudgment_closed_count += 1
-            elif p.closure_state == "requires_read_still_open":
+                self.rejudgment_constraint_resolved_count += 1
+            elif p.closure_state in REJUDGE_SOURCE_TERMINAL_NON_SUPPORT:
+                p.rejudgment_outcome = "source_terminal_non_support"
+                self.rejudgment_terminal_non_support_count += 1
+            else:
+                p.rejudgment_outcome = "still_requires_more_evidence"
                 self.pending_read_targeted_rejudgment_still_open_count += 1
+                self.rejudgment_requires_read_still_open_count += 1
             if was_reread:
                 if status in ("full_support", "contradiction"):
                     self.predicate_reread_resolved_pending_judgment_count += 1
@@ -2445,24 +2512,121 @@ class CandidateFrontier:
                            data={"pending_read_judgment_id": p.pending_read_judgment_id,
                                  "resolution": status})
             elif status == "partial_support":
+                # 5v-2: partial support is SOURCE-TERMINAL non-support for a blocking
+                # constraint — it never resolves the obligation as support and records an
+                # evidence gap for an alternate clean source.
                 if cand is not None and p.constraint_id not in cand.constraints_supported:
                     _union(cand.constraints_partial, p.constraint_id)
                 self.requires_read_resolved_by_read_count += 1
                 resolved += 1
+                self._record_evidence_gap(p, "partial_only")
                 self._emit("read_judgment_resolved", candidate_id=p.candidate_id,
                            slot_id=p.slot_id,
                            data={"pending_read_judgment_id": p.pending_read_judgment_id,
                                  "resolution": status})
-            else:
-                # irrelevant / requires_read again / still_unresolved: an explicit, recorded
-                # non-closure (a re-read that still cannot support is NOT silent progress).
-                p.resolution = ("irrelevant" if status == "irrelevant" else "still_unresolved")
+            elif status == "irrelevant":
+                # 5v-2: the source is TERMINAL for this body — the obligation is done for THIS
+                # source but no blocking constraint is satisfied; record an evidence gap.
+                p.resolution = "irrelevant"
                 self.requires_read_unresolved_after_read_count += 1
+                self._record_evidence_gap(p, "source_irrelevant")
+                self._emit("read_judgment_still_unresolved", candidate_id=p.candidate_id,
+                           slot_id=p.slot_id,
+                           data={"pending_read_judgment_id": p.pending_read_judgment_id,
+                                 "reason": status})
+            else:
+                # requires_read / still_unresolved: needs MORE evidence from the same/better
+                # source — the ONLY outcome that keeps the read obligation open.
+                p.resolution = "still_unresolved"
+                self.requires_read_unresolved_after_read_count += 1
+                self._record_evidence_gap(p, "requires_more_evidence")
                 self._emit("read_judgment_still_unresolved", candidate_id=p.candidate_id,
                            slot_id=p.slot_id,
                            data={"pending_read_judgment_id": p.pending_read_judgment_id,
                                  "reason": status})
         return resolved
+
+    def _register_read_body(self, *, source_url, read_text, pending_ids, read_meta=None):
+        """5v-1: register one read-class body's EXACT provenance and return its read_body_id.
+        Keyed by the stored-body hash + normalized url + provider, so the validator can verify
+        a recorded rejudgment by id + hash without any URL-matching heuristic. Idempotent: a
+        re-read at a higher cap yields a new id (different body bytes)."""
+        from regimes_probe.agent.read_judgment import (
+            body_hash, make_read_body_id, normalize_service_url)
+        rm = dict(read_meta or {})
+        provider = rm.get("body_provider") or rm.get("tool") or ""
+        norm = normalize_service_url(source_url)
+        bh = body_hash(read_text or "")
+        rbid = make_read_body_id(bh, norm, provider)
+        rec = self.read_bodies.get(rbid)
+        raw_text = rm.get("raw_text") or ""
+        if rec is None:
+            rec = {
+                "read_body_id": rbid,
+                "read_event_id": rm.get("read_event_id", ""),
+                "pending_read_judgment_ids": [],
+                "tool": rm.get("tool", ""), "body_provider": provider,
+                "requested_url": (rm.get("requested_url") or source_url or "")[:300],
+                "final_url": (rm.get("final_url") or "")[:300],
+                "normalized_url": norm[:300],
+                "body_source": rm.get("body_source", "live_run_read_body"),
+                "stored_body_chars": len(read_text or ""),
+                "cached_payload_chars": len(raw_text),
+                "body_hash": bh,
+                "raw_body_hash": (body_hash(raw_text) if raw_text else ""),
+                "max_chars": rm.get("max_chars"),
+                "body_truncated_for_storage": bool(rm.get("body_truncated_for_storage")),
+                "store_raw_was_enabled": rm.get("store_raw_was_enabled"),
+                "contaminated": bool(rm.get("contaminated")),
+                "noise_flag": bool(rm.get("noise_flag")),
+            }
+            self.read_bodies[rbid] = rec
+        for pid in pending_ids:
+            if pid not in rec["pending_read_judgment_ids"]:
+                rec["pending_read_judgment_ids"].append(pid)
+        self._emit("read_body_registered",
+                   data={"read_body_id": rbid, "body_hash": bh,
+                         "body_provider": provider, "url_host": _host(source_url),
+                         "stored_body_chars": rec["stored_body_chars"]})
+        return rbid
+
+    def _record_evidence_gap(self, p, gap_reason: str) -> None:
+        """5v-3: record a GENERIC, replayable evidence gap (no retrieval policy here). Marks
+        whether the candidate is still viable, whether the constraint still blocks, and
+        whether an alternate clean source should be searched later — for a future planner."""
+        from regimes_probe.agent.read_judgment import EVIDENCE_GAP_REASONS
+        if gap_reason not in EVIDENCE_GAP_REASONS:
+            gap_reason = "requires_more_evidence"
+        p.evidence_gap_reason = gap_reason
+        con = self._con(p.constraint_id)
+        cand = self.candidates_by_id.get(p.candidate_id)
+        blocking = bool(con is not None and (
+            getattr(con, "blocks_answer_if_unresolved", False)
+            or getattr(con, "required", False)
+            or getattr(con, "priority", "") == "high"))
+        # candidate stays viable unless contradicted on this constraint.
+        viable = bool(cand is not None
+                      and p.constraint_id not in getattr(cand, "constraints_contradicted", []))
+        # a clean alternate source is worth searching when the candidate is still viable and
+        # the constraint still blocks and the source did not contradict (generic policy hint).
+        search_alt = bool(viable and blocking and gap_reason in (
+            "source_irrelevant", "partial_only", "source_unreadable",
+            "social_media_blocked", "requires_more_evidence"))
+        self._eg += 1
+        gap = {
+            "evidence_gap_id": f"egap{self._eg}",
+            "pending_read_judgment_id": p.pending_read_judgment_id,
+            "candidate_id": p.candidate_id, "slot_id": p.slot_id,
+            "constraint_id": p.constraint_id,
+            "source_url": (p.source_url or "")[:300], "source_url_host": _host(p.source_url),
+            "gap_reason": gap_reason,
+            "candidate_remains_viable": viable,
+            "constraint_remains_blocking": blocking,
+            "search_alternate_clean_source": search_alt,
+        }
+        self.evidence_gaps.append(gap)
+        self._emit("evidence_gap_recorded",
+                   candidate_id=p.candidate_id, slot_id=p.slot_id, data=gap)
 
     @staticmethod
     def _live_passage_relevance(scan, p, cand) -> str:
@@ -2484,11 +2648,12 @@ class CandidateFrontier:
             return "predicate_relevant"
         return "subject_only" if scan.matched_anchors else "no_relevant_anchor"
 
-    def _persist_strict_rejudgment(self, p, verdict, body, passage, judge) -> bool:
-        """5t-4: persist a LIVE targeted rejudgment under the STRICT replay namespace, keyed
-        and hashed exactly as replay validation reads it (same body bytes required), so the
-        next default replay finds the verdict offline instead of
-        ``rejudgment_prompt_not_in_cache``. Never gold; the passage/body are run artifacts."""
+    def _persist_strict_rejudgment(self, p, verdict, body, passage, judge,
+                                   *, read_body_id: str = "") -> bool:
+        """5t-4/5v-1: persist a LIVE targeted rejudgment under the STRICT replay namespace.
+        The entry references the EXACT ``read_body_id`` + ``judged_body_hash`` of the body it
+        judged, so the validator verifies it by id+hash (not by re-locating + re-hashing a
+        body via URL heuristics). Never gold; the passage/body are run artifacts."""
         judge = judge or (getattr(self.interpreter, "judge", None) if self.interpreter else None)
         cache = getattr(judge, "cache", None)
         if cache is None:
@@ -2496,9 +2661,15 @@ class CandidateFrontier:
         from regimes_probe.agent.read_judgment import (
             LIVE_RUN_BODY_SOURCE, STRICT_REJUDGE_VERSION, body_hash, strict_rejudgment_key)
         cand = self.candidates_by_id.get(p.candidate_id)
+        bh = body_hash(body)
+        rbrec = self.read_bodies.get(read_body_id, {}) if read_body_id else {}
         rec = {"version": STRICT_REJUDGE_VERSION, "verdict": verdict,
-               "body_source": LIVE_RUN_BODY_SOURCE, "body_provider": p.read_tool or "",
-               "body_hash": body_hash(body), "passage_hash": body_hash(passage),
+               "body_source": LIVE_RUN_BODY_SOURCE,
+               "body_provider": rbrec.get("body_provider", "") or p.read_tool or "",
+               "body_hash": bh, "passage_hash": body_hash(passage),
+               # 5v-1: the exact body identity is the PRIMARY proof for offline verification.
+               "read_body_id": read_body_id, "judged_body_hash": bh,
+               "passage_window_hash": body_hash(passage),
                "source_url": (p.source_url or "")[:300], "candidate_id": p.candidate_id,
                "candidate_text": ((cand.candidate_text if cand else p.source_subject)
                                   or "")[:120],
@@ -2516,7 +2687,7 @@ class CandidateFrontier:
                    candidate_id=p.candidate_id, slot_id=p.slot_id,
                    data={"pending_read_judgment_id": p.pending_read_judgment_id,
                          "verdict": verdict, "body_hash": rec["body_hash"],
-                         "judge_mode": rec["judge_mode"]})
+                         "read_body_id": read_body_id, "judge_mode": rec["judge_mode"]})
         return True
 
     def _judge_passage(self, p, con, slot, cand, passage, judge, scan) -> str:
@@ -2727,6 +2898,10 @@ class CandidateFrontier:
             # 5t-1: URL-level pending-service registry (attempt/outcome/fallback per URL).
             "pending_service_urls": [dict(r) for r in
                                      self.pending_service_urls.values()][:40],
+            # 5v-1: exact read-body provenance manifest (primary rejudgment-verification key).
+            "read_bodies": [dict(r) for r in self.read_bodies.values()][:60],
+            # 5v-3: generic, replayable evidence gaps for the next alternate-source planner.
+            "evidence_gaps": list(self.evidence_gaps)[:60],
             "metrics": self.metrics(),
         }
 
@@ -2864,6 +3039,28 @@ class CandidateFrontier:
                 self.predicate_reread_resolved_pending_judgment_count,
             "predicate_reread_still_open_count": self.predicate_reread_still_open_count,
             "predicate_reread_blocked_count": self.predicate_reread_blocked_count,
+            # 5v-1 exact read-body provenance.
+            "read_body_count": len(self.read_bodies),
+            "read_body_with_raw_count": sum(
+                1 for r in self.read_bodies.values() if r.get("raw_body_hash")),
+            # 5v-2 split rejudgment-outcome counts (terminal non-support is NOT still-open).
+            "rejudgment_constraint_resolved_count": self.rejudgment_constraint_resolved_count,
+            "rejudgment_terminal_non_support_count":
+                self.rejudgment_terminal_non_support_count,
+            "rejudgment_requires_read_still_open_count":
+                self.rejudgment_requires_read_still_open_count,
+            "rejudgment_outcome_counts": dict(Counter(
+                p.rejudgment_outcome for p in self.pending_read_judgments.values()
+                if p.rejudgment_outcome)),
+            "pending_read_targeted_rejudgment_terminal_count": (
+                self.rejudgment_constraint_resolved_count
+                + self.rejudgment_terminal_non_support_count),
+            # 5v-3 evidence gaps (generic, replayable; no retrieval policy here).
+            "evidence_gap_count": len(self.evidence_gaps),
+            "evidence_gap_reason_counts": dict(Counter(
+                g["gap_reason"] for g in self.evidence_gaps)),
+            "evidence_gap_search_alternate_count": sum(
+                1 for g in self.evidence_gaps if g.get("search_alternate_clean_source")),
         }
 
     def _metrics_5h(self) -> dict[str, Any]:

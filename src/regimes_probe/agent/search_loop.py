@@ -936,6 +936,24 @@ class SearchLoop:
                     # DIRECTED ingest: when an LLM proposal drove this call, link the
                     # evidence to the proposal's SELECTED slot/constraints (req 3).
                     lf_pid = task_action_info.get("llm_frontier_proposal_id")
+                    # 5v-1: exact read-body provenance for offline rejudgment verification —
+                    # the fetch_meta (truncation/raw/cap) + tool/provider + redirect url.
+                    _rfm = response.fetch_meta or {}
+                    read_meta = ({
+                        "read_event_id": f"{attempt_id}:call{ci}",
+                        "tool": tool, "body_provider": tool,
+                        "requested_url": query,
+                        "final_url": _rfm.get("final_url", ""),
+                        "body_source": "live_run_read_body",
+                        "max_chars": _rfm.get("adapter_max_chars") or opts.get("max_chars"),
+                        "body_truncated_for_storage": bool(
+                            _rfm.get("body_truncated_for_storage")),
+                        "store_raw_was_enabled": bool(_rfm.get("raw_text")),
+                        "raw_text": _rfm.get("raw_text", ""),
+                        "cached_payload_chars": len(_rfm.get("raw_text", "") or ""),
+                        "contaminated": any(getattr(o, "benchmark_contaminated", False)
+                                            for o in obs),
+                    } if scrape_info else None)
                     fev = frontier.ingest_evidence(
                         obs, source_tool=tool, stage=ci + 1,
                         read_depth=(2 if scrape_info.get("is_scrape") else (1 if scrape_info else 0)),
@@ -945,7 +963,8 @@ class SearchLoop:
                                                  if lf_pid else None),
                         proposal_id=lf_pid,
                         read_candidate_id=(task_action_info.get("candidate_id")
-                                           if scrape_info else None))
+                                           if scrape_info else None),
+                        read_meta=read_meta)
                     if not progressed:
                         for s in frontier.slates:
                             frontier.note_no_progress_for_slate(s)

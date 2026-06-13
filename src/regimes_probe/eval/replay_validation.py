@@ -141,6 +141,18 @@ class ObligationOutcome:
     rejudgment_status: str = ""
     #: the strict verdict was verified against an independently located actual body.
     rejudgment_verified: bool = False
+    # Level 5v exact read-body provenance + split rejudgment-outcome semantics.
+    #: stable id of the read body the recorded rejudgment was run on (primary proof key).
+    read_body_id: str = ""
+    #: how the recorded rejudgment was verified: body_id | url_fallback | none.
+    rejudgment_verify_method: str = "none"
+    #: when unverifiable: body_hash_mismatch | body_not_found | judge_cache_missing | "".
+    rejudgment_unverifiable_reason: str = ""
+    #: split outcome category: constraint_resolving | source_terminal_non_support |
+    #: requires_read_still_open | unverifiable | "".
+    rejudgment_outcome: str = ""
+    #: a generic evidence gap was recorded for this obligation (terminal/unreadable source).
+    evidence_gap_reason: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {k: getattr(self, k) for k in (
@@ -164,7 +176,8 @@ class ObligationOutcome:
             "service_status", "live_rejudgment_attempted", "live_rejudgment_recorded",
             "live_closure_state", "live_passage_relevance", "body_available_recorded",
             "service_block_reason", "service_group_id", "rejudgment_status",
-            "rejudgment_verified")}
+            "rejudgment_verified", "read_body_id", "rejudgment_verify_method",
+            "rejudgment_unverifiable_reason", "rejudgment_outcome", "evidence_gap_reason")}
 
 
 @dataclass
@@ -439,7 +452,13 @@ STAGE_REASONS = (
     # as the invariant-violation name, pinned 0 in normal mechanics).
     "service_blocked_disallowed_tool", "service_blocked_source_not_readable",
     "service_blocked_contaminated_or_noise", "service_blocked_no_clean_url",
-    "service_already_satisfied_by_same_url_read", "other")
+    "service_already_satisfied_by_same_url_read",
+    # 5v-2: split rejudgment-outcome stage reasons (precise; terminal non-support is NOT
+    # still-open). 5v-1: unverifiable reasons are concrete, never silently missing.
+    "judged_resolved_full_support", "judged_resolved_contradiction",
+    "judged_source_irrelevant_terminal", "judged_partial_terminal_non_support",
+    "judged_requires_more_evidence", "judged_unverifiable_body_hash_mismatch",
+    "judged_unverifiable_body_missing", "judged_unverifiable_cache_missing", "other")
 
 
 #: 5u-2: canonicalize OLD 5t-era persisted service statuses into the 5u terminal vocabulary
@@ -1249,6 +1268,9 @@ def load_legacy_run(run_dir: str | Path, *, allow_live_judge: bool = False,
     # persisted by the run (replay only REPORTS them; it never fetches).
     service_urls_all: list[dict] = []
     run_event_counts: Counter = Counter()
+    # 5v-1: run-wide read-body provenance manifest; 5v-3: aggregated evidence gaps.
+    read_body_manifest: dict[str, dict] = {}
+    evidence_gaps_all: list[dict] = []
     # 5u-4: pinned safety metrics aggregated from per-record frontier metrics — emitted as
     # explicit integers (never None/absent).
     unrelated_read_executed_total = 0
@@ -1273,6 +1295,13 @@ def load_legacy_run(run_dir: str | Path, *, allow_live_judge: bool = False,
             not_targeted_events_total += 1
         _cf = record.get("candidate_frontier") or {}
         service_urls_all.extend(_cf.get("pending_service_urls") or [])
+        # 5v-1: the run's exact read-body manifest (read_body_id -> provenance) is the PRIMARY
+        # offline-verification key for recorded rejudgments. 5v-3: aggregate evidence gaps.
+        for rb in (_cf.get("read_bodies") or []):
+            rbid = rb.get("read_body_id") or ""
+            if rbid and rbid not in read_body_manifest:
+                read_body_manifest[rbid] = rb
+        evidence_gaps_all.extend(_cf.get("evidence_gaps") or [])
         _cfm = _cf.get("metrics") or {}
         if _cfm:
             frontier_metrics_seen = True
@@ -1314,7 +1343,9 @@ def load_legacy_run(run_dir: str | Path, *, allow_live_judge: bool = False,
                 body_available_recorded=bool(ob.get("body_available")),
                 service_block_reason=ob.get("service_block_reason", "") or "",
                 service_group_id=ob.get("service_group_id", "") or "",
-                rejudgment_status=_raw_rejudgment_status(ob))
+                rejudgment_status=_raw_rejudgment_status(ob),
+                read_body_id=ob.get("read_body_id", "") or "",
+                evidence_gap_reason=ob.get("evidence_gap_reason", "") or "")
             # never DROP an obligation for missing ids — keep it with a precise reason.
             if not o.constraint_id or (not o.candidate_id and not o.candidate_text):
                 o.stage_reason = "legacy_missing_candidate_slot_or_constraint"
@@ -1513,11 +1544,13 @@ def load_legacy_run(run_dir: str | Path, *, allow_live_judge: bool = False,
                 # entry (hash/triple) for lifecycle accounting — but never use its verdict
                 # for closure (subject-only passages are not judgeable; strict gate intact).
                 if o.rejudgment_status:
-                    _ver, _mm = _recorded_rejudgment(
+                    _ver, _method, _reason = _recorded_rejudgment(
                         judge_cache_path, o, body,
-                        stored_body=(body_rec.get("read_body", "") if body_rec else ""))
+                        stored_body=(body_rec.get("read_body", "") if body_rec else ""),
+                        read_body_manifest=read_body_manifest)
                     if _ver:
                         o.rejudgment_verified = True
+                        o.rejudgment_verify_method = _method
                 # 5n-4/5o-3: subject/title/weak hits alone are NOT judgeable passages. If the
                 # actual body is capped with no raw, the predicate may lie beyond the cap.
                 if o.raw_unavailable and near_cap:
@@ -1535,33 +1568,55 @@ def load_legacy_run(run_dir: str | Path, *, allow_live_judge: bool = False,
                 continue
             o.pipeline_status = "passages_scanned"
             # judged/closed: STRICT versioned rejudgment cache, else the live tier (opt-in).
-            recorded, mismatch = _recorded_rejudgment(
+            # 5v-1: verification is by read_body_id + body_hash (manifest), not URL re-hash.
+            recorded, verify_method, unverif_reason = _recorded_rejudgment(
                 judge_cache_path, o, body,
-                stored_body=(body_rec.get("read_body", "") if body_rec else ""))
-            if mismatch:
-                rejudge_version_mismatches += 1
-                res.replay_events.append({"event_type":
-                                          "recorded_rejudgment_cache_version_mismatch",
-                                          "item_id": item_id,
-                                          "pending_read_judgment_id": o.pending_read_judgment_id})
+                stored_body=(body_rec.get("read_body", "") if body_rec else ""),
+                read_body_manifest=read_body_manifest)
+            o.rejudgment_verify_method = verify_method
             if recorded:
                 closure = _RESOLUTION_TO_CLOSURE.get(recorded, "requires_read_still_open")
                 o.closure_code = closure
                 o.live_rejudgment_source = "recorded_rejudgment_cache"
                 o.rejudgment_verified = True
-                # 5o-1: "closed" only when the verdict RESOLVES support; a judged-but-open
-                # verdict never carries a closed_by_* stage reason. 5t-7: a run that recorded
-                # the pending-service event gets the service-aware status name.
-                if closure in _RESOLVING_CLOSURES:
+                # 5v-2: split closure semantics — constraint_resolving CLOSES; source-terminal
+                # non-support (irrelevant/partial) is DONE for this source but not still-open
+                # and not answer-supporting (records an evidence gap); requires_read_still_open
+                # is the ONLY "still open" outcome.
+                if closure in _REJUDGE_CONSTRAINT_RESOLVING:
                     o.pipeline_status = "closed"
-                    o.stage_reason = ("pending_service_body_acquired_rejudgment_closed"
-                                      if o.service_status
-                                      else "closed_by_recorded_strict_rejudgment")
+                    o.rejudgment_outcome = "constraint_resolving"
+                    o.stage_reason = ("judged_resolved_full_support"
+                                      if closure == "resolved_full_support"
+                                      else "judged_resolved_contradiction")
+                elif closure in _REJUDGE_SOURCE_TERMINAL_NON_SUPPORT:
+                    o.pipeline_status = "source_terminal"
+                    o.rejudgment_outcome = "source_terminal_non_support"
+                    o.stage_reason = ("judged_partial_terminal_non_support"
+                                      if closure == "resolved_partial_support"
+                                      else "judged_source_irrelevant_terminal")
+                    o.evidence_gap_reason = o.evidence_gap_reason or (
+                        "partial_only" if closure == "resolved_partial_support"
+                        else "source_irrelevant")
                 else:
                     o.pipeline_status = "judged_unclosed"
-                    o.stage_reason = ("pending_service_body_acquired_rejudgment_still_open"
-                                      if o.service_status
-                                      else "judged_by_recorded_strict_rejudgment_still_open")
+                    o.rejudgment_outcome = "requires_read_still_open"
+                    o.stage_reason = "judged_requires_more_evidence"
+                    o.evidence_gap_reason = o.evidence_gap_reason or "requires_more_evidence"
+            elif unverif_reason in ("body_hash_mismatch", "body_not_found") and (
+                    o.rejudgment_status or _strict_entry_present(o.pending_read_judgment_id)):
+                # 5v-1/2: a strict entry EXISTS but cannot be verified against the exact body
+                # (wrong hash / provenance / missing manifest body) — classify the
+                # UNVERIFIABLE reason precisely (never silently judged/closed/missing). The
+                # verdict is NOT used for closure, preserving the strict gate.
+                o.rejudgment_outcome = "unverifiable"
+                o.pipeline_status = "rejudgment_unverifiable"
+                o.stage_reason = {
+                    "body_hash_mismatch": "judged_unverifiable_body_hash_mismatch",
+                    "body_not_found": "judged_unverifiable_body_missing",
+                    "judge_cache_missing": "judged_unverifiable_cache_missing",
+                }.get(unverif_reason, "judged_unverifiable_body_hash_mismatch")
+                o.rejudgment_unverifiable_reason = unverif_reason
             elif allow_live_judge and scan.passages:
                 if live_calls >= max_judge_calls:          # hard cap, fail-closed (0 = none)
                     o.pipeline_status = "rejudgment_pending"
@@ -1576,11 +1631,23 @@ def load_legacy_run(run_dir: str | Path, *, allow_live_judge: bool = False,
                     closure = _RESOLUTION_TO_CLOSURE.get(verdict, "requires_read_still_open")
                     o.closure_code = closure
                     o.live_rejudgment_source = o.body_source
-                    if closure in _RESOLVING_CLOSURES:
+                    # 5v-2: split semantics for the opt-in live tier too.
+                    if closure in _REJUDGE_CONSTRAINT_RESOLVING:
                         o.pipeline_status = "closed"
+                        o.rejudgment_outcome = "constraint_resolving"
                         o.stage_reason = "closed_by_live_rejudgment"
+                    elif closure in _REJUDGE_SOURCE_TERMINAL_NON_SUPPORT:
+                        o.pipeline_status = "source_terminal"
+                        o.rejudgment_outcome = "source_terminal_non_support"
+                        o.stage_reason = ("judged_partial_terminal_non_support"
+                                          if closure == "resolved_partial_support"
+                                          else "judged_source_irrelevant_terminal")
+                        o.evidence_gap_reason = o.evidence_gap_reason or (
+                            "partial_only" if closure == "resolved_partial_support"
+                            else "source_irrelevant")
                     else:
                         o.pipeline_status = "judged_unclosed"
+                        o.rejudgment_outcome = "requires_read_still_open"
                         o.stage_reason = "judged_by_live_rejudgment_still_open"
                     res.replay_events.append({"event_type": "read_judged_after_read",
                                               "item_id": item_id, "verdict": verdict,
@@ -1614,10 +1681,20 @@ def load_legacy_run(run_dir: str | Path, *, allow_live_judge: bool = False,
             continue
         if raw in _terminal_raw:
             continue
-        o.rejudgment_status = (
-            "rejudgment_skipped_body_hash_mismatch"
-            if _strict_entry_present(o.pending_read_judgment_id)
-            else "rejudgment_missing_invariant_violation")
+        # 5v-1: map the validator's precise UNVERIFIABLE reason to its lifecycle bucket. A
+        # strict entry that is entirely ABSENT is the only invariant violation; an entry that
+        # exists but cannot be verified (hash mismatch / body provenance missing) is a
+        # concrete unverifiable bucket, never a silent "missing".
+        if o.rejudgment_unverifiable_reason == "body_hash_mismatch":
+            o.rejudgment_status = "rejudgment_skipped_body_hash_mismatch"
+        elif o.rejudgment_unverifiable_reason == "body_not_found":
+            o.rejudgment_status = "rejudgment_skipped_body_not_found"
+        elif not _strict_entry_present(o.pending_read_judgment_id):
+            o.rejudgment_status = "rejudgment_missing_invariant_violation"
+        elif o.rejudgment_unverifiable_reason == "judge_cache_missing":
+            o.rejudgment_status = "rejudgment_skipped_judge_cache_missing"
+        else:
+            o.rejudgment_status = "rejudgment_skipped_body_hash_mismatch"
 
     _summarize_legacy(res, n_items, live_calls, coverage_bounded=coverage_bounded,
                       allow_live_judge=allow_live_judge, cache_report=cache_report,
@@ -1625,7 +1702,9 @@ def load_legacy_run(run_dir: str | Path, *, allow_live_judge: bool = False,
                       bodies=bodies, recon_sources=recon_sources,
                       not_targeted_events_total=not_targeted_events_total,
                       service_urls=service_urls_all, run_event_counts=run_event_counts,
-                      unrelated_read_executed_total=unrelated_read_executed_total)
+                      unrelated_read_executed_total=unrelated_read_executed_total,
+                      read_body_manifest=read_body_manifest,
+                      evidence_gaps=evidence_gaps_all)
     return res
 
 
@@ -1636,52 +1715,79 @@ def load_legacy_run(run_dir: str | Path, *, allow_live_judge: bool = False,
 #: reported as version mismatches — they may have been judged on snippets.
 from regimes_probe.agent.read_judgment import (  # noqa: E402
     LIVE_RUN_BODY_SOURCE as _LIVE_BODY_SOURCE,
+    REJUDGE_CONSTRAINT_RESOLVING as _REJUDGE_CONSTRAINT_RESOLVING,
+    REJUDGE_SOURCE_TERMINAL_NON_SUPPORT as _REJUDGE_SOURCE_TERMINAL_NON_SUPPORT,
     STRICT_REJUDGE_VERSION,
     body_hash as _body_hash,
 )
 
 
-def _recorded_rejudgment(judge_cache_path: Path, o: "ObligationOutcome",
-                         body: str = "", stored_body: str = "") -> tuple[Optional[str], bool]:
-    """Per-obligation strict-cache lookup (5n-5). Returns ``(verdict, version_mismatch)``:
-    a verdict only when a STRICT entry exists with matching version + body provenance/hash;
-    ``version_mismatch=True`` when a legacy (pre-strict) or provenance-mismatched entry was
-    found and ignored.
+#: body sources accepted as ACTUAL read bodies for strict rejudgment verification (5v-1):
+#: the live-run manifest source + the validator's own located-body sources. A search
+#: snippet or debug snippet is never in this set, so the strict gate is preserved.
+_VERIFIABLE_BODY_SOURCES = frozenset({
+    _LIVE_BODY_SOURCE, "cache_read_body", "call_embedded_read_body", "replay_export_body"})
 
-    5t-4: an entry recorded BY THE LIVE RUN (``body_source == live_run_read_body``) is
-    accepted only when its body hash matches the actual read body the validator located
-    independently (the chosen body or its stored cap'd variant — the live run judges the
-    stored body; a raw payload is a superset of the same fetch). A hash over a search
-    snippet can never match an actual read body, so strictness is preserved."""
+
+def _recorded_rejudgment(judge_cache_path: Path, o: "ObligationOutcome",
+                         body: str = "", stored_body: str = "",
+                         read_body_manifest: Optional[dict] = None
+                         ) -> tuple[Optional[str], str, str]:
+    """Per-obligation strict-cache lookup. Returns ``(verdict, verify_method, reason)``.
+
+    5v-1: verification is PRIMARILY by ``read_body_id`` + ``judged_body_hash`` against the
+    run's persisted read-body manifest — NOT by re-locating + re-hashing a body via URL
+    heuristics. The chain is: strict entry (pending_read_judgment_id keyed) -> read_body_id ->
+    manifest provenance object whose ``body_hash`` must equal the entry's ``judged_body_hash``
+    and whose ``body_source`` must be a genuine read body (never a snippet) and not
+    contaminated. ``verify_method`` is ``body_id`` for that path. When the entry has no
+    read_body_id (legacy 5u/earlier), fall back to hashing against the located body
+    (``url_fallback``). On failure ``reason`` is one of body_hash_mismatch / body_not_found /
+    judge_cache_missing (a version/legacy mismatch is judge_cache_missing-class)."""
     if not judge_cache_path.exists():
-        return None, False
+        return None, "none", "judge_cache_missing"
     try:
         store = json.loads(judge_cache_path.read_text(encoding="utf-8"))
     except Exception:
-        return None, False
+        return None, "none", "judge_cache_missing"
     oid = o.pending_read_judgment_id
     strict = (store or {}).get(f"{STRICT_REJUDGE_VERSION}::{oid}")
-    if isinstance(strict, dict):
-        triple_ok = (strict.get("version") == STRICT_REJUDGE_VERSION
-                     and strict.get("constraint_id") == o.constraint_id
-                     and strict.get("slot_id") == o.slot_id)
-        if strict.get("body_source") == _LIVE_BODY_SOURCE:
-            hashes = {_body_hash(body)} | ({_body_hash(stored_body)} if stored_body else set())
-            prov_ok = (not strict.get("body_provider") or not o.body_provider
-                       or strict.get("body_provider") == o.body_provider)
-            if triple_ok and prov_ok and strict.get("body_hash") in hashes:
-                return str(strict.get("verdict") or "") or None, False
-            return None, True                        # live entry, wrong body/provenance
-        ok = (triple_ok
-              and strict.get("body_source") == o.body_source
-              and strict.get("body_provider") == o.body_provider
-              and strict.get("body_hash") == _body_hash(body))
-        if ok:
-            return str(strict.get("verdict") or "") or None, False
-        return None, True                            # strict entry, wrong provenance/hash
-    if (store or {}).get(f"rejudgment::{oid}"):
-        return None, True                            # legacy pre-strict entry: ignored
-    return None, False
+    if not isinstance(strict, dict):
+        if (store or {}).get(f"rejudgment::{oid}"):
+            return None, "none", "judge_cache_missing"   # legacy pre-strict entry: ignored
+        return None, "none", "judge_cache_missing"
+    triple_ok = (strict.get("version") == STRICT_REJUDGE_VERSION
+                 and strict.get("constraint_id") == o.constraint_id
+                 and strict.get("slot_id") == o.slot_id)
+    if not triple_ok:
+        return None, "none", "body_hash_mismatch"        # wrong triple/version
+    # PRIMARY: verify by read_body_id against the persisted manifest (no URL heuristic).
+    rbid = strict.get("read_body_id") or ""
+    if rbid:
+        mani = (read_body_manifest or {}).get(rbid)
+        if mani is None:
+            return None, "none", "body_not_found"
+        judged = strict.get("judged_body_hash") or strict.get("body_hash")
+        if judged and mani.get("body_hash") and judged != mani.get("body_hash"):
+            return None, "none", "body_hash_mismatch"    # genuine body replacement/corruption
+        # strict gate: the body must be a real read body and never contaminated.
+        if mani.get("contaminated") or mani.get("body_source") not in _VERIFIABLE_BODY_SOURCES:
+            return None, "none", "body_hash_mismatch"
+        return str(strict.get("verdict") or "") or None, "body_id", ""
+    # FALLBACK (legacy entries without a read_body_id): hash against the located body.
+    if strict.get("body_source") == _LIVE_BODY_SOURCE:
+        hashes = {_body_hash(body)} | ({_body_hash(stored_body)} if stored_body else set())
+        prov_ok = (not strict.get("body_provider") or not o.body_provider
+                   or strict.get("body_provider") == o.body_provider)
+        if prov_ok and strict.get("body_hash") in hashes:
+            return str(strict.get("verdict") or "") or None, "url_fallback", ""
+        return None, "none", "body_hash_mismatch"
+    ok = (strict.get("body_source") == o.body_source
+          and strict.get("body_provider") == o.body_provider
+          and strict.get("body_hash") == _body_hash(body))
+    if ok:
+        return str(strict.get("verdict") or "") or None, "url_fallback", ""
+    return None, "none", "body_hash_mismatch"
 
 
 def _candidate_text(record: dict, candidate_id: str, url: str) -> str:
@@ -1744,7 +1850,7 @@ def _live_rejudge(judge, o: ObligationOutcome, record: dict, candidate_text: str
 _REAL_BODY_SOURCES = ("cache_read_body", "call_embedded_read_body", "replay_export_body")
 #: per-obligation pipeline stages that imply an actual body was located.
 _BODY_STAGES = ("actual_body_located", "passages_scanned", "rejudgment_pending",
-                "judged_unclosed", "closed")
+                "rejudgment_unverifiable", "source_terminal", "judged_unclosed", "closed")
 
 
 def _url_category(rec: dict) -> str:
@@ -1771,6 +1877,7 @@ _REJUDGE_ATTEMPT_BUCKETS = (
     "rejudgment_attempted_cache_write_failed",
     "rejudgment_attempted_invalid_response_recorded_fail_closed",
     "rejudgment_skipped_budget_exhausted", "rejudgment_skipped_body_hash_mismatch",
+    "rejudgment_skipped_body_not_found", "rejudgment_skipped_judge_cache_missing",
     "rejudgment_skipped_contaminated_or_noise", "rejudgment_missing_invariant_violation")
 
 
@@ -1783,7 +1890,9 @@ def _summarize_legacy(res: ReplayValidationResult, n_items: int, live_calls: int
                       not_targeted_events_total: int = 0,
                       service_urls: Optional[list] = None,
                       run_event_counts: Optional[Counter] = None,
-                      unrelated_read_executed_total: int = 0) -> None:
+                      unrelated_read_executed_total: int = 0,
+                      read_body_manifest: Optional[dict] = None,
+                      evidence_gaps: Optional[list] = None) -> None:
     obs = res.obligations
     stage = Counter(o.pipeline_status for o in obs)
     reasons = Counter(o.stage_reason for o in obs if o.stage_reason)
@@ -1793,12 +1902,17 @@ def _summarize_legacy(res: ReplayValidationResult, n_items: int, live_calls: int
     real_body = [o for o in obs if o.body_is_actual_read_body]
     n_scanned = sum(1 for o in real_body
                     if o.pipeline_status in ("passages_scanned", "rejudgment_pending",
+                                             "rejudgment_unverifiable", "source_terminal",
                                              "judged_unclosed", "closed"))
-    judged = sum(1 for o in obs if o.pipeline_status in ("judged_unclosed", "closed"))
+    # 5v-2: a rejudgment was "judged" if it CLOSED, was SOURCE-TERMINAL, or stayed still-open.
+    judged = sum(1 for o in obs if o.pipeline_status in (
+        "judged_unclosed", "closed", "source_terminal"))
     # 5o-1: closed only counts genuinely RESOLVING closures on actual bodies.
     closed = sum(1 for o in obs if o.pipeline_status == "closed"
                  and o.closure_code in _RESOLVING_CLOSURES and o.body_is_actual_read_body)
+    # 5v-2: judged_unclosed is now ONLY requires_read_still_open (source-terminal split off).
     judged_unclosed = sum(1 for o in obs if o.pipeline_status == "judged_unclosed")
+    source_terminal = sum(1 for o in obs if o.pipeline_status == "source_terminal")
     res.metrics = {
         "n_items_inspected": n_items,
         "replay_pending_read_judgment_count": len(obs),
@@ -1817,6 +1931,19 @@ def _summarize_legacy(res: ReplayValidationResult, n_items: int, live_calls: int
         "judged_count": judged,
         "judged_unclosed_count": judged_unclosed,
         "closed_count": closed,
+        # 5v-2: explicit, non-overlapping rejudgment-outcome accounting. "closed" stays STRICT
+        # (constraint-resolving only). source-terminal non-support is its OWN bucket — not
+        # still-open, not answer-supporting. Renamed-for-clarity aliases are added too.
+        "constraint_resolving_count": closed,
+        "source_obligation_terminal_count": source_terminal,
+        "rejudgment_constraint_resolved_count": closed,
+        "rejudgment_terminal_non_support_count": source_terminal,
+        "rejudgment_requires_read_still_open_count": judged_unclosed,
+        "rejudgment_unverifiable_count": sum(
+            1 for o in obs if o.pipeline_status == "rejudgment_unverifiable"),
+        "rejudgment_outcome_counts": dict(Counter(
+            o.rejudgment_outcome for o in obs if o.rejudgment_outcome)),
+        "pending_read_targeted_rejudgment_terminal_count": closed + source_terminal,
         # 5o-1: closure breakdown derived from closure_code (not from stage reasons).
         "closure_counts": dict(Counter(o.closure_code for o in obs
                                        if o.closure_code != "unvalidated_cache_miss")),
@@ -1929,6 +2056,9 @@ def _summarize_legacy(res: ReplayValidationResult, n_items: int, live_calls: int
                     "subject_only_passage_no_predicate_anchor",
                     "judged_by_recorded_strict_rejudgment_still_open",
                     "judged_by_live_rejudgment_still_open",
+                    # 5v-2: the precise requires-more-evidence reason replaces the old
+                    # service-aware still-open name.
+                    "judged_requires_more_evidence",
                     "pending_service_body_acquired_rejudgment_still_open")
     diags = []
     for o in obs:
@@ -2065,6 +2195,7 @@ def _summarize_legacy(res: ReplayValidationResult, n_items: int, live_calls: int
         "pending_read_targeted_rejudgment_recorded_count": sum(
             1 for o in obs if o.live_rejudgment_source == "recorded_rejudgment_cache"),
         "pending_read_targeted_rejudgment_closed_count": closed,
+        # 5v-2: still-open is ONLY requires_read_still_open (source-terminal split out).
         "pending_read_targeted_rejudgment_still_open_count": judged_unclosed,
         # 5u-3: "missing" now means a TRUE invariant violation (a claimed-recorded verdict
         # whose strict entry is entirely absent) — never the ordinary lifecycle buckets.
@@ -2073,6 +2204,19 @@ def _summarize_legacy(res: ReplayValidationResult, n_items: int, live_calls: int
             if o.rejudgment_status == "rejudgment_missing_invariant_violation"),
         "pending_read_rejudgment_pending_count": sum(
             1 for o in real_body if o.pipeline_status == "rejudgment_pending"),
+        # 5v-1: recorded-rejudgment verification provenance (body_id-primary, url-fallback).
+        "recorded_rejudgment_verified_by_body_id_count": sum(
+            1 for o in obs if o.rejudgment_verify_method == "body_id"),
+        "recorded_rejudgment_verified_by_url_fallback_count": sum(
+            1 for o in obs if o.rejudgment_verify_method == "url_fallback"),
+        "recorded_rejudgment_body_hash_mismatch_count": sum(
+            1 for o in obs if o.rejudgment_unverifiable_reason == "body_hash_mismatch"),
+        "recorded_rejudgment_body_not_found_count": sum(
+            1 for o in obs if o.rejudgment_unverifiable_reason == "body_not_found"),
+        "recorded_rejudgment_unverifiable_count": sum(
+            1 for o in obs if o.rejudgment_unverifiable_reason),
+        # 5v-1: read-body manifest size (the offline-verification key set).
+        "read_body_manifest_count": len(read_body_manifest or {}),
         # 5t-5/6: fallback + bounded-reread outcomes, REPORTED from recorded events only
         # (replay never fetches; a reread is a live-run action).
         "pending_read_primary_failed_count": ev.get("pending_read_primary_failed", 0),
@@ -2108,6 +2252,36 @@ def _summarize_legacy(res: ReplayValidationResult, n_items: int, live_calls: int
     res.metrics["rejudgment_cache_write_failed_samples"] = [
         _rj_sample(o) for o in obs
         if o.rejudgment_status == "rejudgment_attempted_cache_write_failed"][:5]
+    # 5v-1: bounded body-verification mismatch samples (expected vs located hash + provenance).
+    def _bid_sample(o: "ObligationOutcome") -> dict:
+        mani = (read_body_manifest or {}).get(o.read_body_id, {})
+        return {"pending_read_judgment_id": o.pending_read_judgment_id, "item_id": o.item_id,
+                "read_body_id": o.read_body_id,
+                "expected_body_hash": mani.get("body_hash", ""),
+                "manifest_body_source": mani.get("body_source", ""),
+                "manifest_present": bool(mani),
+                "unverifiable_reason": o.rejudgment_unverifiable_reason,
+                "body_source": o.body_source, "body_provider": o.body_provider,
+                "source_url": (o.source_url or "")[:120]}
+
+    res.metrics["recorded_rejudgment_body_mismatch_samples"] = [
+        _bid_sample(o) for o in obs
+        if o.rejudgment_unverifiable_reason in ("body_hash_mismatch", "body_not_found")][:5]
+    # 5v-3: evidence-gap aggregation (generic, replayable; no retrieval policy implemented).
+    egaps = list(evidence_gaps or [])
+    res.metrics["evidence_gap_count"] = len(egaps)
+    res.metrics["evidence_gap_reason_counts"] = dict(Counter(
+        g.get("gap_reason", "") for g in egaps if g.get("gap_reason")))
+    res.metrics["evidence_gap_search_alternate_count"] = sum(
+        1 for g in egaps if g.get("search_alternate_clean_source"))
+    res.metrics["evidence_gap_candidate_viable_count"] = sum(
+        1 for g in egaps if g.get("candidate_remains_viable"))
+    res.metrics["evidence_gap_samples"] = [
+        {k: (str(g.get(k))[:120] if k in ("source_url",) else g.get(k))
+         for k in ("evidence_gap_id", "pending_read_judgment_id", "constraint_id",
+                   "source_url", "gap_reason", "candidate_remains_viable",
+                   "constraint_remains_blocking", "search_alternate_clean_source")}
+        for g in egaps][:8]
     # 5u-2/6: blocked-URL + service invariant-violation samples (bounded, sanitized).
     res.metrics["blocked_service_urls_sample"] = [
         {"url": (r.get("url") or "")[:120], "url_host": r.get("url_host", ""),
@@ -2130,6 +2304,13 @@ def _summarize_legacy(res: ReplayValidationResult, n_items: int, live_calls: int
         and o.pipeline_status in ("judged_unclosed", "closed"))
     res.metrics["requires_read_still_open_counted_closed_count"] = sum(
         1 for o in obs if o.closure_code == "requires_read_still_open"
+        and o.pipeline_status == "closed")
+    # 5v-2: source-terminal non-support must be its OWN bucket — never still-open, never closed.
+    res.metrics["source_terminal_counted_still_open_count"] = sum(
+        1 for o in obs if o.pipeline_status == "source_terminal"
+        and o.closure_code == "requires_read_still_open")
+    res.metrics["source_terminal_counted_closed_count"] = sum(
+        1 for o in obs if o.rejudgment_outcome == "source_terminal_non_support"
         and o.pipeline_status == "closed")
     # 5r-3: explain a body located WITHOUT a persisted read-event backlink (legacy runs).
     if res.metrics["body_located_count"] > 0 and res.metrics["matched_read_call_count"] == 0:
@@ -2179,6 +2360,12 @@ def _summarize_legacy(res: ReplayValidationResult, n_items: int, live_calls: int
                               else "unvalidated_cache_miss")
     elif closed > 0:
         res.overall_status = "validated_closed"
+    elif judged_unclosed > 0:
+        res.overall_status = "judged_unclosed"
+    elif source_terminal > 0:
+        # 5v-2: every rejudgment was SOURCE-TERMINAL non-support (done for this source/body,
+        # no blocking constraint satisfied) — distinct from "needs more of the same source".
+        res.overall_status = "source_terminal_non_support"
     elif judged > 0:
         res.overall_status = "judged_unclosed"
     elif n_scanned > 0 or any(o.pipeline_status == "actual_body_located" for o in obs):
@@ -2314,6 +2501,28 @@ def consistency_violations(metrics: dict) -> list[str]:
         v.append("debug snippet was judged")
     if metrics.get("requires_read_still_open_counted_closed_count", 0):
         v.append("requires_read_still_open counted as closed")
+    # 5v-2: source-terminal non-support must NOT be counted as still-open or as closed.
+    if metrics.get("source_terminal_counted_still_open_count", 0):
+        v.append("source-terminal non-support counted as still-open")
+    if metrics.get("source_terminal_counted_closed_count", 0):
+        v.append("source-terminal non-support counted as closed")
+    # 5v-2: verified recorded rejudgments PARTITION into resolving + terminal + still-open
+    # + unverifiable (no overlap, none dropped).
+    rj_verified = metrics.get("pending_read_targeted_rejudgment_recorded_count", 0)
+    rj_parts = (metrics.get("rejudgment_constraint_resolved_count", 0)
+                + metrics.get("rejudgment_terminal_non_support_count", 0)
+                + metrics.get("rejudgment_requires_read_still_open_count", 0))
+    if rj_verified and rj_verified != rj_parts:
+        v.append("verified rejudgment outcomes do not partition resolving/terminal/still-open")
+    # 5v-1: a body-id-verified rejudgment must never also be a hash mismatch.
+    if metrics.get("recorded_rejudgment_verified_by_body_id_count", 0) \
+            and metrics.get("recorded_rejudgment_body_hash_mismatch_count", 0) \
+            and metrics.get("recorded_rejudgment_unverifiable_count", 0) \
+            and (metrics.get("recorded_rejudgment_verified_by_body_id_count", 0)
+                 + metrics.get("recorded_rejudgment_verified_by_url_fallback_count", 0)
+                 + metrics.get("recorded_rejudgment_unverifiable_count", 0)) \
+            < metrics.get("pending_read_targeted_rejudgment_recorded_count", 0):
+        v.append("recorded rejudgment verification methods do not cover recorded count")
     return v
 
 
@@ -2352,5 +2561,18 @@ def _absent_or_unknown(p: Path, res: ReplayValidationResult) -> ReplayValidation
                    "service_invariant_violation_count": 0,
                    "rejudgment_status_counts": {},
                    "rejudgment_invariant_violation_count": 0,
+                   # 5v: pinned outcome/verification/gap metrics explicit even when absent.
+                   "source_terminal_counted_still_open_count": 0,
+                   "source_terminal_counted_closed_count": 0,
+                   "rejudgment_constraint_resolved_count": 0,
+                   "rejudgment_terminal_non_support_count": 0,
+                   "rejudgment_requires_read_still_open_count": 0,
+                   "rejudgment_unverifiable_count": 0, "rejudgment_outcome_counts": {},
+                   "recorded_rejudgment_verified_by_body_id_count": 0,
+                   "recorded_rejudgment_verified_by_url_fallback_count": 0,
+                   "recorded_rejudgment_body_hash_mismatch_count": 0,
+                   "recorded_rejudgment_body_not_found_count": 0,
+                   "recorded_rejudgment_unverifiable_count": 0,
+                   "evidence_gap_count": 0, "evidence_gap_reason_counts": {},
                    "consistency_violations": []}
     return res
